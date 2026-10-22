@@ -1,6 +1,6 @@
 // Triage: a cheap first pass. One private line plus a 0-10 interest per item, so only
 // items worth it get drafted. Reactions show on the Reads view and feed the taste log.
-import { loadBeat, loadPositions, loadAudience, topicsOf } from './config.js';
+import { loadBeat, loadPositions, loadAudience, topicsOf, topicWeight } from './config.js';
 import { createFencer, SETTINGS_NOTE } from './fence.js';
 import { clip, clamp } from './text.js';
 import { TRIAGE } from './prompts.js';
@@ -23,6 +23,12 @@ export function audienceBlock(store, fz) {
   return fz.block('Who the brand writes for, and its buttons', rows, 'Lean toward a button when the item touches one.');
 }
 
+// Her topic weights, said plainly. The slugs passed the config validator, so they are safe to list.
+function weightNote(beat) {
+  const more = beat.topics.filter((t) => topicWeight(beat, t) === 3), less = beat.topics.filter((t) => topicWeight(beat, t) === 1);
+  return [more.length ? `\nShe wants more about: ${more.join(', ')}.` : '', less.length ? `\nShe wants less about: ${less.join(', ')}.` : ''].join('');
+}
+
 export function triageQueue(ctx) {
   const settings = ctx.settings();
   const beat = loadBeat(ctx.store);
@@ -35,7 +41,7 @@ export function triageQueue(ctx) {
     const rows = items.map((i, n) => ({ item: n + 1, source: i.source_name, title: i.title, summary: clip(i.body, 400), also_covered_by: (i.also || []).length || undefined }));
     const text = [
       `# Triage (${items.length} items)`, TRIAGE({ offLimits: beat.off_limits, onBeat: beat.on_beat }), fz.guard,
-      `## Topics (use exactly one of these)\n${topicsOf(beat).join(', ')}`,
+      `## Topics (use exactly one of these)\n${topicsOf(beat).join(', ')}${weightNote(beat)}`,
       positionsBlock(ctx.store, fz), audienceBlock(ctx.store, fz),
       fz.block('Items', rows),
       `Reply with studio_record_triage({queue_id: ${q.id}, reactions: [{item, thought, interest, topic}, ...]}).`,

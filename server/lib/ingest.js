@@ -1,12 +1,13 @@
 // Reading: fetch every feed, dedupe by URL and by story, age out old items.
 // Wander: slow curiosity reading over her approved reading list; it never drafts.
-import { loadSources, loadBeat, loadPositions, topicsOf } from './config.js';
+import { loadSources, loadBeat, loadPositions, topicsOf, topicWeight } from './config.js';
 import { fetchText, parseFeed } from './feeds.js';
 import { mergeItems } from './dedupe.js';
 import { hostOf } from './urls.js';
 import { createFencer, INSTRUCTION_RE, ownWords, SETTINGS_NOTE } from './fence.js';
 import { clip, clamp, mean } from './text.js';
 import { WANDER } from './prompts.js';
+import { fetchDue } from './schedule.js';
 
 const H = 3600e3;
 
@@ -19,10 +20,15 @@ async function pool(tasks, n = 4) {
   return out;
 }
 
-export async function fetchAll(ctx) {
+export async function fetchAll(ctx, { force = false } = {}) {
   const sources = loadSources(ctx.store);
-  if (!sources.feeds.length) return { feeds: 0, added: 0, dupes: 0, clustered: 0, errors: [], note: 'No feeds yet. Run /studio:setup or /studio:add-source.' };
-  const results = await pool(sources.feeds.map((f) => async () => {
+  const feeds = sources.feeds.filter((f) => !f.paused);
+  if (!feeds.length) return { feeds: 0, added: 0, dupes: 0, clustered: 0, errors: [], note: sources.feeds.length ? 'Every feed is paused. Turn one back on under Sources.' : 'No feeds yet. Add one under Sources on the board, or run /studio:setup or /studio:add-source.' };
+  if (!force) {
+    const due = fetchDue(ctx.settings().fetch_every, ctx.tx((db) => db.runs.last_fetch), ctx.now());
+    if (!due.fetch) return { feeds: 0, added: 0, dupes: 0, clustered: 0, errors: [], skipped: true, note: `Didn't read the news this time: ${due.reason}. Carry on with the rest of the run.` };
+  }
+  const results = await pool(feeds.map((f) => async () => {
     try {
       const xml = await fetchText(f.url, { fetchImpl: ctx.fetchImpl });
       return { f, parsed: parseFeed(xml, { limit: f.limit, aggregatorHosts: sources.aggregator_hosts }) };
@@ -39,8 +45,9 @@ export async function fetchAll(ctx) {
     const pruned = prune(db, ctx.settings().item_keep_days, now);
     db.runs.last_fetch = new Date(now).toISOString();
     const errors = results.filter((r) => r.error).map((r) => ({ name: r.f.name, error: r.error }));
+    db.runs.feed_errors = errors;
     ctx.store.event('fetch', { ...res, pruned, errors: errors.length }, now);
-    return { feeds: sources.feeds.length, ...res, pruned, errors };
+    return { feeds: feeds.length, paused: sources.feeds.length - feeds.length, ...res, pruned, errors };
   });
 }
 
@@ -60,7 +67,7 @@ export function topicScores(attention, beat, recentText, now) {
     const xs = recent.filter((a) => a.topic === t && Number.isFinite(a.interest)).map((a) => a.interest);
     const kws = beat.curiosity?.[t] || [];
     const bonus = Math.min(3, kws.filter((k) => recentText.toLowerCase().includes(String(k).toLowerCase())).length);
-    scores[t] = (xs.length ? mean(xs) : 4) + bonus;
+    scores[t] = (xs.length ? mean(xs) : 4) + bonus + topicWeight(beat, t) - 2;
   }
   return scores;
 }

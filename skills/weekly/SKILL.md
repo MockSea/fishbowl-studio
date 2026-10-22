@@ -9,7 +9,9 @@ The server computes every number. You write the prose and propose changes. Nothi
 
 ## Step 1: check in
 
-Call `studio_status`. If setup isn't finished, stop and say so.
+If a scheduled task started this, call `studio_personas` `{action: "list"}` and write one report per persona that is set up, passing `persona: "<slug>"` on every studio call for it. If she asked in chat, do the active persona unless she named another.
+
+Call `studio_status`. If setup isn't finished, skip that persona and say so.
 
 ## Step 2: playbook, from the numbers only
 

@@ -8,6 +8,7 @@
   "posts_per_day": 2,
   "daily_cap": 10,
   "release_hours": [8, 12, 16, 20],
+  "fetch_every": "weekdays",
   "held_max_hours": 16,
   "takes_per_item": 3,
   "drafts_per_run": 12,

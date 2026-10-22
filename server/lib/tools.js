@@ -9,8 +9,9 @@ import { releaseTool, statusTool, runRelease } from './run.js';
 import { weeklyBrief, saveWeekly } from './weekly.js';
 import { proposalsTool, decideProposal } from './proposals.js';
 import { metricsTool } from './metrics.js';
-import { draftsView, readsView, playbookView, settingsView, header, draftsText } from './views.js';
+import { draftsView, readsView, playbookView, settingsView, sourcesView, topicsView, scheduleView, personasSummary, header, draftsText } from './views.js';
 import { configFiles, validateConfig, parseJson } from './config.js';
+import { addSource, editSource, editTopic, draftLink } from './sources.js';
 import { createFencer, SETTINGS_NOTE } from './fence.js';
 
 export const UI_URI = 'ui://studio/board';
@@ -29,11 +30,15 @@ const proposal = { type: 'object', properties: { op: str('add | remove | replace
 
 export const TOOLS = [
   { name: 'studio_status', title: 'Studio status', description: 'Where the studio stands: setup state, today\'s counter (released of cap, held, next batch, scrapped), drafts waiting, queued jobs, untriaged items, open proposals. Also releases any batch that is due. Call this first in any studio skill.', inputSchema: NONE },
-  { name: 'studio_board', title: 'Open the review board', description: 'Open the review board (waiting / passed / killed / scrapped drafts, Reads, Playbook, Settings). Use when she wants to review drafts or says "show me the board". Also returns a text list, for when the board can\'t render.', inputSchema: NONE, _meta: BOARD_META },
-  { name: 'studio_view', title: 'Board data', description: 'List drafts or other board views as text plus data. view: drafts | reads | playbook | settings. For drafts: tab waiting | passed | killed | scrapped, chip filter, platform. Used by the board and by the chat review.', inputSchema: obj({ view: str('drafts | reads | playbook | settings'), tab: str('waiting | passed | killed | scrapped'), chip: str('filter chip, default all'), platform: str('all | linkedin | x'), offset: int('paging offset') }), _meta: BOTH },
+  { name: 'studio_board', title: 'Open the review board', description: 'Open the review board (drafts, sources, topics, schedule, settings, reads, playbook; persona switcher). Use when she wants to review drafts or says "show me the board". Also returns a text list, for when the board can\'t render.', inputSchema: NONE, _meta: BOARD_META },
+  { name: 'studio_view', title: 'Board data', description: 'List drafts or other board views as text plus data. view: drafts | reads | playbook | settings | sources | topics | schedule. For drafts: tab waiting | passed | killed | scrapped, chip filter, platform. Used by the board and by the chat review.', inputSchema: obj({ view: str('drafts | reads | playbook | settings | sources | topics | schedule'), tab: str('waiting | passed | killed | scrapped'), chip: str('filter chip, default all'), platform: str('all | linkedin | x'), offset: int('paging offset') }), _meta: BOTH },
   { name: 'studio_act', title: 'Act on a draft', description: `Her verdicts and actions. action: ${ACTION_NAMES.join(' | ')}. pass and edit need the draft's hash (from the list) so a stale view can't overwrite a rewrite. pick = choose a take from a set; none = none of these (set_id, optional note); redo = new takes for a set (set_id, note); restore needs reason; heart target draft | thinking | read; note queues a rewrite; draft_this takes id (a draft's thinking) or item_id (a read); mark_posted takes optional url.`, inputSchema: obj({ action: str('the action'), id: int('draft id (or item id for heart target read)'), set_id: int('set id'), item_id: int('item id for draft_this on a read'), hash: str('fingerprint of the text she saw'), text: str('edited text, or the note'), and_pass: { type: 'boolean' }, note: str('note on a set, or a heart note'), reason: str('restore reason'), url: str('link to the live post'), target: str('heart target: draft | thinking | read') }, ['action']), _meta: BOTH },
   { name: 'studio_config', title: 'Studio settings files', description: `Read or write the studio's files in the data folder: ${configFiles().join(', ')}. action get (no file = all), set (replace a file; JSON files take an object, .md files take text) or patch (settings.json only: merge keys).`, inputSchema: obj({ action: str('get | set | patch'), file: str('file name'), content: { description: 'object for .json, string for .md' }, patch: { type: 'object', description: 'settings keys to change' } }, ['action']), _meta: BOTH },
-  { name: 'studio_fetch', title: 'Fetch the news', description: 'Fetch every feed in sources.json, dedupe by URL and by story, and store new items. Returns counts and any dead feeds.', inputSchema: NONE },
+  { name: 'studio_fetch', title: 'Fetch the news', description: 'Fetch every feed in sources.json that isn\'t paused, dedupe by URL and by story, and store new items. Returns counts and any dead feeds. Skips the fetch (and says so) when the last one was sooner than her news setting allows, or on a weekend with "weekdays"; pass force:true only when she asks for fresh news right now.', inputSchema: obj({ force: { type: 'boolean', description: 'fetch even if her news setting says not yet' } }) },
+  { name: 'studio_personas', title: 'Personas', description: 'The brands she writes for, each with its own drafts, sources and settings. action list | create (name) | switch (slug) | rename (slug, name). Every other studio tool acts on the active persona unless given persona.', inputSchema: obj({ action: str('list | create | switch | rename'), slug: str('persona slug'), name: str('display name, e.g. the brand') }, ['action']), _meta: BOTH },
+  { name: 'studio_sources', title: 'Edit news sources', description: 'Add a news source from a pasted address (a feed, or a web page that links to its feed; it is test-fetched first), or pause, resume, remove or re-file one. list feeds (daily news, default) | reading (slow curiosity reading).', inputSchema: obj({ action: str('add | pause | resume | remove | topic'), url: str('https:// address'), list: str('feeds | reading'), name: str('optional display name'), topic: str('topic slug') }, ['action', 'url']), _meta: BOTH },
+  { name: 'studio_topics', title: 'Edit topics', description: 'Add or remove a topic on her beat, or set how much she wants of it: weight 1 less, 2 normal, 3 more (shifts the interest a story needs by one point).', inputSchema: obj({ action: str('add | remove | weight'), topic: str('topic name or slug'), weight: int('1 | 2 | 3') }, ['action', 'topic']), _meta: BOTH },
+  { name: 'studio_draft_link', title: 'Draft from a link', description: 'She pasted one article address: fetch it through the safe fetch path, store it as a story (untrusted, fenced like feed items) and queue it to be drafted. Then call studio_drafting_brief to draft it now, or it is drafted on the next run.', inputSchema: obj({ url: str('https:// article address') }, ['url']), _meta: BOTH },
   { name: 'studio_wander', title: 'Wander', description: 'One curiosity visit to a source on her reading list (chosen by interest, neglect and caps). Returns fenced material; reply with studio_record_wander. Says done when caps are reached.', inputSchema: NONE },
   { name: 'studio_record_wander', title: 'Record wander findings', description: 'Save up to two findings from a wander visit.', inputSchema: obj({ visit_id: int('from studio_wander'), findings: { type: 'array', items: obj({ item: int('item number'), finding: str('your reaction, under 240 chars'), question: str('open question, under 160 chars'), interest: int('0-10') }, ['item', 'finding']) } }, ['visit_id']) },
   { name: 'studio_triage_queue', title: 'Triage queue', description: 'The newest untriaged stories (up to 40), fenced, with instructions. Reply with studio_record_triage.', inputSchema: NONE },
@@ -47,6 +52,10 @@ export const TOOLS = [
   { name: 'studio_proposal_decide', title: 'Accept or reject a proposal', description: 'The board\'s Accept and Reject buttons on the Playbook view.', inputSchema: obj({ id: int('proposal id'), decision: str('accept | reject') }, ['id', 'decision']), _meta: APP_ONLY },
   { name: 'studio_metrics', title: 'Post numbers', description: 'Enter numbers for a post she published (action add: draft_id, views, likes, replies, reposts, quotes) or import a CSV export of platform analytics (action import_csv: csv text, optional platform). Rows match posts by link or text.', inputSchema: obj({ action: str('add | import_csv'), draft_id: int('draft id'), views: int(''), likes: int(''), replies: int(''), reposts: int(''), quotes: int(''), csv: str('CSV text'), platform: str('linkedin | x') }, ['action']), _meta: BOTH },
 ];
+
+// Any tool can act on a persona other than the active one (the daily run goes through each).
+const PERSONA_ARG = { persona: str('persona slug; default the active persona') };
+for (const t of TOOLS) if (t.name !== 'studio_personas') t.inputSchema = { ...t.inputSchema, properties: { ...(t.inputSchema.properties || {}), ...PERSONA_ARG } };
 
 let seq = 0;
 const text = (t) => ({ content: [{ type: 'text', text: t }] });
@@ -66,6 +75,9 @@ function view(ctx, args = {}) {
         data.proposals.length ? fz.block('Open proposals (she accepts or rejects them on the board)', data.proposals.map((p) => ({ id: p.id, kind: p.kind, op: p.op, text: p.text || p.old }))) : 'Open proposals: none'].join('\n\n');
     }
     else if (v === 'settings') { data = settingsView(ctx); summary = `Data folder: ${data.home}\nDaily cap ${data.settings.daily_cap}, release hours ${data.settings.release_hours.join(', ')}, platforms ${data.platforms.filter((p) => p.enabled).map((p) => p.name).join(', ')}; ${data.feeds.length} feeds.`; }
+    else if (v === 'sources') { data = sourcesView(ctx, db); summary = [fz.guard, fz.block(`Sources (${data.feeds.length} feeds, ${data.reading.length} reading list)`, [...data.feeds, ...data.reading].map((f) => ({ name: f.name, list: f.list, url: f.url, topic: f.topic, status: f.status })))].join('\n\n'); }
+    else if (v === 'topics') { data = topicsView(ctx, db); summary = `Topics: ${data.topics.map((t) => `${t.slug}${t.weight !== 2 ? ` (${t.weight === 3 ? 'more' : 'less'})` : ''}`).join(', ') || 'none'}.\nLearned from ${data.verdicts} verdicts: ${data.learned.map((l) => `${l.direction === 'up' ? '+' : '-'} ${l.label}`).join('; ') || 'not enough yet'}.`; }
+    else if (v === 'schedule') { data = scheduleView(ctx, db); summary = `News: ${data.fetch_every}. Batches at ${data.release_hours.join(', ')}. Set in Cowork: ${data.tasks.map((t) => t.text).join(' | ')}`; }
     else { data = draftsView(ctx, db, args); summary = draftsText(data, head, fz); }
     return { ...data, header: head, stamp: { createdAt: ctx.now(), seq: ++seq }, summary };
   });
@@ -83,6 +95,7 @@ function configTool(ctx, { action, file, content, patch }) {
     const cur = parseJson(s.readFile('settings.json'), {});
     const next = validateConfig('settings.json', { ...cur, ...(patch || content || {}) });
     s.writeFile('settings.json', JSON.stringify(next, null, 2) + '\n');
+    if ('brand' in (patch || content || {}) && next.brand) { try { ctx.personas.rename(ctx.slug, next.brand); } catch {} }
     return text(`Updated settings: ${Object.keys(patch || content || {}).join(', ')}.`);
   }
   if (action === 'set') {
@@ -102,7 +115,7 @@ export const HANDLERS = {
   studio_view: (ctx, a) => { const v = view(ctx, a); return withData(v.summary, v); },
   studio_act: (ctx, a) => { const r = act(ctx, a); return { content: [{ type: 'text', text: r.message }], structuredContent: r, ...(r.ok ? {} : { isError: true }) }; },
   studio_config: (ctx, a) => configTool(ctx, a),
-  studio_fetch: async (ctx) => { const r = await fetchAll(ctx); return text(r.note || `Fetched ${r.feeds} feed(s): ${r.added} new item(s), ${r.dupes} already seen, ${r.clustered} grouped with a story from another outlet, ${r.pruned} old item(s) pruned.${r.errors.length ? `\nDead or failing feeds: ${r.errors.map((e) => `${e.name} (${e.error})`).join('; ')}` : ''}`); },
+  studio_fetch: async (ctx, a) => { const r = await fetchAll(ctx, { force: !!a.force }); return text(r.note || `Fetched ${r.feeds} feed(s): ${r.added} new item(s), ${r.dupes} already seen, ${r.clustered} grouped with a story from another outlet, ${r.pruned} old item(s) pruned.${r.errors.length ? `\nDead or failing feeds: ${r.errors.map((e) => `${e.name} (${e.error})`).join('; ')}` : ''}`); },
   studio_wander: async (ctx) => json(await wander(ctx)),
   studio_record_wander: (ctx, a) => json({ ...recordWander(ctx, a), text: undefined }),
   studio_triage_queue: (ctx) => json(triageQueue(ctx)),
@@ -115,11 +128,44 @@ export const HANDLERS = {
   studio_proposals: (ctx, a) => { const r = proposalsTool(ctx, a); return withData(r.text || r.message, r); },
   studio_proposal_decide: (ctx, a) => { const r = decideProposal(ctx, a); return withData(r.message, r); },
   studio_metrics: (ctx, a) => json(metricsTool(ctx, a)),
+  studio_personas: (ctx, a) => personasTool(ctx, a),
+  studio_sources: async (ctx, a) => { const r = a.action === 'add' ? await addSource(ctx, a) : editSource(ctx, a); return withData(r.message, r); },
+  studio_topics: (ctx, a) => { const r = editTopic(ctx, a); return withData(r.message, r); },
+  studio_draft_link: async (ctx, a) => { const r = await draftLink(ctx, a); return { content: [{ type: 'text', text: r.message }], structuredContent: r, ...(r.ok ? {} : { isError: true }) }; },
 };
+
+function personasTool(ctx, { action, slug, name }) {
+  const P = ctx.personas;
+  if (action === 'list') {
+    const list = personasSummary(ctx);
+    return withData(list.map((p) => `${p.active ? '* ' : '  '}${p.slug} · ${p.name}${p.setup_complete ? '' : ' (not set up)'} · ${p.waiting} waiting`).join('\n'), { ok: true, personas: list });
+  }
+  if (action === 'create') {
+    const p = P.create(name);
+    ctx.persona(p.slug).store.writeFile('settings.json', JSON.stringify(validateConfig('settings.json', { brand: p.name }), null, 2) + '\n');
+    P.switch(p.slug);
+    return withData(`Created ${p.name} (${p.slug}) and switched to it. Run /studio:setup to set up its voice and sources.`, { ok: true, persona: p });
+  }
+  if (action === 'switch') { const p = P.switch(slug); return withData(`Now working on ${p.name}.`, { ok: true, persona: p }); }
+  if (action === 'rename') {
+    const target = slug || P.active();
+    const p = P.rename(target, name);
+    const store = ctx.persona(target).store;
+    const cur = parseJson(store.readFile('settings.json'), {});
+    store.writeFile('settings.json', JSON.stringify(validateConfig('settings.json', { ...cur, brand: p.name }), null, 2) + '\n');
+    return withData(`Renamed to ${p.name}.`, { ok: true, persona: p });
+  }
+  throw new Error('action must be list, create, switch or rename');
+}
 
 export async function callTool(ctx, name, args = {}) {
   const h = HANDLERS[name];
   if (!h) { const e = new Error(`Unknown tool: ${name}`); e.code = -32602; throw e; }
-  try { return await h(ctx, args || {}); }
+  try {
+    const { persona, ...rest } = args || {};
+    // Pin the call to one persona for its whole run, so a switch elsewhere can't split it.
+    const c = name === 'studio_personas' ? ctx : ctx.persona(persona ? ctx.personas.get(persona).slug : ctx.personas.active());
+    return await h(c, rest);
+  }
   catch (e) { return { content: [{ type: 'text', text: String(e.message || e) }], isError: true }; }
 }

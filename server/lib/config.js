@@ -5,6 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeHttpsUrl } from './urls.js';
 import { instructionPhrase } from './fence.js';
+import { oneLine } from './text.js';
+import { FETCH_KEYS } from './schedule.js';
 
 export const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -44,10 +46,12 @@ export function loadShapes(store) {
 
 export function loadBeat(store) {
   const b = parseJson(store.readFile('beat.json'), {});
-  return { topics: [], on_beat: [], off_limits: [], curiosity: {}, allow_names: [], ...b };
+  return { topics: [], weights: {}, on_beat: [], off_limits: [], curiosity: {}, allow_names: [], ...b };
 }
 
 export const topicsOf = (beat) => [...new Set([...(beat.topics || []), 'other'])];
+// 1 less, 2 normal, 3 more.
+export const topicWeight = (beat, topic) => beat.weights?.[topic] ?? 2;
 
 export function loadSources(store) {
   const s = parseJson(store.readFile('sources.json'), {});
@@ -130,10 +134,14 @@ const validators = {
     if ('daily_cap' in out && !(Number.isInteger(out.daily_cap) && out.daily_cap >= 1 && out.daily_cap <= 50)) throw new Error('daily_cap must be 1-50');
     if ('held_max_hours' in out && !(out.held_max_hours >= 1 && out.held_max_hours <= 48)) throw new Error('held_max_hours must be 1-48');
     if ('takes_per_item' in out && ![1, 2, 3].includes(out.takes_per_item)) throw new Error('takes_per_item must be 1, 2 or 3');
+    if ('evergreen_per_day' in out && !(Number.isInteger(out.evergreen_per_day) && out.evergreen_per_day >= 0 && out.evergreen_per_day <= 6)) throw new Error('evergreen_per_day must be 0-6');
+    if ('fetch_every' in out && !FETCH_KEYS.includes(out.fetch_every)) throw new Error(`fetch_every must be one of: ${FETCH_KEYS.join(', ')}`);
+    if ('brand' in out) out.brand = oneLine(out.brand).slice(0, 60);
     if (out.platforms) {
       for (const id of Object.keys(out.platforms)) if (!allPlatforms()[id]) throw new Error(`Unknown platform ${id}. Known: ${Object.keys(allPlatforms()).join(', ')}`);
     }
     if (out.overused_phrases && (!Array.isArray(out.overused_phrases) || out.overused_phrases.length > 60)) throw new Error('overused_phrases must be a list of up to 60 phrases');
+    if (out.overused_phrases) out.overused_phrases = out.overused_phrases.map((x) => oneLine(x).slice(0, 80)).filter(Boolean);
     return out;
   },
   'beat.json': (o) => {
@@ -142,9 +150,16 @@ const validators = {
     if (topics.length > 30) throw new Error('At most 30 topics');
     const curiosity = {};
     for (const [t, kws] of Object.entries(o.curiosity || {})) curiosity[t] = (kws || []).map(String).slice(0, 20);
+    // Topic weight: 1 less, 2 normal (not stored), 3 more. Only for topics on the list.
+    const weights = {};
+    for (const [t, w] of Object.entries(o.weights || {})) {
+      if (!topics.includes(t)) continue;
+      if (![1, 2, 3].includes(w)) throw new Error(`Topic "${t}": weight must be 1 (less), 2 (normal) or 3 (more)`);
+      if (w !== 2) weights[t] = w;
+    }
     return {
       about: typeof o.about === 'string' ? o.about.slice(0, 2000) : '',
-      topics,
+      topics, weights,
       on_beat: (o.on_beat || []).map(String).slice(0, 40),
       off_limits: (o.off_limits || []).map(String).slice(0, 40),
       curiosity,
@@ -157,7 +172,7 @@ const validators = {
       const u = safeHttpsUrl(f.url);
       if (!u.ok) throw new Error(`Source "${f.name}": ${u.reason}`);
       if (f.topic && !SLUG_RE.test(f.topic)) throw new Error(`Source "${f.name}": topic must be a slug`);
-      return { name: f.name.trim(), url: u.url, topic: f.topic || 'other', limit: clampInt(f.limit, 1, 40, 12) };
+      return { name: oneLine(f.name), url: u.url, topic: f.topic || 'other', limit: clampInt(f.limit, 1, 40, 12), ...(f.paused === true ? { paused: true } : {}) };
     };
     const feeds = (o.feeds || []).map(feed);
     const reading = (o.reading || []).map(feed);

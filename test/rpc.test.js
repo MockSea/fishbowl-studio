@@ -93,9 +93,9 @@ test('the server exits when stdin closes', async () => {
 test('the board resource is one self-contained HTML document', async () => {
   const { boardHtml } = await import('../server/lib/rpc.js');
   const html = boardHtml();
-  assert.doesNotMatch(html, /__CSS__|__BRIDGE__|__VIEWS__/);
+  assert.doesNotMatch(html, /__CSS__|__SKINS__|__BRIDGE__|__VIEWS__/);
   assert.doesNotMatch(html, /<script[^>]+src=|<link[^>]+stylesheet/i, 'no external scripts or styles');
-  assert.match(html, /name="color-scheme" content="light dark"/);
+  assert.match(html, /name="color-scheme" content="light"/, 'the board has its own light skin (server/ui/skins/light.css)');
   assert.match(html, /ui\/initialize/);
   assert.ok(html.length < 150000);
 });
