@@ -11,7 +11,7 @@
   const NOTE_CHIPS = ['Too long', 'Too salesy', 'Not like us', 'Make it punchier', 'Too formal'];
   const SET_REASONS = ['Too generic', 'Wrong tone', 'Misses the point', 'Too long', 'Not our story'];
   const RESTORE_CHIPS = ['It grew on me', 'Right after all', 'Wrong button'];
-  // Why she skipped: one optional tap. Same keys as the server's KILL_REASONS.
+  // Why they skipped: one optional tap. Same keys as the server's KILL_REASONS.
   const WHY = [['off_brand', 'Off-brand'], ['wrong_topic', 'Wrong topic'], ['too_salesy', 'Too salesy'], ['boring', 'Boring'], ['factually_off', 'Factually off'], ['other', 'Other']];
 
   // After a skip: ask why, once, without getting in the way. Ignoring it is fine.
@@ -35,7 +35,7 @@
     return h('div', { class: 'panel' }, h('div', { class: 'chips' }, WHY.map(([k, l]) => h('button', { class: 'chip', onclick: () => act({ action: 'kill_reason', id: c.id, reason: k }) }, l))));
   }
 
-  // Lint flags in her words.
+  // Lint flags in their words.
   function friendly(f) {
     const inParens = (f.label.match(/\(([^)]*)\)/) || [])[1];
     switch (f.code) {
@@ -69,7 +69,7 @@
   }
 
   const me = () => (state.head && state.head.persona) || { slug: 'studio', name: 'Fishbowl Studio' };
-  // "Post for me" is on for this draft's account: her Approve here is her OK to post it.
+  // "Post for me" is on for this draft's account: their Approve here is their OK to post it.
   const posts = (c) => ((state.head && state.head.posting && state.head.posting.on) || []).includes(c.platform);
   const approve = (c, text) => (posts(c)
     ? B.call('studio_post_schedule', { id: c.id, hash: c.hash, ...(text != null ? { text } : {}) })
@@ -186,7 +186,7 @@
   }
 
   // Where an approved post stands when Claude posts it: scheduled, posted, or why it didn't go
-  // out. A missed or failed post stays here until she picks what to do; nothing retries by itself.
+  // out. A missed or failed post stays here until they pick what to do; nothing retries by itself.
   function postLine(c) {
     const p = c.post;
     if (!p || (p.seen && !['scheduled', 'posting', 'posted'].includes(p.status))) return c.posted_by === 'claude' ? h('div', { class: 'post-ctx' }, icon('check'), 'Posted by Claude') : null;

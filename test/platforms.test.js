@@ -24,13 +24,13 @@ test('Threads and Bluesky are one file each, with the same fields as the others'
     assert.ok(all[id].target_chars[1] < all[id].max_chars && all[id].long_over <= all[id].max_chars);
     assert.equal(all[id].hashtags_max, 0);
     assert.ok(eligible(seedShapes(), id).length >= 10, `${id} has shapes to draft with`);
-    // An account type to match, which can post once she turns it on.
+    // An account type to match, which can post once they turn it on.
     const t = accountTypes()[id];
     assert.equal(t.label, want.name);
     assert.equal(t.capabilities.post, true);
     assert.match(t.compose, /^https:\/\//);
     assert.match(t.post_warning, /restrict|take down/);
-    // Off for an existing studio until she switches it on; switching it on is a valid setting.
+    // Off for an existing studio until they switch it on; switching it on is a valid setting.
     assert.equal(defaults('settings').platforms[id].enabled, false);
     assert.equal(validateConfig('settings.json', { platforms: { [id]: { enabled: true, share: 0.5 } } }).platforms[id].enabled, true);
   }

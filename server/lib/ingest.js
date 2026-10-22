@@ -1,5 +1,5 @@
 // Reading: fetch every feed, dedupe by URL and by story, age out old items.
-// Wander: slow curiosity reading over her approved reading list; it never drafts.
+// Wander: slow curiosity reading over their approved reading list; it never drafts.
 import { loadSources, loadBeat, loadPositions, topicsOf, topicWeight } from './config.js';
 import { fetchText, parseFeed } from './feeds.js';
 import { mergeItems } from './dedupe.js';

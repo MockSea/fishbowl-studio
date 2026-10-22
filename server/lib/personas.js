@@ -1,4 +1,4 @@
-// Personas: one studio per brand she writes for. Each persona is its own folder under
+// Personas: one studio per brand they write for. Each persona is its own folder under
 // STUDIO_HOME/personas/<slug>/ holding exactly what a single-brand studio held before
 // (settings, voice, sources, state/...). personas.json at the root names them and points at
 // the active one. A folder from before personas is moved into personas/<slug>/ on first start.

@@ -13,7 +13,7 @@ test('proposals are validated: own words, no instructions, known kinds', () => {
   assert.equal(validateProposal({ kind: 'playbook', op: 'add', text: 'Lead with the concrete detail' }).op, 'add');
 });
 
-test('nothing changes until she accepts', () => {
+test('nothing changes until they accept', () => {
   const { ctx } = testContext();
   writePlaybook(ctx.store, ['Short beats clever']);
   ctx.store.writeFile('positions.json', JSON.stringify({ positions: [{ text: 'Repair before replace', strength: 3 }] }));

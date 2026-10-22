@@ -1,7 +1,7 @@
 // Weekly coach. The server computes every number; Claude writes the prose and proposals.
-// Part "numbers" comes first and is all the playbook proposal may lean on; her notes, taste and
+// Part "numbers" comes first and is all the playbook proposal may lean on; their notes, taste and
 // restores only arrive in part "full", after the playbook proposal is saved. Part "numbers" is
-// also the periodic pass over her edits: patterns become proposals (never direct writes).
+// also the periodic pass over their edits: patterns become proposals (never direct writes).
 // The report (what's working, what isn't, what to try) is stored for the board's Coach page.
 import { loadPlaybook, loadAudience, loadPositions, loadSources } from './config.js';
 import { createFencer, SETTINGS_NOTE, instructionPhrase } from './fence.js';
@@ -68,16 +68,16 @@ export function numbers(db, now) {
   ].join('\n');
 }
 
-// Her edits, skip reasons and how each source does. Source names come from feeds, so they are
+// Their edits, skip reasons and how each source does. Source names come from feeds, so they are
 // fenced by the caller (sourceRows); everything here is counts, reason keys and topic slugs.
 function flywheel(db, now) {
   const items = byId(db.items);
   const reasons = tallyReasons(killReasons(db.drafts, items, now, 7));
   const ed = editPatterns(db.edits, now);
   return [
-    `## Why she skipped (this week)`,
+    `## Why they skipped (this week)`,
     KILL_REASON_KEYS.filter((k) => reasons[k]).map((k) => `- ${KILL_REASONS[k]}: ${reasons[k].n} (${Object.entries(reasons[k].topics).map(([t, n]) => `${t} ${n}`).join(', ')})`).join('\n') || '- (no reasons given)',
-    `## Her edits (last 60 days: ${ed.n})`,
+    `## Their edits (last 60 days: ${ed.n})`,
     [...ed.patterns.map((p) => `- ${p.why}`), ...ed.phrases.map((p) => `- ${p.why}`)].join('\n') || '- (no pattern yet)',
   ].join('\n');
 }
@@ -88,8 +88,8 @@ export function sourceRows(db, src, now) {
   return Object.entries(rec).sort((a, b) => b[1].decided - a[1].decided).map(([k, r]) => ({ source: names[k] || sourceLabel(k), approved: `${r.approved} of ${r.decided}`, suggestion: r.suggest_pause ? 'keeps losing: suggest pausing it' : undefined }));
 }
 
-// The periodic pass over her edits: each pattern she shows becomes one proposal, once. A pattern
-// she has decided on in the last 60 days, or a line already in the playbook, is not proposed again.
+// The periodic pass over their edits: each pattern they show becomes one proposal, once. A pattern
+// they have decided on in the last 60 days, or a line already in the playbook, is not proposed again.
 export function editProposals(ctx, db, now = ctx.now()) {
   const { patterns, phrases } = editPatterns(db.edits, now);
   const recent = (key) => db.proposals.some((p) => p.key === key && (p.status === 'open' || now - Date.parse(p.decided_at || p.created_at) < 60 * DAY));
@@ -124,19 +124,19 @@ export function weeklyBrief(ctx, { part = 'numbers' } = {}) {
       const ep = editProposals(ctx, db, now);
       const fromEdits = db.proposals.filter((p) => p.status === 'open' && p.source === 'edits');
       return { part, edit_proposals: ep.added.length, text: [`# Weekly report, part 1: numbers`, PLAYBOOK, fz.guard, pb, nums, sources,
-        fromEdits.length ? fz.block('Already proposed from her edits (don\'t repeat these)', fromEdits.map((p) => ({ kind: p.kind, op: p.op, text: p.text }))) : '',
+        fromEdits.length ? fz.block('Already proposed from their edits (don\'t repeat these)', fromEdits.map((p) => ({ kind: p.kind, op: p.op, text: p.text }))) : '',
         'Save playbook proposals with studio_save_weekly({playbook: [{op, text, old, reason}]}), then call studio_weekly_brief({part: "full"}).'].filter(Boolean).join('\n\n') };
     }
     const a = loadAudience(ctx.store);
     const ps = loadPositions(ctx.store);
-    const notes = db.feedback.filter((f) => now - Date.parse(f.at) < 7 * DAY).map((f) => ({ post: f.prior_text, her_note: f.text }));
+    const notes = db.feedback.filter((f) => now - Date.parse(f.at) < 7 * DAY).map((f) => ({ post: f.prior_text, user_note: f.text }));
     const restores = db.reversals.filter((r) => now - Date.parse(r.at) < 7 * DAY).map((r) => ({ post: r.line, reason: r.reason }));
     const topicCounts = {};
     for (const d of db.drafts.filter((x) => now - Date.parse(x.created_at) < 7 * DAY)) topicCounts[d.tags?.topic || 'other'] = (topicCounts[d.tags?.topic || 'other'] || 0) + 1;
     const open = db.proposals.filter((p) => p.status === 'open');
     return { part, text: [`# Weekly report, part 2: the rest`, fz.guard, nums, sources, taste(db, now),
-      fz.block('Proposals waiting for her', open.map((p) => ({ kind: p.kind, change: `${p.op}: ${p.text || p.old}`, why: p.reason || undefined }))),
-      fz.block('Her notes this week', notes), fz.block('Kills she undid, with her reasons', restores),
+      fz.block('Proposals waiting for them', open.map((p) => ({ kind: p.kind, change: `${p.op}: ${p.text || p.old}`, why: p.reason || undefined }))),
+      fz.block('Their notes this week', notes), fz.block('Kills they undid, with their reasons', restores),
       fz.block('Audience profile', [...a.who.map((w) => ({ who: w.text, confidence: `${w.confidence}/5` })), ...a.buttons.map((b) => ({ button: b.text, confidence: `${b.confidence}/5` }))], SETTINGS_NOTE) || '## Audience profile\n(empty)',
       `Evidence refs: ${Object.entries(topicCounts).map(([k, v]) => `topic:${k}=${v}`).join(', ') || 'none'}`, AUDIENCE(2),
       fz.block('Positions', ps.map((p) => ({ position: p.text, strength: `${p.strength}/5` })), SETTINGS_NOTE) || '## Positions\n(none)', POSITIONS,
@@ -145,7 +145,7 @@ export function weeklyBrief(ctx, { part = 'numbers' } = {}) {
   });
 }
 
-// Coach lines are her report, shown on the board: one line each, no links or handles, nothing
+// Coach lines are their report, shown on the board: one line each, no links or handles, nothing
 // instruction-shaped. They are never fed back into a brief.
 function coachLines(list, max = 4) {
   const kept = [], dropped = [];

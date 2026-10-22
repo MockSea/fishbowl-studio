@@ -3,7 +3,7 @@
 // every state, and "Fernhollow Bakery", a smaller second studio. Sources, topics, verdict history
 // and learned interests are filled in so every board section has something to show. Northwind
 // finished the setup wizard and has "Post for me" on for X (posts scheduled, posted, missed and
-// failed); Fernhollow is partway through re-running setup, with Claude's drafts waiting for her.
+// failed); Fernhollow is partway through re-running setup, with Claude's drafts waiting for them.
 // Usage: node dev/seed.mjs [folder]   (default dev/.demo-home; wipes it first)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -46,7 +46,7 @@ function history(d, iso, rows, items = [], firstItem = 100) {
   });
 }
 
-// Her edits, as the board stores them: the draft, her version, and what changed.
+// Their edits, as the board stores them: the draft, their version, and what changed.
 const editRows = (iso, rows) => rows.map(([before, after, daysAgo, topic], i) => ({ id: i + 1, draft_id: null, before, after, platform: 'x', topic, shape_ids: [], at: iso(daysAgo * 24), diff: editDiff(before, after) }));
 
 function seedNorthwind(ctx, now) {
@@ -193,7 +193,7 @@ function seedNorthwind(ctx, now) {
     db.weights = { current: { hot: 0.23, trending: 0.2, interest: 0.31, entertaining: 0.26 }, tuned_at: iso(2), history: [{ at: iso(8 * 24), weights: { hot: 0.25, trending: 0.2, interest: 0.3, entertaining: 0.25 } }, { at: iso(2), weights: { hot: 0.23, trending: 0.2, interest: 0.31, entertaining: 0.26 } }] };
     db.runs.last_fetch = iso(1);
     db.items.push(...oldItems);
-    // What Claude read on the X and LinkedIn pages and in her saved searches, triaged like news.
+    // What Claude read on the X and LinkedIn pages and in their saved searches, triaged like news.
     const web = [
       ['watch:x:@example_lanes', 'Example Lanes Collective', 'Ride count on the bridge road this morning: 412 bikes before 9. Last spring it was 140.', 'https://x.com/example_lanes/status/1', 'infrastructure', 8, 'a number worth repeating', 'watch'],
       ['watch:x:@example_lanes', 'Example Lanes Collective', 'Reminder that a painted line is not a lane. Kerbs or it did not happen.', 'https://x.com/example_lanes/status/2', 'infrastructure', 6, 'same fight as ours', 'watch'],
@@ -213,7 +213,7 @@ function seedNorthwind(ctx, now) {
     db.runs.last_web_read = iso(2);
     db.runs.browser = { ok: true, at: iso(2) };
     db.runs.web_status = { 'watch:linkedin:company/example-urban-freight-co': { status: 'login_wall', via: 'browser', posts: 1, at: iso(2) }, 'watch:x:@example_lanes': { status: 'read', via: 'browser', posts: 2, at: iso(2) } };
-    // Her edits: she keeps cutting the opening question and the summing-up last line.
+    // Their edits: they keep cutting the opening question and the summing-up last line.
     db.edits = editRows(iso, [
       ['Ever wondered why the bridge feels safer? Four kilometres of kerb. That is why.', 'Four kilometres of kerb. That is why the bridge feels safer.', 2, 'infrastructure'],
       ['Who fixes a courier fleet? Shops like ours, at dawn. Game-changer for the high street.', 'Shops like ours fix the courier fleets, at dawn.', 4, 'cargo'],
@@ -236,7 +236,7 @@ function seedNorthwind(ctx, now) {
         not_working: ['Policy stories: 3 skipped as wrong topic or too salesy.', 'Posts that open with a question: you rewrote the opening in 5 of 7 edits.'],
         try: ['Open on the concrete detail and let the question go.', 'Try one post from the Example Lanes Collective ride counts.', 'Pause Example Transport Policy Notes for two weeks and see if you miss it.'] },
     ];
-    // X posts for her; Threads was on for a week and she turned it off again.
+    // X posts for them; Threads was on for a week and they turned it off again.
     db.accounts = [
       { type: 'x', status: 'connected_by_prompt', at: iso(48), posting: { on: true, history: [{ on: true, at: iso(46) }] } },
       { type: 'threads', status: 'connected_by_prompt', at: iso(24 * 9), posting: { on: false, history: [{ on: true, at: iso(24 * 8) }, { on: false, at: iso(24 * 2) }] } },
@@ -250,7 +250,7 @@ function seedNorthwind(ctx, now) {
       post(3, missed, { slot: slotAt(1, 16), status: 'missed', done_at: slotAt(1, 18), reason: 'Nothing ran between 16:00 and 17:00: your computer was asleep or Claude was closed. It wasn\'t posted.' }),
       post(4, failed, { slot: slotAt(2, 12), status: 'failed', code: 'not_signed_in', claimed_at: slotAt(2, 12), done_at: slotAt(2, 12), reason: 'You weren\'t signed in, so Claude couldn\'t post it. (x.com showed the sign-in page)' }),
     ];
-    // She finished the setup wizard when she started; everything Claude drafted is long since decided.
+    // They finished the setup wizard when they started; everything Claude drafted is long since decided.
     db.wizard = { step: 'done', brand: 'Northwind Bicycles', link: 'https://northwind-bicycles.example.com/', answers: { audience: 'Commuters and parents in town thinking about a cargo bike', tone: 'Warm, practical, a little dry. Never salesy.', topics: 'repair, cargo bikes, safer streets', off_limits: 'Racing gossip, naming customers' }, site: { url: 'https://northwind-bicycles.example.com/', title: 'Northwind Bicycles: repairs and cargo bikes', at: iso(24 * 40) }, brief_id: null, fixed: false, requested_at: iso(24 * 40), drafted_at: iso(24 * 40), proposal_ids: [8, 9, 10], source_ids: [11], started_at: iso(24 * 40), updated_at: iso(24 * 40), finished_at: iso(24 * 40) };
     db.proposals.push(
       { id: 8, kind: 'voice', op: 'set', text: 'A neighbourhood bike shop and repair workshop. Warm, practical, a little dry.', reason: 'Drafted from your setup answers', refs: [], status: 'accepted', edited: true, source: 'wizard', created_at: iso(24 * 40), decided_at: iso(24 * 40) },
@@ -338,10 +338,10 @@ function seedFernhollow(ctx, now) {
       { id: 1, kind: 'playbook', op: 'add', text: 'No exclamation marks', reason: 'You took out the exclamation marks in 4 of your last 4 edits.', refs: ['edits:4/4'], key: 'edits:cut_exclamation', status: 'open', source: 'edits', created_at: iso(10) },
       { id: 2, kind: 'source', op: 'add', text: 'Daily news: smallfood.example.net', target: { kind: 'site', url: 'https://smallfood.example.net/', list: 'feeds' }, key: 'site:smallfood.example.net', reason: '3 good results from your search in the last month, over 3 days.', refs: [], status: 'open', source: 'discovery', created_at: iso(6) },
     ];
-    // LinkedIn connected, "Post for me" left off: she copies posts out by hand.
+    // LinkedIn connected, "Post for me" left off: they copy posts out by hand.
     db.accounts = [{ type: 'linkedin', status: 'connected_by_prompt', at: iso(24 * 6) }];
     db.posts = [];
-    // She re-ran setup after a month (Settings › Run setup again): Claude's new drafts are waiting.
+    // They re-ran setup after a month (Settings › Run setup again): Claude's new drafts are waiting.
     const wiz = (pid, kind, op, text, extra = {}) => ({ id: pid, kind, op, text, old: null, reason: 'Drafted from your setup answers', refs: [], section: null, name: null, platforms: null, strength: null, key: null, status: 'open', source: 'wizard', created_at: iso(0.4), ...extra });
     db.proposals.push(
       wiz(3, 'voice', 'set', '## Who we are\nA small neighbourhood bakery on Mill Lane: sourdough, seasonal pastries and a wholesale round to four cafes.\n\n## Voice\nCalm, warm and specific. Flour-on-the-apron detail. Proud of the craft, never precious about it.\n\n## Never\nNo "artisanal", no exclamation marks, no diet talk.'),

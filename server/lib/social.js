@@ -1,10 +1,10 @@
-// Reading where her audience is: watched X and LinkedIn accounts, X trending topics, and saved
+// Reading where their audience is: watched X and LinkedIn accounts, X trending topics, and saved
 // searches. The server can't read these (no open feeds, and it never logs in), so Claude does:
-// studio_read_queue lists the targets she approved, with addresses the server built from validated
+// studio_read_queue lists the targets they approved, with addresses the server built from validated
 // handles; Claude reads each public page with its browser tool (or web search when the browser
 // isn't available) and hands the posts back through studio_record_reads. They are stored as items
 // and reach Claude fenced exactly like feed items. Nothing in them is ever fetched by the server,
-// and no address in them becomes a source except through a proposal she accepts (discovery).
+// and no address in them becomes a source except through a proposal they accept (discovery).
 import { loadSources } from './config.js';
 import { fetchDue } from './schedule.js';
 import { mergeItems } from './dedupe.js';
@@ -28,7 +28,7 @@ export function targetName(t) {
   return `Search: ${t.q}`;
 }
 
-// What Claude should read this run, or {done}. Respects her news frequency like studio_fetch.
+// What Claude should read this run, or {done}. Respects their news frequency like studio_fetch.
 export function readQueue(ctx, { force = false } = {}) {
   const now = ctx.now();
   const settings = ctx.settings();
@@ -47,7 +47,7 @@ export function readQueue(ctx, { force = false } = {}) {
     }
     const r = { id: ctx.id('web_read'), at: new Date(now).toISOString(), targets, recorded: [] };
     db.web_reads = [...db.web_reads.filter((x) => now - Date.parse(x.at) < 2 * DAY).slice(-10), r];
-    // Handles, addresses and searches were validated when she added them (handles.js), so they
+    // Handles, addresses and searches were validated when they added them (handles.js), so they
     // are safe to list as they are.
     const line = (t) => t.kind === 'watch' ? `${t.n}. ${t.platform === 'x' ? 'X account' : 'LinkedIn page'} ${t.handle}: open ${t.url} (logged out), up to ${READ_LIMITS.watch} recent posts`
       : t.kind === 'trends' ? `${t.n}. X trending topics: open ${t.url} (logged out), up to ${READ_LIMITS.trends} topics`
@@ -67,7 +67,7 @@ function postItem(t, p, via, now) {
   const safe = p?.url ? safeHttpsUrl(p.url) : { ok: false };
   let url = safe.ok ? safe.url : null;
   // A post's link must be on its own platform; a search result's can be anywhere public. Links
-  // are stored for her to open, never fetched by the studio.
+  // are stored for them to open, never fetched by the studio.
   if (t.kind === 'watch' && url && !onHost(url, PLATFORM_HOSTS[t.platform])) url = null;
   if (t.kind === 'trends' && url && !onHost(url, PLATFORM_HOSTS.x)) url = null;
   if (t.kind === 'search' && !url) return null;
@@ -132,7 +132,7 @@ export function discoveryCandidates(items, src, now, { minGood = 3, minSpread = 
       why: `${g.ids.length} good results from ${g.queries.size > 1 ? `${g.queries.size} of your searches` : 'your search'} in the last month${g.days.size > 1 ? `, over ${g.days.size} days` : ''}.` }));
 }
 
-// Turn candidates into source proposals. A site she has already accepted or rejected is never
+// Turn candidates into source proposals. A site they have already accepted or rejected is never
 // proposed again. Returns the new proposal ids.
 export function discover(ctx, db, now = ctx.now()) {
   const src = loadSources(ctx.store);

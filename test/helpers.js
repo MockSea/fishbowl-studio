@@ -28,8 +28,8 @@ export function rss(items, title = 'Example Feed') {
     `<item><title>${i.title}</title><link>${i.link}</link><description>${i.desc || ''}</description>${i.date ? `<pubDate>${i.date}</pubDate>` : ''}</item>`).join('')}</channel></rss>`;
 }
 
-// Fixture sources, written as her own file (validated). Claude can't add sources through
-// studio_config; she adds them on the board.
+// Fixture sources, written as their own file (validated). Claude can't add sources through
+// studio_config; they add them on the board.
 export function setSources(ctx, content) {
   ctx.store.writeFile('sources.json', JSON.stringify(validateConfig('sources.json', content), null, 2) + '\n');
 }

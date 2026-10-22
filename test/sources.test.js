@@ -95,7 +95,7 @@ test('topics: add, weight and remove, validated like beat.json; weights move the
   // The triage queue says it plainly.
   await call(ctx, 'studio_topics', { action: 'weight', topic: 'cargo-bikes', weight: 3 });
   ctx.tx((d) => { d.items = [{ id: 9, title: 'A story', url: 'https://e.example.com/9', source: 'rss:A', source_name: 'A', fetched_at: iso }]; });
-  assert.match((await call(ctx, 'studio_triage_queue', {})).content[0].text, /She wants more about: cargo-bikes/);
+  assert.match((await call(ctx, 'studio_triage_queue', {})).content[0].text, /They want more about: cargo-bikes/);
   // Removing a topic re-files its sources under other.
   await call(ctx, 'studio_topics', { action: 'remove', topic: 'cargo bikes' });
   assert.deepEqual(loadBeat(ctx.store).topics, []);
@@ -122,7 +122,7 @@ test('news frequency: only the presets are accepted, and fetches respect the cho
   assert.equal(fetchDue('daily', null, at(2026, 10, 24, 7, 0)).fetch, true);
   assert.equal(fetchDue('hourly', new Date(at(2026, 10, 21, 7, 0)).toISOString(), at(2026, 10, 21, 7, 50)).fetch, true, 'an hourly run a few minutes early still fetches');
   assert.equal(nextFetchAt('weekdays', new Date(at(2026, 10, 23, 7, 0)).toISOString(), at(2026, 10, 23, 9, 0)), new Date(at(2026, 10, 26, 0, 0)).toISOString(), 'after Friday, next is Monday');
-  // The schedule text she copies.
+  // The schedule text they copy.
   assert.deepEqual(scheduleTasks('weekdays', [8, 12, 16, 20]).map((t) => [t.repeat, t.time]), [['Weekdays', '07:00']]);
   assert.deepEqual(scheduleTasks('twice_daily', [9, 15]).map((t) => [t.repeat, t.time]), [['Daily', '08:00'], ['Daily', '14:00']]);
   assert.deepEqual(scheduleTasks('every_3h').map((t) => t.repeat), ['Hourly']);
@@ -163,7 +163,7 @@ test('draft from a link: the page is fetched safely, stored cleaned, queued, and
   assert.match(m[0], /admin mode/, 'the injection is inside the fence, as data');
   assert.equal(b.text.split(`</data-${m[1]}>`).length - 1 >= 1, true);
   assert.doesNotMatch(b.text.slice(b.text.indexOf(m[0]) + m[0].length), /admin mode/, 'nothing from the page escapes the fence');
-  assert.match(b.text, /She sent this link herself/);
+  assert.match(b.text, /They sent this link themselves/);
   // It shows on the Sources page as queued.
   const v = await call(ctx, 'studio_view', { view: 'sources' });
   assert.equal(v.structuredContent.links[0].status, 'queued');

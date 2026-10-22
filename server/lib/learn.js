@@ -1,5 +1,5 @@
-// The flywheel: what her edits, skip reasons, hearts and verdicts say, as small pure functions.
-// Nothing here writes her voice or playbook. Edit patterns become proposals she accepts on the
+// The flywheel: what their edits, skip reasons, hearts and verdicts say, as small pure functions.
+// Nothing here writes their voice or playbook. Edit patterns become proposals they accept on the
 // board; source records and learned interests only nudge which stories are drafted first, and
 // every nudge carries the sentence that explains it.
 import { words, contentWords, clamp, oneLine } from './text.js';
@@ -50,7 +50,7 @@ export function reasonsLine(rows) {
     const tops = Object.entries(t[k].topics).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([s, n]) => `${s} ${n}`).join(', ');
     return `${KILL_REASONS[k].toLowerCase()} ${t[k].n} (${tops})`;
   });
-  return parts.length ? `Why she skipped posts lately (last 30 days): ${parts.join('; ')}.` : '';
+  return parts.length ? `Why they skipped posts lately (last 30 days): ${parts.join('; ')}.` : '';
 }
 
 // ---- edits ----
@@ -60,8 +60,8 @@ const norm = (s) => words(s).join(' ');
 const EMOJI = /\p{Extended_Pictographic}/u;
 const FIRST = /\b(we|our|us)\b/i;
 
-// What changed between the draft and her version. `keys` are the patterns the weekly pass counts;
-// `removed` are short phrases she took out (candidates for "phrases we overuse").
+// What changed between the draft and their version. `keys` are the patterns the weekly pass counts;
+// `removed` are short phrases they took out (candidates for "phrases we overuse").
 export function editDiff(before, after) {
   const b = String(before || ''), a = String(after || '');
   const bs = sentences(b), as = sentences(a);
@@ -95,7 +95,7 @@ export function removedPhrases(before, after, max = 40) {
   return [...grams(before)].filter((g) => !kept.has(g) && (g.includes(' ') ? contentWords(g).length >= 1 : g.length >= 5 && contentWords(g).length === 1)).slice(0, max);
 }
 
-// Each pattern: what she did (why) and the playbook line it would become (a description of the
+// Each pattern: what they did (why) and the playbook line it would become (a description of the
 // brand, never an order, so it passes the same check every playbook line does).
 export const EDIT_PATTERNS = {
   cut_opening_question: { did: 'cut the opening question', line: 'Open with a plain statement, not a question' },
@@ -111,7 +111,7 @@ export const EDIT_PATTERNS = {
   added_number: { did: 'added a number', line: 'One concrete number when the story has one' },
 };
 
-// Patterns across her recent edits: a pattern counts when it shows up in at least 3 edits and at
+// Patterns across their recent edits: a pattern counts when it shows up in at least 3 edits and at
 // least half of them (and there are 4 or more edits to go on).
 export function editPatterns(edits, now, { days = 60, minEdits = 4, minHits = 3, share = 0.5 } = {}) {
   const recent = edits.filter((e) => now - Date.parse(e.at) < days * DAY);
@@ -122,7 +122,7 @@ export function editPatterns(edits, now, { days = 60, minEdits = 4, minHits = 3,
   const patterns = Object.entries(count).filter(([k, c]) => EDIT_PATTERNS[k] && c >= minHits && c / n >= share)
     .sort((a, b) => b[1] - a[1])
     .map(([key, k]) => ({ key, k, n, line: EDIT_PATTERNS[key].line, why: `You ${EDIT_PATTERNS[key].did} in ${k} of your last ${n} edits.` }));
-  // A phrase counts when she cut it at least 3 times and in at least 3 of every 4 drafts that had it.
+  // A phrase counts when they cut it at least 3 times and in at least 3 of every 4 drafts that had it.
   const ph = {};
   for (const e of recent) for (const p of new Set(e.diff?.removed || [])) ph[p] = (ph[p] || 0) + 1;
   const cands = Object.entries(ph).filter(([p, c]) => c >= minHits && !/\d/.test(p)).map(([phrase, k]) => {
@@ -197,7 +197,7 @@ const MAX_TOPIC = 0.75, MAX_SOURCE = 0.75, MAX_TOTAL = 1.5;
 const label = (s) => String(s || 'other').replace(/-/g, ' ');
 
 // Adjustments, in interest points, for each topic and source, each with the sentences that
-// explain it. A story's boost is its topic's plus its source's, capped at +-1.5 (her own topic
+// explain it. A story's boost is its topic's plus its source's, capped at +-1.5 (their own topic
 // weights move a story by one point, for scale).
 export function interestBoosts({ drafts = [], items = [], hearts = [], now, sourceNames = {} }) {
   const byId = new Map(items.map((i) => [i.id, i]));

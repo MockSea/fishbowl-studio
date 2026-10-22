@@ -136,7 +136,7 @@
     if (state.menu) {
       const items = (head.personas || []).map((p) => h('button', { class: 'item', role: 'menuitem', onclick: () => switchTo(p.slug) },
         avatar(p, 'sm'), h('span', { class: 'nm', text: p.name }), p.active ? icon('check') : personaStatus(p)));
-      // Add persona opens the setup wizard; the persona is made when she sends step 1.
+      // Add persona opens the setup wizard; the persona is made when they send step 1.
       const add = h('button', { class: 'item add', onclick: () => openWizard({ fresh: true }) }, icon('plus'), h('span', { class: 'nm' }, 'Add persona'));
       menu = h('div', { class: 'menu', role: 'menu' }, items, h('hr'), add);
     }
@@ -208,7 +208,7 @@
     } }, label);
   }
 
-  // A proposal she decides with one tap: what would change, and why it's suggested.
+  // A proposal they decide with one tap: what would change, and why it's suggested.
   const KIND_LABEL = { playbook: 'Playbook', position: 'Position', audience: 'Audience', shape: 'Shape', phrase: 'Overused phrase', voice: 'Voice', topic: 'Topic' };
   const OP_LABEL = { add: 'Add', remove: 'Remove', replace: 'Replace', strengthen: 'Stronger', weaken: 'Weaker', drop: 'Drop', raise: 'Raise', lower: 'Lower', set: 'New version', avoid: 'Off limits' };
   function proposalRow(p) {
@@ -231,7 +231,7 @@
   }
 
   // "Post for me" on one account: off by default; turning it on shows the plain warning first and
-  // only her second tap (Turn it on) sends it. Used in Settings and in the setup wizard.
+  // only their second tap (Turn it on) sends it. Used in Settings and in the setup wizard.
   function postingControl(a) {
     if (!a.capabilities || a.capabilities.post !== true) return null;
     const on = a.posting && a.posting.on;
@@ -269,7 +269,7 @@
   function firstRunCard(head) {
     const fr = head.first_run;
     const w = head.wizard;
-    // A half-finished setup is offered again, wherever she left it.
+    // A half-finished setup is offered again, wherever they left it.
     if (w && (!fr || !fr.show || fr.setup)) return card({ icon: 'spark', title: `Finish setting up ${head.brand}`, sub: `You stopped at step ${WIZ_STEP_N[w.step] || 1} of 4. Everything you answered is saved.` },
       h('div', { class: 'chips' }, h('button', { class: 'btn sm primary', onclick: () => openWizard() }, 'Pick up where you left off')));
     if (!fr || !fr.show) return null;

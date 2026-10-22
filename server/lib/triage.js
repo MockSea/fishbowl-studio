@@ -20,7 +20,7 @@ export function triageCandidates(items, batch = 40) {
 
 export function positionsBlock(store, fz, n = 6) {
   const ps = loadPositions(store).slice().sort((a, b) => b.strength - a.strength).slice(0, n);
-  return fz.block('The brand\'s positions (hers; hold them)', ps.map((p) => ({ position: p.text, strength: `${p.strength}/5` })), SETTINGS_NOTE);
+  return fz.block('The brand\'s positions (theirs; hold them)', ps.map((p) => ({ position: p.text, strength: `${p.strength}/5` })), SETTINGS_NOTE);
 }
 
 export function audienceBlock(store, fz) {
@@ -29,10 +29,10 @@ export function audienceBlock(store, fz) {
   return fz.block('Who the brand writes for, and its buttons', rows, 'Lean toward a button when the item touches one.');
 }
 
-// Her topic weights, said plainly. The slugs passed the config validator, so they are safe to list.
+// Their topic weights, said plainly. The slugs passed the config validator, so they are safe to list.
 function weightNote(beat) {
   const more = beat.topics.filter((t) => topicWeight(beat, t) === 3), less = beat.topics.filter((t) => topicWeight(beat, t) === 1);
-  return [more.length ? `\nShe wants more about: ${more.join(', ')}.` : '', less.length ? `\nShe wants less about: ${less.join(', ')}.` : ''].join('');
+  return [more.length ? `\nThey want more about: ${more.join(', ')}.` : '', less.length ? `\nThey want less about: ${less.join(', ')}.` : ''].join('');
 }
 
 export function triageQueue(ctx) {
@@ -76,7 +76,7 @@ export function recordTriage(ctx, { queue_id, reactions = [] }) {
       saved++;
       if (item.interest >= settings.interest_threshold) worth++;
     }
-    // Sites that keep turning up in good search results become suggestions for her, never sources.
+    // Sites that keep turning up in good search results become suggestions for them, never sources.
     const suggested = discover(ctx, db);
     return { saved, worth_drafting: worth, threshold: settings.interest_threshold, suggested: suggested.length };
   });
