@@ -168,7 +168,7 @@ function applyPhrase(store, p) {
 // Source proposals are applied by sources.js (adding one may test-fetch it first).
 const APPLY = { playbook: applyPlaybook, position: applyPosition, audience: applyAudience, shape: applyShape, phrase: applyPhrase, voice: applyVoice, topic: applyTopic };
 
-// Model-callable: list and propose. Accepting or rejecting is theirs alone (decideProposal,
+// Model-callable: list and propose. Accepting or rejecting is the user's alone (decideProposal,
 // reachable only from the board), so the model can never apply its own proposal.
 export function proposalsTool(ctx, args) {
   if (args.action === 'accept' || args.action === 'reject') throw new Error('Only the user can accept or reject proposals, with the buttons on the board\'s Playbook view. Tell them it is waiting there.');
