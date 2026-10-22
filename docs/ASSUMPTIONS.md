@@ -18,7 +18,7 @@ Fishbowl Studio was built against a written reference of the MCP, MCP Apps and C
 9. **Legacy MCP handshake.** The server speaks the `2025-11-25` `initialize` handshake (it echoes 2025-06-18, 2025-03-26 and 2024-11-05 too) and answers `server/discover` and other unknown methods with `-32601`, so a dual-era host falls back to `initialize`. Unverified which era Cowork uses for stdio servers.
 10. **`ping`** returns `{}`; **`resources/templates/list`** returns an empty list. Both standard, neither confirmed against Claude.
 11. **Non-UI tools return text only**, no `structuredContent`, because some hosts pass the structured JSON to the model instead of the text. The board tools (`studio_board`, `studio_view`, `studio_act`, `studio_proposals`, `studio_proposal_decide`) return both, and their structured content is readable by a model, so item text in it is cleaned to one line but is not fenced.
-12. **The host enforces `visibility: ["app"]`.** `studio_proposal_decide` (accept/reject) is marked app-only so only her clicks on the board reach it. The server can't tell who called a tool; if a host lists app-only tools to the model anyway, the model could accept its own proposals. Unverified for Cowork.
+12. **The host enforces `visibility: ["app"]`.** `studio_proposal_decide` (accept/reject, including adding a suggested source), `studio_source_add` (adding anything the studio reads) and `studio_account_set` (connecting an account) are marked app-only so only her clicks on the board reach them. The server can't tell who called a tool; if a host lists app-only tools to the model anyway, the model could accept its own proposals or add a source. This is the one assumption the "nothing new is read without her tap" guarantee rests on. Unverified for Cowork.
 
 ## The board (MCP App)
 
@@ -29,7 +29,7 @@ Fishbowl Studio was built against a written reference of the MCP, MCP Apps and C
 16. **`ui/open-link`** opens the story; local servers always get a confirmation prompt. If refused, the board shows the URL.
 17. **Every tool call mounts a new board.** Older boards listen on a `BroadcastChannel` and show "a newer board is open" when a newer one announces itself. If `BroadcastChannel` isn't available in the sandbox, old boards stay live; fingerprints still stop them overwriting newer text.
 18. **No board in some surfaces.** MCP App panels reportedly don't mount in mobile Cowork or in cloud-run sessions. Every board action is also a model-visible tool, and `studio_board` returns a text list, so the `review` skill works in chat.
-19. **HTML size.** The assembled board is about 40 KB; no size limit was found in the reference.
+19. **HTML size.** The assembled board is about 115 KB; no size limit was found in the reference.
 
 ## Scheduling and runtime
 
@@ -38,4 +38,12 @@ Fishbowl Studio was built against a written reference of the MCP, MCP Apps and C
 22. **Releases happen lazily.** Batches release whenever any studio tool is called after a release hour (opening the board, the status check, the scheduled run). If nothing touches the studio all afternoon, the 12:00 and 16:00 batches release together the next time she looks. This matches the original's "missed batches run as one".
 23. **Local time.** Release hours use the computer's local time zone.
 24. **One writer at a time.** If the scheduled run and an open board act at the same moment, a lock in `state/.lock` serialises them (stale locks older than 30 s are broken).
-25. **Network.** Only `studio_fetch` and `studio_wander` make network calls (built-in `fetch`, 15 s timeout, 3 MB cap, HTTPS only). Nothing else leaves the machine.
+25. **Network.** The server's own network calls are `studio_fetch`, `studio_wander`, `studio_draft_link` and the test-fetch when she adds a website or subreddit (built-in `fetch`, 15 s timeout, 3 MB cap, HTTPS only). Claude's browser and web-search reads (below) are Claude's, not the server's. Nothing else leaves the machine.
+
+## Reading social sites
+
+26. **Subreddit feeds.** Every public subreddit serves `https://www.reddit.com/r/<name>/.rss` (Atom). Reddit rate-limits and sometimes blocks unfamiliar user agents (HTTP 429 or 403); a blocked subreddit shows as "Not responding" like any dead feed. Unverified how often that happens with the studio's user agent.
+27. **X and LinkedIn logged out.** Claude reads the public page with its browser tool (Claude in Chrome). Since 2023 X shows logged-out visitors little or nothing of an account's timeline, and LinkedIn often redirects company pages to a sign-in wall. Expect many `login_wall` results; the skill then reports it and the board says "Asks to log in". The web-search fallback finds posts only when other sites quote them. Unverified what a logged-out Claude in Chrome sees today.
+28. **X trending topics** (`x.com/explore/tabs/trending`) may need a login too; same handling.
+29. **Claude in Chrome in a scheduled task.** Unverified whether a Cowork scheduled run has the browser tool, or whether the extension needs Chrome open. If it doesn't, the skill reports `no_browser`, falls back to web search, and the board says so.
+30. **Claude's web search in Cowork** is assumed available to the daily run for saved searches. If it isn't, the skill reports `failed` for those targets and the run carries on.

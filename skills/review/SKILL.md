@@ -23,8 +23,10 @@ If she wants to see the board, call `studio_board`. It opens the interactive boa
 | `pick 1b` | `{action:"pick", id}` |
 | `edit 3: <text>` | `{action:"edit", id, hash, text}`; add `and_pass:true` if she also says pass |
 | `kill 2` | `{action:"kill", id}` |
+| `kill 2: too salesy` | `{action:"kill", id, reason:"too_salesy"}`. Reasons: `off_brand`, `wrong_topic`, `too_salesy`, `boring`, `factually_off`, `other`. Optional: never ask for one, but use it if she gives one |
 | `note 2: <text>` | `{action:"note", id, text}` (queues a rewrite) |
-| `none 1` / `none 1: <note>` | `{action:"none", set_id, note}` |
+| `none 1` / `none 1: <note>` | `{action:"none", set_id, note}` (add `reason` if her note is one of the reasons above) |
+| "that one was off-brand" (after a kill) | `{action:"kill_reason", id, reason:"off_brand"}` (or `set_id` for a set) |
 | `redo 1` / `redo 1: <note>` | `{action:"redo", set_id, note}` |
 | `heart 2` | `{action:"heart", id}` (or `target:"thinking"` for the thinking) |
 | `restore 4: <reason>` (Killed tab) | `{action:"restore", id, reason}`; a reason is required, ask for one |

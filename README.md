@@ -2,16 +2,16 @@
 
 **A drafting studio for the person who writes a brand's LinkedIn and X posts.**
 
-Every weekday morning, Fishbowl Studio reads the news on your brand's beat, decides what's worth talking about, and drafts a few different takes on each story in your brand's voice. Through the day it puts the best of them on a review board inside Claude. You pass the good ones, fix the nearly-good ones, kill the rest, and leave a note when something's off. It learns from every verdict. When you're happy with a post, you copy it and post it yourself.
+Every weekday morning, Fishbowl Studio reads the news on your brand's beat, and the places your audience actually talks (subreddits, the X and LinkedIn accounts you watch, your saved searches), decides what's worth talking about, and drafts a few different takes on each story in your brand's voice. Through the day it puts the best of them on a review board inside Claude. You pass the good ones, fix the nearly-good ones, kill the rest, and leave a note when something's off. It learns from every verdict, every edit you make and every reason you give for a skip, so it writes more like you the more you use it. When you're happy with a post, you copy it and post it yourself.
 
 It runs inside the Claude desktop app as a plugin. There's nothing to host and no account to create.
 
 ## Your day with it
 
-- **7:00.** While you're making coffee, the studio reads your news feeds, drops duplicates (the same story from five outlets counts once), and gives each story an honest interest score. It writes three takes for each story worth it, each built a different way: one leads with the concrete detail, one asks the question the story raises, one says plainly what the brand thinks.
+- **7:00.** While you're making coffee, the studio reads your news feeds and subreddits, Claude looks at the public pages of the accounts you watch and runs your saved searches, duplicates are dropped (the same story from five outlets counts once), and each story gets an honest interest score. Stories like the ones you approve and heart move up the queue. It writes three takes for each story worth it, each built a different way: one leads with the concrete detail, one asks the question the story raises, one says plainly what the brand thinks.
 - **8:00, 12:00, 16:00, 20:00.** A few drafts appear on your board at each time, up to ten a day, best first. Stale ones are quietly cleared away so you never review yesterday's news.
 - **Whenever you like.** Open the board, pick the best take from each set, tweak a word, pass it, copy it, post it. Leave a note like "too preachy" and Claude rewrites it. Say "none of these" and ask for a redo.
-- **Fridays.** A short report: what worked, what didn't, and a few suggested changes to your playbook that you accept or reject with one click.
+- **Fridays.** Your coach: a short report per brand on the board (what's working, what isn't, two or three things to try) and the changes it suggests, each with its reason ("you cut the opening question 7 of 9 times"). You accept or reject each with one tap; nothing about your voice changes without it.
 
 ## What the board looks like
 
@@ -19,12 +19,12 @@ A light, roomy dashboard inside Claude: a sidebar on the left, today's counter a
 
 At the top of the sidebar is the **brand switcher**: one studio per brand you write for (we call them personas), each with its own drafts, sources, topics and voice. **Add persona** starts a fresh one with a three-step "here's how this works" card.
 
-- **Drafts** reads like a feed. Each draft is a post with your brand's name and handle, the text, a character-count ring and an action row: **Approve**, **Edit** (right in the card, with the ring counting as you type), **Skip**, ♡, and **Rewrite** (leave a note; Claude rewrites it). Anything worth a second look shows as a friendly chip under the post ("Check the number: 7 isn't in the story"). The story it's about sits under the post like a quoted link, and **Why it wrote this** folds out the reasoning. When it wrote several takes on one story you see them together and pick one (**Best bet** marks its favourite), or say **None of these…** with a quick reason and **try again**. Tabs: **To review**, **Approved** (with **Copy · LinkedIn · 612/3000**, **Mark as posted**, **Add numbers**), **Skipped** and **Expired**, each with a **Bring back**. Filter by platform or by "Pick one", "Needs a look" and so on. On a wide screen, a side column shows today's numbers and all your brands with what's waiting.
-- **Sources**: the sites it reads, each with an on/off switch, a topic picker and a status ("Active", "Paused", "Not responding"). Paste a website to add it (it finds the feed and checks it works). **Draft from a link**: paste one article and it becomes a draft with the next run, or ask Claude to draft it now.
-- **Topics**: what it pays attention to, each set to **Less**, **Normal** or **More**, and **Learned from your verdicts**: what it has noticed you approve or skip, and why ("Posts about policy: you approved 0 of 6 in the last 3 weeks").
+- **Drafts** reads like a feed. Each draft is a post with your brand's name and handle, the text, a character-count ring and an action row: **Approve**, **Edit** (right in the card, with the ring counting as you type), **Skip**, ♡, and **Rewrite** (leave a note; Claude rewrites it). Anything worth a second look shows as a friendly chip under the post ("Check the number: 7 isn't in the story"). The story it's about sits under the post like a quoted link, and **Why it wrote this** folds out the reasoning. When it wrote several takes on one story you see them together and pick one (**Best bet** marks its favourite), or say **None of these…** with a quick reason and **try again**. After **Skip** it asks, once and optionally, why: **Off-brand**, **Wrong topic**, **Too salesy**, **Boring**, **Factually off** or **Other**. Tabs: **To review**, **Approved** (with **Copy · LinkedIn · 612/3000**, **Mark as posted**, **Add numbers**), **Skipped** and **Expired**, each with a **Bring back**. Filter by platform or by "Pick one", "Needs a look" and so on. On a wide screen, a side column shows today's numbers and all your brands with what's waiting.
+- **Sources**: everything it reads, each with an on/off switch, a topic picker, a status ("Active", "Paused", "Not responding", "Asks to log in") and its record ("4 of 5 approved"; one that keeps losing says "Pause it?", but only you pause it). Add a **website** (it finds the feed and checks it works), a **subreddit** (`r/name`), an **X or LinkedIn account** to watch (`@handle` or the page's address), **X trending topics**, or a **saved search** ("bike commuting"). **Suggested sources** at the top are sites that kept showing up in good search results, or that Claude suggested in chat: nothing there is read until you tap **Add**. **Draft from a link**: paste one article and it becomes a draft with the next run, or ask Claude to draft it now.
+- **Topics**: what it pays attention to, each set to **Less**, **Normal** or **More**; **Learned from your verdicts**: what it has noticed you approve or skip, and why ("Posts about policy: you approved 0 of 6 in the last 3 weeks"); **What it drafts first**: the stories it moves up or down because of that ("Because: you hearted 2 reads about cargo"); and **From your edits**: what you keep changing.
 - **Schedule**: how often to read the news (every hour, every 3 hours, twice a day, once a day, or weekdays), which hours drafts arrive (tap to toggle), and the exact scheduled task to set up in Claude, with copy buttons.
-- **Settings**: platforms (switches), drafts a day and evergreen posts a day (− / + steppers), takes per story (1, 2 or 3), voice examples and phrases you overuse. Everything saves as you click.
-- **Reads** shows every story it read, with its one-line reaction and interest score, and a **Draft this** button. **Playbook** shows the rules it's learned, your brand's positions, who you write for, and suggested changes waiting for your yes or no.
+- **Settings**: platforms (switches), drafts a day and evergreen posts a day (− / + steppers), takes per story (1, 2 or 3), voice examples, phrases you overuse, and **Accounts**: X, LinkedIn, Reddit and Bluesky. **Add account** asks Claude to walk you through signing in yourself, in your own browser; the studio only notes that it's connected. It doesn't use those accounts for anything yet. Everything saves as you click.
+- **Reads** shows every story, post and search result it read, with its one-line reaction, interest score and why it moved up or down, and a **Draft this** button. **Coach** shows this week's report and every suggested change waiting for your yes or no, with its reason. **Playbook** shows the rules it's learned, your brand's positions and who you write for.
 
 If the board can't appear (some Claude windows don't show it), just say "review my drafts" and do it all in chat: *"pass 1a, kill 2, edit 3: …"*.
 
@@ -43,18 +43,19 @@ It needs Claude's desktop app on your computer, with Node.js available (see [doc
 
 - "Show my studio board" · "Review my drafts" · "Do my rewrites"
 - "Run the studio now" (`/studio:run`)
-- "Add this feed: …" (`/studio:add-source`) · "Draft a post from this link: …"
+- "Add this feed: …", "Watch @… on X", "Save a search for …" (`/studio:add-source`; Claude suggests it, you tap Add) · "Draft a post from this link: …"
 - "Set up another brand" · "Switch to my other brand"
 - "Learn my voice from these posts" (`/studio:voice`)
-- "Write three evergreen posts" · "Weekly report"
+- "Write three evergreen posts" · "Weekly report" (your coach)
 - "Import these numbers" (attach the CSV export from LinkedIn or X analytics)
 
 ## What it will never do
 
 - **Post for you.** There is no posting code in it at all. You copy and post.
-- **Read your messages, DMs, inbox or accounts.** It only reads the public news feeds you approve.
-- **Send anything anywhere.** No analytics, no tracking, no servers of ours. Its only outbound traffic is fetching the feeds you list and the links you paste. Your drafts, notes and numbers stay in your Documents folder.
-- **Change what your brand believes.** It can suggest a change to your positions or playbook; nothing changes until you click Accept.
+- **Read your messages, DMs, inbox or accounts.** It reads only what you approve: news feeds and public subreddits, the public pages of the X and LinkedIn accounts you chose (Claude looks at them logged out, never signed in), X trending topics, and your saved searches. Anything it reads there is treated as text to react to, never as instructions, and it never adds a source on its own: a site it finds is only suggested.
+- **Log in anywhere or keep passwords.** Connecting an account means Claude walks you through signing in yourself; the studio stores no password, token or cookie.
+- **Send anything anywhere.** No analytics, no tracking, no servers of ours. The studio fetches the feeds you list and the links you paste; Claude opens the account pages you chose and runs your searches. Your drafts, notes and numbers stay in your Documents folder.
+- **Change your voice or what your brand believes.** It can suggest a change to your positions, playbook or overused phrases, from your edits or the weekly coach; nothing changes until you tap Accept.
 - **Name private people.** A draft that names someone who isn't in the story is sent back for a rewrite, and flagged on the board if the name survives.
 - **Make memes or images.** Words only.
 

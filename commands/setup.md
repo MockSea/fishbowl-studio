@@ -24,7 +24,7 @@ Say in one or two sentences what's about to happen: "I'll ask about 9 quick ques
    - If she skips: ask (one at a time) how formal it should be, whether humour is welcome, and any words or habits to avoid.
 5. **Positions.** "What does the brand believe that not everyone in your field does? Two to six short lines." Ask how strongly for each only if unclear (default 3 of 5).
 6. **Beat.** "What topics should I read about every day?" Turn her answer into 3-8 short topic slugs (lowercase, hyphens, e.g. `urban-cycling`) and confirm them. Then ask: "Anything I should never post about?" and "Any public names (companies, public figures) you're happy for posts to mention?" (Optional.)
-7. **News feeds.** Propose 5-10 RSS or Atom feeds for her beat: trade publications, news sections, blogs. Use feed URLs you are confident exist, and say plainly that you'll test them. Also propose 2-5 slower "reading list" sources for curiosity reading. She confirms, removes or adds. Feeds must be `https://` addresses.
+7. **Sources.** Propose 5-10 RSS or Atom feeds for her beat: trade publications, news sections, blogs. Use feed URLs you are confident exist, and say plainly that each is tested when she adds it. Also propose 2-5 slower "reading list" sources for curiosity reading. Then ask where her audience talks: subreddits, X or LinkedIn accounts worth watching (read logged out, from their public pages), and 1-3 searches to run each day ("bike commuting"). She confirms, removes or adds. Feeds must be `https://` addresses.
 8. **Platforms.** "LinkedIn, X, or both?"
 9. **Pace.** "How many posts do you want to publish a day?" Then: "I'll put up to 10 drafts a day on your board, released at 8:00, 12:00, 16:00 and 20:00. Want different times or fewer drafts?"
 
@@ -37,8 +37,9 @@ Call `studio_config` with `action: "set"` for each file (JSON files take an obje
 - `audience.json`: `{ "who": [{ "text", "confidence": 2 }], "buttons": [{ "text", "confidence": 1 }] }`.
 - `positions.json`: `{ "positions": [{ "text", "strength": 1-5 }] }`.
 - `beat.json`: `{ "about": "...", "topics": [...], "on_beat": [...], "off_limits": [...], "curiosity": { "<topic>": ["keyword", ...] }, "allow_names": [...] }`.
-- `sources.json`: `{ "feeds": [{ "name", "url", "topic" }], "reading": [{ "name", "url", "topic" }] }`. Each `topic` must be one of the topic slugs.
-- `playbook.md`: `# Playbook` then 3-5 starting bullets drawn from her voice ("Lead with the concrete detail", …). Tell her these are starting guesses the weekly report will refine with her approval.
+- `playbook.md`: `# Playbook` then 3-5 starting bullets drawn from her voice ("Lead with the concrete detail", …). Tell her these are starting guesses the weekly coach will refine with her approval.
+
+Sources are not written with `studio_config`. For each source she agreed to, call `studio_sources` with `{action: "suggest", kind, ...}` (see `/studio:add-source` for the kinds) and its topic slug. They wait on the board's **Sources** page under Suggested sources, and she adds them with **Add all**: nothing is fetched or read until she does. Open the board (`studio_board`) and tell her to tap it now.
 
 Then call `studio_config` with `action: "patch"` and `patch`:
 `{ "brand": "<name>", "platforms": { "linkedin": { "enabled": true|false }, "x": { "enabled": true|false } }, "posts_per_day": N, "daily_cap": N, "release_hours": [8, 12, 16, 20], "fetch_every": "weekdays", "setup_complete": true }`.
@@ -48,7 +49,7 @@ If a call returns an error, fix the value and try again; tell her only if you ne
 
 ## 3. Test the feeds
 
-Call `studio_fetch`. If any feed is dead, tell her which, propose a replacement, update `sources.json` (get, edit, set) and fetch again. One retry round is enough.
+Each website is test-fetched when she taps Add; one that doesn't work stays in Suggested sources with the reason. Once she has added them, call `studio_fetch` with `force: true`. If a feed is dead, tell her which and suggest a replacement the same way. One retry round is enough.
 
 ## 4. The daily schedule (she does this; a plugin can't)
 

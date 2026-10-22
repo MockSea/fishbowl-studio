@@ -18,13 +18,13 @@ Everything lives in one folder, `~/Documents/Fishbowl Studio/` by default (set `
 | `voice.md` | the brand and its voice | you, via `/studio:voice` |
 | `voice-samples.json` | posts you pasted as examples | you |
 | `beat.json` | topics and how much you want of each, off-limits list, curiosity keywords, names you allow | you (board Topics, or setup) |
-| `sources.json` | news feeds and the reading list, each can be paused | you (board Sources, or `/studio:add-source`) |
+| `sources.json` | news feeds and subreddits, the reading list, watched X and LinkedIn accounts, X trending topics, saved searches; each can be paused | you, on the board's Sources page; Claude can only suggest, pause, re-file or remove |
 | `positions.json` | what the brand believes, strength 1-5 | you; Claude only proposes |
 | `audience.json` | who you write for and their "buttons" | you; Claude only proposes |
 | `playbook.md` | the learned rules injected into every draft | you; Claude only proposes |
 | `shapes.json` | shapes learned from posts you admire | you accept them on the board |
 | `reports/weekly-*.md` | weekly reports | written by the weekly skill |
-| `state/*.json` | bookkeeping: items, drafts, verdicts, notes, hearts, jobs, proposals, weights | the server |
+| `state/*.json` | bookkeeping: items, drafts, verdicts, skip reasons, edits, notes, hearts, jobs, proposals, weights, coach reports, connected accounts | the server |
 
 All writes are atomic (temp file + rename) under a folder lock, so a scheduled run and an open board can't overwrite each other.
 
@@ -42,12 +42,13 @@ One studio per brand. `personas.json` is `{active, personas: [{slug, name, creat
 The scheduled task asks Claude to "Run the Fishbowl Studio daily run". The `daily-run` skill then calls:
 
 1. `studio_status`: setup check, plus any release that is due.
-2. `studio_fetch`: every feed in `sources.json` that isn't paused. It first checks her **news frequency** (below) and skips the fetch, saying why, if it is too soon. The feed parser is hand-written and tolerant (RSS 2.0, RSS 1.0, Atom), refuses DTDs and entities, strips HTML, keeps HTTPS links only, takes 12 items per feed and at most 3 MB per fetch (it parses the first 1 MB and 200 items, in one linear pass). Redirects are followed by hand, at most 5, and every hop must be a public HTTPS host name; hosts that resolve to private, loopback or link-local addresses are refused. Titles, summaries and authors are flattened to one line with control, format and Unicode tag characters removed. A dead feed is reported and the rest carry on.
+2. `studio_fetch`: every feed in `sources.json` that isn't paused (websites and subreddits). It first checks her **news frequency** (below) and skips the fetch, saying why, if it is too soon. The feed parser is hand-written and tolerant (RSS 2.0, RSS 1.0, Atom), refuses DTDs and entities, strips HTML, keeps HTTPS links only, takes 12 items per feed and at most 3 MB per fetch (it parses the first 1 MB and 200 items, in one linear pass). Redirects are followed by hand, at most 5, and every hop must be a public HTTPS host name; hosts that resolve to private, loopback or link-local addresses are refused. Titles, summaries and authors are flattened to one line with control, format and Unicode tag characters removed. A dead feed is reported and the rest carry on.
    - **Dedupe**: exact URL (normalised: tracking parameters, `www.`, fragments and trailing slashes removed) and **story level**: titles are normalised (outlet suffix and punctuation dropped, light stemming) and compared by Jaccard similarity (≥ 0.5) or containment (≥ 0.8 for 4+ words) within 72 hours. The first outlet's item represents the story; the others are recorded as "also covered by" and feed the trending signal.
    - **Ageing**: items older than 30 days with no drafts are pruned. Only items from the last 48 hours are drafted.
+   - Then `studio_read_queue` / `studio_record_reads`: the X and LinkedIn accounts she watches, X trending topics and her saved searches, read by Claude (below).
 3. `studio_wander` / `studio_record_wander` (up to twice): slow curiosity reading over the reading list. The source is chosen by topic interest (7-day mean triage interest, default 4, plus up to 3 for curiosity keywords seen recently), neglect (every third trip takes the least recently visited source), and caps (12 visits a day, same host at most every 2 h, same source every 24 h). Instruction-shaped entries are dropped. Findings never become drafts directly; they feed evergreen posts.
-4. `studio_triage_queue` / `studio_record_triage`: the newest 40 untriaged stories, one per story cluster. Claude writes a one-line private reaction, a 0-10 interest score and a topic. These show on the Reads tab and feed the taste log.
-5. `studio_drafting_brief` / `studio_save_takes`, in a loop. The work queue is: queued rewrites, redos and "draft this" requests, then stories with interest ≥ 6 (up to `drafts_per_run`, 12 by default), then evergreen posts (2 a day by default).
+4. `studio_triage_queue` / `studio_record_triage`: the newest 40 untriaged stories, one per story cluster (posts and search results included, each marked as what it is). Claude writes a one-line private reaction, a 0-10 interest score and a topic. The queue also says, in one line, why she skipped posts lately ("wrong topic 3 (policy 3)"). These show on the Reads tab and feed the taste log. After each triage the server checks for sites worth suggesting (discovery, below).
+5. `studio_drafting_brief` / `studio_save_takes`, in a loop. The work queue is: queued rewrites, redos and "draft this" requests, then stories with interest ≥ 6 (after her topic weights and what it has learned, below; up to `drafts_per_run`, 12 by default), then evergreen posts (2 a day by default).
 6. `studio_release`: rank and release the due batch.
 
 Running the skill twice is harmless: fetched items dedupe, triaged items aren't re-queued, drafted stories aren't drafted again, and each batch releases once.
@@ -68,9 +69,28 @@ The gaps are a little under the interval so a run that starts a few minutes earl
 
 ## Sources, topics and links from the board
 
-- **Sources** (`studio_sources`): `add` takes an address and test-fetches it through the same safe path as the feeds (below). A feed is used as is; a web page is searched for its `<link rel="alternate" type="application/rss+xml|atom+xml">` and that feed is fetched instead, if it too is a public HTTPS address. The name is hers if given, else the feed's title (flattened to one line, capped at 80, and replaced by the host name if it reads like an instruction), else the host. `pause`, `resume`, `remove` and `topic` (re-file under one of her topics) find the source by normalised address. Every write goes through the `sources.json` validator.
+- **Sources.** She adds them on the board (`studio_source_add`, board only). Claude can only **suggest** one (`studio_sources` `suggest`, or `add`, which is treated as a suggestion): it waits under Suggested sources until she taps Add, and nothing is fetched before that. `studio_config` can edit, pause, re-file or remove sources in `sources.json` but refuses a write that adds a new one. A website is test-fetched through the same safe path as the feeds (below). A feed is used as is; a web page is searched for its `<link rel="alternate" type="application/rss+xml|atom+xml">` and that feed is fetched instead, if it too is a public HTTPS address. The name is hers if given, else the feed's title (flattened to one line, capped at 80, and replaced by the host name if it reads like an instruction), else the host. `pause`, `resume`, `remove` and `topic` (re-file under one of her topics) find the source by its list (`feeds`, `reading`, `watch`, `trends`, `searches`) and normalised address, or a search by its words. Every write goes through the `sources.json` validator.
 - **Topics** (`studio_topics`): `add` turns "Cargo bikes" into the slug `cargo-bikes`, `remove` drops it (and re-files its sources under "other"), `weight` sets 1 (less), 2 (normal) or 3 (more). Weights move the drafting bar by one point: a story's interest counts one higher on a "more" topic and one lower on a "less" one, for both the threshold (6) and the order. They also tilt wandering the same way, and the triage queue tells Claude plainly which topics she wants more or less of. Every write goes through the `beat.json` validator.
 - **Draft from a link** (`studio_draft_link`): one article address, checked like a source address and fetched through the same path (HTTPS, public hosts only, redirects followed by hand and checked at every hop, private addresses refused, 3 MB cap). The page is parsed in linear passes: title (Open Graph title or `<title>`), description, and the paragraphs of its `<article>` or `<main>`, with scripts, styles and tags removed, entities decoded, flattened to one line, control and invisible characters stripped, fence tags neutralised, capped at 3,000 characters. A feed pasted here is refused with "add it under Sources". It is stored as a story marked `from_link`, skips triage (she chose it), and is queued as a "draft this" job; the brief fences the page exactly like a feed item and adds one line, outside the fence, that she sent the link herself. Pasting the same article again while it waits queues it once; an article already read from a feed is reused rather than fetched again.
+
+## Reading where her audience is
+
+Five kinds of source, one validator (`handles.js`, `config.js`). Whatever she pastes becomes one canonical entry or a plain refusal:
+
+| Kind | She pastes | Stored as | Read by |
+|---|---|---|---|
+| Website | a page or feed address | the feed's `https://` address | the server, every run (`studio_fetch`) |
+| Subreddit | `r/name` or a reddit.com/r/name address | `https://www.reddit.com/r/<name>/.rss`, always rebuilt from the name | the server, like any feed. The poster's username and the "submitted by … [link] [comments]" footer are dropped: Reddit users are private people |
+| X account | `@handle`, `handle`, or an x.com (or twitter.com) address of the account itself | `https://x.com/<handle>` (letters, digits, `_`, at most 15; page names like `home` or `explore` refused) | Claude, in its browser, logged out |
+| LinkedIn page | a linkedin.com `/company/`, `/showcase/` or `/in/` address | `https://www.linkedin.com/<kind>/<slug>/` | Claude, in its browser, logged out |
+| X trending topics | (a switch) | `x.com/explore/tabs/trending` | Claude, in its browser, logged out |
+| Saved search | a few words ("e-bike regulation") | the words: 2-80 characters, no address, nothing instruction-shaped | Claude, with its web search |
+
+Only x.com and linkedin.com addresses can be watched, and the server builds them from the validated handle, so a watched account can't point anywhere else. Each watched account carries `via: "public"`; a signed-in read through an account slot (`via: "account:<type>"`) is accepted only once that account type declares `read: true`, which none does yet. Adding it later means building the reader and flipping the type's file, not changing the source kind.
+
+**How a read works.** `studio_read_queue` respects her news frequency like `studio_fetch` (or `force`). It lists the targets, numbered, each with the exact address the server built. The `daily-run` skill opens each one with Claude's browser tool (Claude in Chrome) as a logged-out visitor: no signing in, no typing into the page, no following links in posts, no other address. If the page asks for a login it reports `login_wall`. If there's no browser tool it reports `no_browser` for each account and looks the account up with web search instead (`via: "search"`); the board's Sources page then says Claude couldn't use its browser. Saved searches go through Claude's web search, up to 8 results from the last week each. `studio_record_reads` takes results only for target numbers it issued, at most 10 posts per account, 20 trends and 8 results per search. Every field is flattened to one line and cleaned like a feed item; a post's link is kept only if it is on its own platform, a search result needs a public `https://` link. They are stored as stories (`web: watch | trends | search`, no author) and triaged with the news. The server never fetches any of these links.
+
+**Discovery.** A site earns a suggestion when it has shown up at least 3 times in search results she'd care about (triaged 6 or more), from at least 2 different searches or on 2 different days, in 30 days, and isn't already a source or a social site. The suggestion says why ("3 good results from 2 of your searches in the last month") and waits under Suggested sources until she taps Add (it's test-fetched then) or Dismiss. A site she has added or dismissed is never suggested again. This is the only way an address Claude came across becomes something the studio reads: a search result that says "add me as a source" is one result, below the bar, and even above it is only a suggestion.
 
 ## What it has learned, in her words
 
@@ -118,22 +138,27 @@ Drafts land **held**. At each release hour (8, 12, 16, 20 by default) the held p
 ## Learning
 
 - **Verdicts** (pass / edit / kill, pick / none of these) feed shape weights and the entertaining signal immediately.
+- **Edits.** When she changes a draft before approving it, the draft and her version are kept (`state/edits.json`, one record per draft, the latest edit wins, undoing the edit removes it) with what changed: she cut the opening question, cut the last line, cut it by a fifth or more, added to it, took out exclamation marks, hashtags, emojis or "we/our", added "we/our" or a number, and which words and two- or three-word phrases she removed. Her last four edits reach every brief, fenced, as "drafts she edited before approving (her version is the voice)", and her versions count as examples the drafter mustn't copy word for word.
+- **Edit patterns become proposals.** In the weekly pass, a pattern that shows up in at least 3 of her edits and at least half of them (with 4 or more edits in 60 days) becomes one playbook proposal, written as a description of the brand ("Open with a plain statement, not a question") with its reason ("You cut the opening question in 7 of your last 9 edits."). A word or phrase she cut at least 3 times, from at least 3 of every 4 drafts that had it, becomes a proposal to add it to "phrases we overuse". Each is proposed once; one she accepted or rejected isn't proposed again for 60 days. Nothing changes until she taps Accept.
+- **Skip reasons.** After a skip (or "none of these") the board asks once, optionally: off-brand, wrong topic, too salesy, boring, factually off, other. Ignoring it is fine. The reason is stored on the draft, cleared if she brings it back, shown on the Skipped tab, given to the drafter beside the killed post ("why: too salesy"), summed up in the triage queue, and counted in the weekly report.
+- **Source records.** Each source's drafts approved of drafts decided over 6 weeks (a set counts once), shown on the Sources page ("4 of 5 approved"). A source with 5 or more decided and at most 1 in 5 approved, or 4 or more and none approved, is marked "Keeps losing … Pause it?" on Sources and Coach. It is never paused automatically.
+- **What it drafts first.** Her topic weights move the drafting bar by one point. What it has learned moves it too, by up to 1.5 points either way, with the reasons shown on the Topics page ("What it drafts first") and on each read: per topic, the shrunk approve-vs-skip lift over 21 days (counted exactly like "learned from your verdicts") × 4, capped at ±0.75, plus 0.25 per read she hearted about it (at most 0.5), minus 0.25 per "wrong topic" skip (at most 0.5); per source, (its approval rate − her overall rate) × 2 once it has 3 decided, capped at ±0.75, plus 0.25 per hearted read from it (at most 0.5). Each kind is capped at ±1 and a story's total at ±1.5. It changes which stories are drafted and in what order, not how they're written.
 - **Rank weights** move once a day at the first batch: from the last 14 days of released sets, passes vs kills (each side ≥ 4) give a gap per signal; posted results (above vs below median, each side ≥ 4) give another. `new = old + 0.5 · gap`, clipped to ±0.02 a day, ±0.1 against a week ago, and [0.05, 0.6]. If posts stall (≥ 6 measured posts in 3 days averaging under 0.5 interactions, or all identical), 0.02 moves from the heaviest weight to the lightest and the novelty budget rises.
 - **Notes** queue a rewrite (at most 3 waiting at a time). The rewrite lands as a new version of the same draft; the old text is kept with the note. Posted drafts are never rewritten.
 - **Redo** writes a new set for a story you passed on (at most 2 per story). The new set inherits the old set's daily slot and goes straight to Waiting.
 - **Fingerprints**: pass and edit carry a hash of the text you saw. If a rewrite landed while the board was open, the action is refused and you see the new text.
-- **Weekly**: the report is written in two parts. Playbook changes are proposed from the numbers alone, before Claude sees your notes, so a single grumpy note can't rewrite the rules. Audience and position suggestions come after. Every change is a proposal you accept or reject.
+- **Weekly coach**: the report is written in two parts. Playbook changes are proposed from the numbers alone (including skip reasons, edit patterns and how each source does), before Claude sees your notes, so a single grumpy note can't rewrite the rules. Then the coach report: what's working (2-3 lines), what isn't (1-3), two or three things to try, and a short summary, each line naming its evidence. It is stored per persona (`state/coach.json`, one per week) and shown on the board's Coach page with everything waiting for her yes; lines with a link, a handle or anything instruction-shaped are dropped, and coach text is never fed back into a brief. Audience and position suggestions come after. Every change is a proposal you accept or reject.
 - **Taste log**: every triaged story is logged (seen, drafted, topic, source); the weekly report shows drafted-of-seen by topic and source over four weeks.
 
 ## Untrusted text
 
-Everything read from outside (news, pages, pasted posts) and your own notes when they're fed back to Claude arrive inside `<data-NONCE>` tags, with a fresh random nonce per brief, a guard sentence explaining that it is data and never instructions, control characters stripped, each field capped at 1200 characters, and any fence tags inside the content neutralised. The fencer is one shared, tested function (`server/lib/fence.js`). Model text stored as the brand's own view (proposals, wander findings) must pass an own-words check: no instruction-shaped text, no links or handles, and no ≥ 50% echo of the source.
+Everything read from outside (news, pages, subreddit posts, X and LinkedIn posts, trending topics, search results, pasted posts) and your own notes when they're fed back to Claude arrive inside `<data-NONCE>` tags, with a fresh random nonce per brief, a guard sentence explaining that it is data and never instructions, control characters stripped, each field capped at 1200 characters, and any fence tags inside the content neutralised. The fencer is one shared, tested function (`server/lib/fence.js`). Model text stored as the brand's own view (proposals, wander findings) must pass an own-words check: no instruction-shaped text, no links or handles, and no ≥ 50% echo of the source.
 
 Your own settings are fenced too. The voice, playbook, positions and audience reach Claude inside the same tags, introduced as a description of the brand rather than instructions, so one bad write can't become a standing order in every brief. Saving `voice.md`, `playbook.md`, `positions.json` or `audience.json` through `studio_config` is refused if it contains instruction-shaped text ("ignore previous…", "from now on", "always write…"); describe the brand instead. `studio_config` reads and writes only the files listed above, and the store refuses any path outside the data folder.
 
 In the chat review list, story headlines never share a line with a `[draft · hash]` marker: they come last, fenced, keyed by list number.
 
-Pages she pastes with "Draft from a link" are outside text like any feed: cleaned the same way on the way in, fenced the same way in the brief. Feed titles that become source names are flattened and dropped if instruction-shaped. Persona names are flattened, capped at 60 and refused if instruction-shaped.
+Pages she pastes with "Draft from a link", and everything Claude reads on a social site or in a search, are outside text like any feed: cleaned the same way on the way in, fenced the same way in the brief. A post's text never becomes an instruction, a setting or something to fetch: links in posts are stored for her to open and never fetched, and a new source only ever arrives as a suggestion she taps (see Discovery). Feed titles that become source names are flattened and dropped if instruction-shaped. Persona names are flattened, capped at 60 and refused if instruction-shaped.
 
 ## Tools
 
@@ -142,10 +167,14 @@ Pages she pastes with "Draft from a link" are outside text like any feed: cleane
 | `studio_personas` | list, create, switch or rename personas |
 | `studio_status` | setup state, counter, waiting, jobs; runs due releases |
 | `studio_board` | opens the board (MCP App) and returns a text fallback |
-| `studio_view` | board data and text: drafts tabs, reads, playbook, settings, sources, topics, schedule |
-| `studio_act` | pass, edit, kill, pick, none, redo, restore, resurrect, heart, note, draft_this, mark_posted, unpost |
+| `studio_view` | board data and text: drafts tabs, reads, coach, playbook, settings, sources, topics, schedule |
+| `studio_act` | pass, edit, kill (optional reason), kill_reason, pick, none, redo, restore, resurrect, heart, note, draft_this, mark_posted, unpost |
 | `studio_config` | get/set/patch the files in the persona's folder, with validation |
-| `studio_sources` | add (test-fetched), pause, resume, re-file or remove a source |
+| `studio_sources` | suggest a source (it waits for her tap), or pause, resume, re-file or remove one |
+| `studio_source_add` | add a source (website or subreddit test-fetched; account, trends, search); board only, hidden from Claude |
+| `studio_read_queue`, `studio_record_reads` | the accounts, trends and searches Claude reads, and what it read |
+| `studio_accounts` | list account slots and which are connected |
+| `studio_account_set` | connect (by prompt) or remove an account; board only, hidden from Claude |
 | `studio_topics` | add, remove or weight a topic |
 | `studio_draft_link` | fetch one article and queue it to be drafted |
 | `studio_fetch` | fetch, dedupe and store news (respects the news frequency unless `force`) |
@@ -153,23 +182,31 @@ Pages she pastes with "Draft from a link" are outside text like any feed: cleane
 | `studio_triage_queue`, `studio_record_triage` | triage |
 | `studio_drafting_brief`, `studio_save_takes` | the drafting loop |
 | `studio_release` | rank and release the due batch |
-| `studio_weekly_brief`, `studio_save_weekly` | the weekly report |
-| `studio_proposals` | list or propose changes (Claude) |
-| `studio_proposal_decide` | accept or reject a proposal; board only, hidden from Claude |
+| `studio_weekly_brief`, `studio_save_weekly` | the weekly coach report (and edit-pattern proposals) |
+| `studio_proposals` | list or propose changes (Claude): playbook, position, audience, shape, phrase |
+| `studio_proposal_decide` | accept or reject a proposal, including a suggested source; board only, hidden from Claude |
+
+**Which new tools change what's read or what the voice says, and how they're held back.** Adding a source of any kind: board only (`studio_source_add`), because a source is a standing fetch or read target. Claude suggesting one: proposal (`studio_sources` suggest), because Claude may have been told about it by something it read. Edit patterns and overused phrases: proposals, because they change every future brief. Discovery: proposal, for the same reason as suggestions. Connecting an account: board only. Recording what Claude read (`studio_record_reads`): neither, because it only adds fenced stories, never targets. Skip reasons and learned boosts: neither; like verdicts, they move ranking, not the voice or the sources.
+
+## Account slots
+
+`accounts/` holds one small file per account type (`x.json`, `linkedin.json`, `reddit.json`, `bluesky.json`): its label, icon, what it would enable, a `connect` prompt, and `capabilities` `{read, post}`, each `false` (not built), `"prompt"` (only when she asks Claude in chat) or `true`. All are `false` today. Adding a type is adding a file.
+
+Settings › Accounts lists them. **Add account** records the account as `connected_by_prompt` (type and time, nothing else: no password, token or cookie is ever stored) and sends the type's prompt to Claude, which walks her through signing in herself, in her own browser. That is all it does today. Two hooks wait for later: a watched account's `via` can name an account slot once that type can read (above), and `handOff()` in `accounts.js` is where an approved draft would be handed to an account's `post` capability, through an official API or a scheduler service, never browser automation. It refuses today: posting stays copy and paste.
 | `studio_metrics` | enter post numbers or import a CSV |
 
 Every tool except `studio_personas` also takes `persona`.
 
 ## The board
 
-Sections: Drafts, Sources, Topics, Schedule, Settings, then Reads and Playbook, with the persona switcher at the top of the sidebar. Every setting is a control that saves on click (switch, − / + stepper, segmented choice, hour chips, preset cards); text fields appear only for text (an address, a name, an example post, a note). Lint flags are shown as plain-language chips; "Approve" and "Skip" are the pass and kill verdicts (Skip teaches, like kill always did, and **Bring back** undoes it with a reason).
+Sections: Drafts, Sources, Topics, Schedule, Settings, then Reads, Coach and Playbook, with the persona switcher at the top of the sidebar. Coach carries a badge for proposals waiting for her yes, Sources one for suggested sources. Every setting is a control that saves on click (switch, − / + stepper, segmented choice, hour chips, preset cards); text fields appear only for text (an address, a name, an example post, a note). Lint flags are shown as plain-language chips; "Approve" and "Skip" are the pass and kill verdicts (Skip teaches, like kill always did, and **Bring back** undoes it with a reason).
 
 - **Look.** All colours, radii, type sizes, spacing, shadows and layout widths are CSS custom properties in `server/ui/skins/light.css`; `board.css` only refers to them (a test fails on any literal colour there). A second skin is one more file in `skins/` scoped to `:root[data-skin="<name>"]`; every skin file is bundled, and a skin named after the host theme (e.g. `dark.css`) is used when the host reports that theme. Without one the board stays light. The host's font is used when it provides one.
 - **Layout.** Over 900 px: sidebar, page, and (over 1180 px) a right column. 641-900 px (a chat-width window): the sidebar becomes a strip of icons with short labels. 640 px and under: a menu button opens the sidebar as a drawer. The board sits in an auto-height iframe, so nothing is fixed to the viewport or sized in `vh` (a bottom tab bar would sit at the end of the page, not the bottom of the screen).
 
 ## What changed from the original agent
 
-- No world simulation, personas, posting, scraping or memes.
+- No world simulation, personas (the original's simulated people), posting or memes. What it reads: RSS and Atom feeds and public subreddit feeds (fetched by the server), pages she pastes, and the public, logged-out pages of the X and LinkedIn accounts she chose plus X trending topics and her saved web searches, which Claude reads with its own browser and web search tools during a run and hands back as fenced text. No logins, no cookies, no credentials, no crawling beyond the addresses she approved, and no automated clicking or typing on any site.
 - Takes in a set each get their own shape (the original shared one shape per set).
 - The playbook, positions and audience change only by proposals she accepts on the board (Claude can propose, never accept), or when she edits them with Claude in setup.
 - Autopass became "our pick": the best-ranked take is highlighted, never approved.
