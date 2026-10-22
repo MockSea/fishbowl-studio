@@ -1,0 +1,30 @@
+{
+  "brand": "",
+  "setup_complete": false,
+  "platforms": {
+    "linkedin": { "enabled": true, "share": 0.5 },
+    "x": { "enabled": true, "share": 0.5 }
+  },
+  "posts_per_day": 2,
+  "daily_cap": 10,
+  "release_hours": [8, 12, 16, 20],
+  "held_max_hours": 16,
+  "takes_per_item": 3,
+  "drafts_per_run": 12,
+  "evergreen_per_day": 2,
+  "interest_threshold": 6,
+  "triage_batch": 40,
+  "experiment_share": 0.2,
+  "explore_share": 0.25,
+  "home_weight": 2,
+  "freshness_half_life_hours": 6,
+  "explore_budget": 1,
+  "explore_budget_stalled": 3,
+  "rewrite_queue_cap": 3,
+  "max_redos": 2,
+  "item_keep_days": 30,
+  "wander": { "visits_per_run": 2, "daily_cap": 12, "host_gap_hours": 2, "source_gap_hours": 24 },
+  "variety": { "window": 50, "template_cap": 0.10, "opener_cap": 0.05, "collapse_share": 0.6, "phrase_cap": 0.04 },
+  "overused_phrases": [],
+  "weights": { "hot": 0.25, "trending": 0.20, "interest": 0.30, "entertaining": 0.25 }
+}

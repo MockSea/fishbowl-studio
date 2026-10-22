@@ -1,0 +1,12 @@
+{
+  "id": "the-question",
+  "name": "the question it raises",
+  "mechanism": "Pull out the question the story raises but does not answer, then give the brand's answer in a line.",
+  "corner": "opinion",
+  "platforms": [
+    "linkedin",
+    "x"
+  ],
+  "origin": "seed",
+  "form": "question"
+}

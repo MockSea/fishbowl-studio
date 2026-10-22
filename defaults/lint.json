@@ -1,0 +1,5 @@
+{
+  "news_words": ["breaking", "reportedly", "confirmed", "exclusive", "sources say", "according to reports", "just in", "developing story", "has learned"],
+  "tie_back": ["as i said", "like i said", "as mentioned", "i told you", "as we said"],
+  "name_stopwords": ["The","This","That","These","Those","We","Our","I","It","Its","A","An","And","But","Or","So","If","When","What","Why","How","Who","Here","There","Today","Tomorrow","Yesterday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","January","February","March","April","May","June","July","August","September","October","November","December","LinkedIn","X","Read","See","New","Not","No","Yes","One","Two","Three","First","Every","Most","Some","All","You","Your","They","Their","He","She","My","Me","Us","Is","Are","Was","Be","Do","Don't","Can","Will","Just","Still","Then","Now","Also","Because","After","Before","Which","Where","In","On","At","For","Of","To","With","From","By","As","Why"]
+}

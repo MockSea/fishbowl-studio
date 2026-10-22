@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fishbowl Studio · dev host</title>
+<style>
+  body { margin: 0; font: 14px/1.4 system-ui, sans-serif; background: #f5f4ed; color: #141413; }
+  body.dark { background: #262624; color: #faf9f5; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid #0002; position: sticky; top: 0; background: inherit; z-index: 2; }
+  .bar button, .bar select { font: inherit; padding: 6px 10px; }
+  .wrap { display: flex; gap: 16px; padding: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .frame { background: transparent; border: 1px dashed #8884; border-radius: 12px; }
+  iframe { display: block; width: 100%; border: 0; height: 400px; background: transparent; }
+  .chat { flex: 1; min-width: 240px; max-width: 420px; font-size: 13px; }
+  .chat h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; opacity: .7; }
+  .msg { padding: 8px 10px; border-radius: 8px; background: #0000000d; margin: 6px 0; white-space: pre-wrap; }
+  body.dark .msg { background: #ffffff14; }
+  .muted { opacity: .7; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <strong>Fishbowl Studio dev host</strong>
+  <label>Theme <select id="theme"><option>light</option><option>dark</option></select></label>
+  <label>Width <select id="width"><option value="320">320</option><option value="400">400</option><option value="640" selected>640</option><option value="900">900</option></select></label>
+  <button id="remount">New board (simulate another tool call)</button>
+  <button id="reseed">Reseed demo data</button>
+  <span class="muted" id="status"></span>
+</div>
+<div class="wrap">
+  <div class="frame" id="frame"></div>
+  <div class="chat"><h3>Host log (ui/message, links, errors)</h3><div id="log"></div></div>
+</div>
+<script>
+// Host side of the MCP Apps bridge, implemented against the real server via /rpc.
+const LIGHT = { '--color-background-primary': '#FFFFFF', '--color-background-secondary': '#F5F4ED', '--color-text-primary': '#141413', '--color-text-secondary': '#3D3D3A', '--color-border-primary': 'rgba(31,30,29,.4)' };
+const DARK = { '--color-background-primary': '#30302E', '--color-background-secondary': '#262624', '--color-text-primary': '#FAF9F5', '--color-text-secondary': '#C2C0B6', '--color-border-primary': 'rgba(222,220,209,.4)' };
+const $ = (id) => document.getElementById(id);
+const log = (t) => { const d = document.createElement('div'); d.className = 'msg'; d.textContent = t; $('log').prepend(d); };
+const rpc = async (method, params) => { const r = await fetch('/rpc', { method: 'POST', body: JSON.stringify({ method, params }) }); return r.json(); };
+let html = null;
+const frames = [];
+
+function context() {
+  const theme = $('theme').value;
+  return { theme, styles: { variables: theme === 'dark' ? DARK : LIGHT }, displayMode: 'inline', availableDisplayModes: ['inline', 'fullscreen'], containerDimensions: { width: Number($('width').value), maxHeight: 4000 }, platform: 'web', locale: 'en', deviceCapabilities: { touch: false, hover: true } };
+}
+
+async function mount() {
+  if (!html) html = (await rpc('resources/read', { uri: 'ui://studio/board' })).result.contents[0].text;
+  const box = $('frame');
+  box.style.width = $('width').value + 'px';
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms');
+  iframe.setAttribute('allow', 'clipboard-write');
+  iframe.srcdoc = html;
+  box.prepend(iframe);
+  const f = { iframe, ready: false };
+  frames.push(f);
+  return f;
+}
+
+function send(f, msg) { f.iframe.contentWindow.postMessage(Object.assign({ jsonrpc: '2.0' }, msg), '*'); }
+
+window.addEventListener('message', async (ev) => {
+  const f = frames.find((x) => x.iframe.contentWindow === ev.source);
+  const m = ev.data;
+  if (!f || !m || m.jsonrpc !== '2.0') return;
+  const reply = (result) => send(f, { id: m.id, result });
+  const fail = (code, message) => send(f, { id: m.id, error: { code, message } });
+  switch (m.method) {
+    case 'ui/initialize':
+      return reply({ protocolVersion: '2026-01-26', hostInfo: { name: 'studio-dev-host', version: '0.1.0' }, hostCapabilities: { openLinks: {}, serverTools: {}, message: {} }, hostContext: context() });
+    case 'ui/notifications/initialized': {
+      f.ready = true;
+      $('status').textContent = 'board connected';
+      send(f, { method: 'ui/notifications/tool-input', params: { arguments: {} } });
+      const r = await rpc('tools/call', { name: 'studio_board', arguments: {} });
+      return send(f, { method: 'ui/notifications/tool-result', params: r.result });
+    }
+    case 'ui/notifications/size-changed':
+      f.iframe.style.height = Math.max(200, m.params.height) + 'px'; return;
+    case 'tools/call': {
+      const r = await rpc('tools/call', m.params);
+      return r.error ? fail(r.error.code, r.error.message) : reply(r.result);
+    }
+    case 'ui/message':
+      log('Board → chat: ' + (m.params.content || []).map((c) => c.text).join('\n')); return reply({});
+    case 'ui/open-link':
+      log('Open link: ' + m.params.url); window.open(m.params.url, '_blank', 'noopener'); return reply({});
+    case 'ui/request-display-mode':
+      return reply({ mode: 'inline' });
+    default:
+      if ('id' in m) return fail(-32601, 'Method not found');
+  }
+});
+
+$('theme').onchange = () => {
+  document.body.classList.toggle('dark', $('theme').value === 'dark');
+  for (const f of frames) if (f.ready) send(f, { method: 'ui/notifications/host-context-changed', params: { theme: $('theme').value, styles: context().styles } });
+};
+$('width').onchange = () => { $('frame').style.width = $('width').value + 'px'; };
+$('remount').onclick = () => mount();
+$('reseed').onclick = async () => { await fetch('/reseed', { method: 'POST' }); location.reload(); };
+const qs = new URLSearchParams(location.search);
+if (qs.get('theme')) { $('theme').value = qs.get('theme'); document.body.classList.toggle('dark', qs.get('theme') === 'dark'); }
+if (qs.get('width')) $('width').value = qs.get('width');
+mount();
+</script>
+</body>
+</html>

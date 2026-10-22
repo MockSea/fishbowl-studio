@@ -1,0 +1,11 @@
+{
+  "id": "missing-piece",
+  "name": "the missing piece",
+  "mechanism": "State the obvious reading of the story in one line, then the one thing that reading leaves out.",
+  "corner": "analysis",
+  "platforms": [
+    "linkedin",
+    "x"
+  ],
+  "origin": "seed"
+}

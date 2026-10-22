@@ -1,0 +1,12 @@
+{
+  "id": "plain-take",
+  "name": "the plain take",
+  "mechanism": "Say what the brand actually thinks about the story, straight, in its normal voice. No device, no trick.",
+  "corner": "home",
+  "platforms": [
+    "linkedin",
+    "x"
+  ],
+  "origin": "seed",
+  "home": true
+}

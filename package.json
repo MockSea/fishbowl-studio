@@ -1,0 +1,15 @@
+{
+  "name": "fishbowl-studio",
+  "version": "0.1.0",
+  "description": "A social-post drafting studio that runs inside Claude as a plugin.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test",
+    "dev": "node dev/serve.mjs",
+    "seed": "node dev/seed.mjs",
+    "pack": "node scripts/pack.mjs"
+  }
+}

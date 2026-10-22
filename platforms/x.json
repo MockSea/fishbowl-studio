@@ -1,0 +1,13 @@
+{
+  "id": "x",
+  "name": "X",
+  "max_chars": 280,
+  "target_chars": [60, 220],
+  "long_over": 220,
+  "length_words": { "short": 12, "mid": 30 },
+  "line_breaks": true,
+  "hashtags_max": 0,
+  "links_in_text": false,
+  "register": "Short. One or two sentences, at most 280 characters, usually far fewer. One idea. No thread, no preamble, no \"1/\".",
+  "how": "Write a post for X that reacts to the story. Someone who only sees the headline should still get it."
+}

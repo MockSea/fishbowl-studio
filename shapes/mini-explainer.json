@@ -1,0 +1,11 @@
+{
+  "id": "mini-explainer",
+  "name": "the mini explainer",
+  "mechanism": "Three short paragraphs: what happened, why it happened, what to do about it.",
+  "corner": "explainer",
+  "platforms": [
+    "linkedin"
+  ],
+  "origin": "seed",
+  "form": "paragraphs"
+}

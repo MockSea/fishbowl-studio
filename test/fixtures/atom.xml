@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example Atom</title>
+  <link href="https://example.org/" rel="alternate"/>
+  <entry>
+    <title type="html">Cargo bikes &amp; the &lt;b&gt;school run&lt;/b&gt;</title>
+    <link rel="self" href="https://example.org/self/1"/>
+    <link rel="alternate" href="https://example.org/2026/cargo-bikes"/>
+    <published>2026-10-20T08:00:00Z</published>
+    <author><name>A. Writer</name></author>
+    <summary type="html">&lt;p&gt;Parents are &lt;b&gt;switching&lt;/b&gt; to cargo bikes.&lt;/p&gt;</summary>
+  </entry>
+  <entry>
+    <title>Insecure link is dropped</title>
+    <link href="http://example.org/plain"/>
+  </entry>
+  <entry>
+    <link href="https://example.org/untitled"/>
+    <summary>No title, so skipped</summary>
+  </entry>
+  <entry>
+    <title><![CDATA[CDATA <em>title</em> works]]></title>
+    <link href="https://example.org/cdata"/>
+    <content type="html"><![CDATA[<p>Body with <a href="https://example.net/x">link</a></p>]]></content>
+    <updated>2026-10-19T10:00:00Z</updated>
+  </entry>
+</feed>

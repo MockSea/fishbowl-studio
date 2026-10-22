@@ -1,0 +1,12 @@
+{
+  "name": "fishbowl-studio",
+  "description": "Fishbowl Studio: a social-post drafting studio for Claude.",
+  "owner": { "name": "Fishbowl Studio contributors" },
+  "plugins": [
+    {
+      "name": "studio",
+      "source": "./",
+      "description": "Daily news-driven LinkedIn and X drafts on a review board that learns your taste."
+    }
+  ]
+}

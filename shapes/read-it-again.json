@@ -1,0 +1,11 @@
+{
+  "id": "read-it-again",
+  "name": "read it again",
+  "mechanism": "Quote the gist of the headline in your own words, then show what it actually says when you read it slowly.",
+  "corner": "analysis",
+  "platforms": [
+    "linkedin",
+    "x"
+  ],
+  "origin": "seed"
+}

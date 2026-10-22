@@ -1,0 +1,20 @@
+{
+  "templates": {
+    "hot-take-opener": "^\\s*(unpopular opinion|hot take|controversial take)\\b",
+    "heres-the-thing": "\\bhere'?s the thing\\b",
+    "nobody-talks": "\\bnobody(?:'s| is) talking about\\b",
+    "lets-talk": "^\\s*let'?s talk about\\b",
+    "is-the-new": "\\bis the new\\b",
+    "basically": "\\bis (?:basically|just) (?:a|an|the)\\b",
+    "energy": "\\b(?:energy|vibes)\\b",
+    "stop-doing": "^\\s*stop \\w+ing\\b",
+    "the-real-x": "\\bthe real (?:story|question|problem|lesson) (?:here )?is\\b",
+    "let-that-sink": "\\blet that sink in\\b",
+    "most-since": "\\bmost \\w+ since\\b"
+  },
+  "crutches": {
+    "comparison": { "cap": 0.125, "pattern": "\\b(?:is (?:basically|just|like) (?:a|an|the)|same energy as|the energy of|is giving|it'?s (?:basically |just )?like (?:a|an|the))\\b", "note": "{k} of the last {n} drafts made the point by saying one thing is another. This one can't compare the subject to anything, not even with the words changed. Say what the brand actually thinks about it, or what the reader should do, straight." },
+    "hype": { "cap": 0.06, "pattern": "\\b(?:game[- ]?changer|revolutionar\\w*|unlock\\w*|supercharge\\w*|next[- ]level|disrupt\\w*|10x)\\b", "note": "{k} of the last {n} drafts leaned on hype words. This one uses none: show why it matters with a plain fact from the story." }
+  },
+  "drop_if_stuck": ["hype"]
+}

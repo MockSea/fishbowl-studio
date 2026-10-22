@@ -1,0 +1,12 @@
+{
+  "id": "then-and-now",
+  "name": "then and now",
+  "mechanism": "How this used to work, how it works now, and what changed in between, in that order.",
+  "corner": "explainer",
+  "platforms": [
+    "linkedin",
+    "x"
+  ],
+  "origin": "seed",
+  "form": "two-line"
+}

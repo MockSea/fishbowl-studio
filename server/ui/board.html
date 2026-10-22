@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Fishbowl Studio</title>
+<style>
+/*__CSS__*/
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="brandline"><strong id="brand">Fishbowl Studio</strong><span id="counter" class="muted"></span></div>
+    <nav class="nav" role="tablist" aria-label="Views">
+      <button class="navbtn active" data-view="drafts" role="tab">Drafts <span class="badge" id="badge-drafts"></span></button>
+      <button class="navbtn" data-view="reads" role="tab">Reads</button>
+      <button class="navbtn" data-view="playbook" role="tab">Playbook <span class="badge" id="badge-playbook"></span></button>
+      <button class="navbtn" data-view="settings" role="tab">Settings</button>
+    </nav>
+  </header>
+  <div id="stale" class="banner warn" hidden>A newer board is open further down the chat. This one won't update; use the newest.</div>
+  <div id="flash" class="banner" role="status" aria-live="polite" hidden></div>
+  <div id="jobs" class="banner info" hidden></div>
+  <main id="view"><p class="muted">Loading the board…</p></main>
+</div>
+<script>
+//__BRIDGE__
+</script>
+<script>
+//__VIEWS__
+</script>
+</body>
+</html>

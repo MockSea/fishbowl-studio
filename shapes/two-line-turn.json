@@ -1,0 +1,12 @@
+{
+  "id": "two-line-turn",
+  "name": "the two-line turn",
+  "mechanism": "A setup line that sounds like it is going one way, and a second line that turns it.",
+  "corner": "comedy",
+  "platforms": [
+    "x",
+    "linkedin"
+  ],
+  "origin": "seed",
+  "form": "two-line"
+}

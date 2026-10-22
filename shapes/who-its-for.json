@@ -1,0 +1,11 @@
+{
+  "id": "who-its-for",
+  "name": "who this is for",
+  "mechanism": "Name the one kind of reader this story matters to and say exactly why it matters to them.",
+  "corner": "audience",
+  "platforms": [
+    "linkedin",
+    "x"
+  ],
+  "origin": "seed"
+}

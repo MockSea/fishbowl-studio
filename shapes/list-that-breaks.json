@@ -1,0 +1,12 @@
+{
+  "id": "list-that-breaks",
+  "name": "the list that breaks",
+  "mechanism": "Three items in a row; the third is the odd one out in a way that reveals the real point.",
+  "corner": "comedy",
+  "platforms": [
+    "linkedin",
+    "x"
+  ],
+  "origin": "seed",
+  "form": "list"
+}

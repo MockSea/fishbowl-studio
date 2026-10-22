@@ -1,0 +1,11 @@
+{
+  "id": "one-rule",
+  "name": "the rule of thumb",
+  "mechanism": "Boil the story down to one rule the reader can use tomorrow, then show where it came from.",
+  "corner": "advice",
+  "platforms": [
+    "linkedin",
+    "x"
+  ],
+  "origin": "seed"
+}

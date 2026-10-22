@@ -1,0 +1,13 @@
+{
+  "id": "linkedin",
+  "name": "LinkedIn",
+  "max_chars": 3000,
+  "target_chars": [300, 1300],
+  "long_over": 1300,
+  "length_words": { "short": 60, "mid": 160 },
+  "line_breaks": true,
+  "hashtags_max": 0,
+  "links_in_text": false,
+  "register": "Long-form. Short paragraphs of one to three sentences with a blank line between them. Open with a line that earns the click on \"see more\" (the first ~200 characters show before the fold). Plain words, no corporate filler. End on a thought, not a call to action, unless the brand voice says otherwise.",
+  "how": "Write a LinkedIn post that reacts to the story. The reader may not have seen the story, so give them enough of it in your own words to follow."
+}

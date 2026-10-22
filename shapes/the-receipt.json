@@ -1,0 +1,11 @@
+{
+  "id": "the-receipt",
+  "name": "the receipt",
+  "mechanism": "Lead with one concrete detail or number from the story, then say plainly what it means for the reader.",
+  "corner": "analysis",
+  "platforms": [
+    "linkedin",
+    "x"
+  ],
+  "origin": "seed"
+}

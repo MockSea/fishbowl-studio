@@ -1,0 +1,16 @@
+{
+  "name": "studio",
+  "displayName": "Fishbowl Studio",
+  "version": "0.1.0",
+  "description": "Reads the news on your brand's beat every weekday, drafts LinkedIn and X posts in varied shapes, and puts them on a review board where you pass, edit or kill them. It learns from your verdicts. It never posts for you.",
+  "author": { "name": "Fishbowl Studio contributors" },
+  "license": "MIT",
+  "keywords": ["social", "linkedin", "x", "drafting", "mcp-app", "review-board"],
+  "mcpServers": {
+    "studio": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/server/index.js"]
+    }
+  }
+}
