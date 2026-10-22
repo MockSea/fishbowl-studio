@@ -8,6 +8,7 @@ import { createFencer, INSTRUCTION_RE, ownWords, SETTINGS_NOTE } from './fence.j
 import { clip, clamp, mean } from './text.js';
 import { WANDER } from './prompts.js';
 import { fetchDue } from './schedule.js';
+import { feedKey } from './handles.js';
 
 const H = 3600e3;
 
@@ -39,7 +40,7 @@ export async function fetchAll(ctx, { force = false } = {}) {
     const fresh = [];
     for (const r of results) {
       if (r.error) continue;
-      for (const it of r.parsed.items) fresh.push({ source: `rss:${r.f.name}`, source_name: r.f.name, topic_hint: r.f.topic, title: it.title, url: it.url, body: it.summary, published: it.published, author: it.author });
+      for (const it of r.parsed.items) fresh.push(r.f.kind === 'reddit' ? redditItem(r.f, it) : { source: feedKey(r.f), source_name: r.f.name, topic_hint: r.f.topic, title: it.title, url: it.url, body: it.summary, published: it.published, author: it.author });
     }
     const res = mergeItems(db.items, fresh, { now, nextId: () => ctx.id('item') });
     const pruned = prune(db, ctx.settings().item_keep_days, now);
@@ -49,6 +50,13 @@ export async function fetchAll(ctx, { force = false } = {}) {
     ctx.store.event('fetch', { ...res, pruned, errors: errors.length }, now);
     return { feeds: feeds.length, paused: sources.feeds.length - feeds.length, ...res, pruned, errors };
   });
+}
+
+// A subreddit post is read like a story, minus the poster: Reddit users are private people, so
+// the username and the "submitted by /u/…  [link] [comments]" footer are dropped.
+export function redditItem(f, it) {
+  const body = String(it.summary || '').replace(/\s*submitted by\s+\/?u\/[\w-]+[\s\S]*$/i, '').replace(/\[(link|comments)\]/gi, '').trim();
+  return { source: feedKey(f), source_name: f.name, topic_hint: f.topic, title: it.title, url: it.url, body, published: it.published, author: null, web: 'reddit' };
 }
 
 function prune(db, keepDays, now) {

@@ -39,13 +39,16 @@ export function sameStory(a, b) {
 
 // Add fresh parsed items to the existing list. Returns {added, dupes, clustered}.
 // Mutates `existing` (appends) and assigns story ids. `nextId()` mints item ids.
+// A post read from a social page may have no link of its own; it dedupes on `dedupe_key` instead.
+const keyOf = (i) => i.dedupe_key || normaliseUrl(i.url);
+
 export function mergeItems(existing, fresh, { now = Date.now(), nextId }) {
-  const byUrl = new Set(existing.map((i) => normaliseUrl(i.url)));
+  const byUrl = new Set(existing.map(keyOf));
   const windowStart = now - STORY_WINDOW_HOURS * 3600e3;
   const recent = existing.filter((i) => Date.parse(i.fetched_at) >= windowStart && !i.explore);
   let added = 0, dupes = 0, clustered = 0;
   for (const f of fresh) {
-    const key = normaliseUrl(f.url);
+    const key = keyOf(f);
     if (byUrl.has(key)) { dupes++; continue; }
     byUrl.add(key);
     const id = nextId();

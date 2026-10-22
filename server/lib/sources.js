@@ -1,4 +1,4 @@
-// Board edits to sources and topics, and "draft from a link". Every write goes through the same
+// Board edits to sources and topics, suggestions from Claude, and "draft from a link". Every write goes through the same
 // validators studio_config uses (config.js), and every fetch through the same safe path the
 // feeds use (feeds.js: HTTPS only, public hosts, hand-followed redirects, byte cap). Text read
 // from a page is untrusted exactly like a feed item: flattened, cleaned and fenced in briefs.
@@ -6,8 +6,10 @@ import { loadSources, loadBeat, validateConfig, SLUG_RE } from './config.js';
 import { fetchText, parseFeed, stripHtml, decodeEntities, MAX_PARSE_CHARS } from './feeds.js';
 import { safeHttpsUrl, normaliseUrl, hostOf } from './urls.js';
 import { cleanField, instructionPhrase } from './fence.js';
-import { oneLine } from './text.js';
+import { oneLine, clip } from './text.js';
 import { mergeItems } from './dedupe.js';
+import { normaliseTarget, parseSubreddit, parseWatch } from './handles.js';
+import { addProposals, decideProposal } from './proposals.js';
 
 const LISTS = ['feeds', 'reading'];
 const field = (s, cap) => cleanField(oneLine(s), cap);
@@ -78,36 +80,128 @@ export async function addSource(ctx, { url, list, name, topic }) {
   try { probe = await probeFeed(ctx, safe.url); }
   catch (e) { throw new Error(`Couldn't add it: ${e.message}`); }
   if (known(probe.url)) throw new Error('That source is already on the list.');
-  const beat = loadBeat(ctx.store);
   const src = loadSources(ctx.store);
-  const entry = { name: sourceName(name, probe.parsed.title, probe.url), url: probe.url, topic: topic && beat.topics.includes(topic) ? topic : 'other' };
+  const entry = { name: sourceName(name, probe.parsed.title, probe.url), url: probe.url, topic: topicIn(ctx, topic) };
   src[l] = [...src[l], entry];
   saveSources(ctx, src);
   ctx.store.event('source:add', { list: l, host: hostOf(probe.url) }, ctx.now());
   return { ok: true, message: `Added ${entry.name}${probe.parsed.items.length ? ` (${probe.parsed.items.length}+ recent stories)` : ''}.`, source: entry, list: l };
 }
 
-function findSource(src, l, url) {
-  const key = normaliseUrl(url);
-  const i = src[l].findIndex((f) => normaliseUrl(f.url) === key);
+const topicIn = (ctx, topic) => (topic && loadBeat(ctx.store).topics.includes(topic) ? topic : 'other');
+
+// Add any kind of source. Board only (studio_source_add): it changes what the studio reads.
+// A website or subreddit is test-fetched through the safe fetch path first; an account, the X
+// trends or a search is read by Claude in a run, so there is nothing to fetch here.
+export async function addTarget(ctx, args) {
+  const kind = args.kind || 'site';
+  if (kind === 'site') return addSource(ctx, args);
+  const t = normaliseTarget({ ...args, kind });
+  if (!t.ok) throw new Error(`That ${kind === 'search' ? 'search' : 'address'} won't work: ${t.reason}.`);
+  if (args.topic && !SLUG_RE.test(args.topic)) throw new Error('topic must be one of your topic slugs');
+  const src = loadSources(ctx.store);
+  const name = args.name ? field(args.name, 80) : '';
+  const topic = topicIn(ctx, args.topic);
+  if (targetKnown(src, t)) throw new Error('That one is already on your list.');
+  let entry, message;
+  if (kind === 'reddit') {
+    const r = parseSubreddit(t.target.sub);
+    let parsed;
+    try { parsed = parseFeed(await fetchText(r.url, { fetchImpl: ctx.fetchImpl }), { limit: 3 }); }
+    catch (e) { throw new Error(`Couldn't read ${r.name}: ${e.message}`); }
+    entry = { kind: 'reddit', sub: r.sub, name: name && !instructionPhrase(name) ? name : r.name, url: r.url, topic };
+    src.feeds = [...src.feeds, entry];
+    message = `Added ${r.name}${parsed.items.length ? ` (${parsed.items.length}+ recent posts)` : ''}. Its posts are read like news stories.`;
+  } else if (kind === 'watch') {
+    const w = parseWatch(t.target.url);
+    entry = { platform: w.platform, handle: w.handle, url: w.url, name: name && !instructionPhrase(name) ? name : w.handle, topic, via: 'public' };
+    src.watch = [...src.watch, entry];
+    message = `Watching ${w.handle} on ${w.platform === 'x' ? 'X' : 'LinkedIn'}. Claude reads its public page on each run.`;
+  } else if (kind === 'trends') {
+    entry = { platform: 'x', name: 'Trending on X', topic };
+    src.trends = [entry];
+    message = 'Added X trending topics. Claude checks them on each run.';
+  } else {
+    entry = { q: t.target.q, topic };
+    src.searches = [...src.searches, entry];
+    message = `Saved the search "${t.target.q}". Claude runs it on each run and reads the results like news.`;
+  }
+  saveSources(ctx, src);
+  ctx.store.event('source:add', { kind }, ctx.now());
+  return { ok: true, message, source: entry, kind };
+}
+
+function targetKnown(src, t) {
+  const k = t.key.toLowerCase();
+  if (t.target.kind === 'watch') return src.watch.some((w) => `watch:${w.url.toLowerCase()}` === k);
+  if (t.target.kind === 'reddit') return src.feeds.some((f) => f.kind === 'reddit' && `reddit:${f.sub.toLowerCase()}` === k);
+  if (t.target.kind === 'search') return src.searches.some((x) => `search:${x.q.toLowerCase()}` === k);
+  if (t.target.kind === 'trends') return src.trends.length > 0;
+  return [...src.feeds, ...src.reading].some((f) => hostOf(f.url) === hostOf(t.target.url) && normaliseUrl(f.url).replace(/\/+$/, '') === normaliseUrl(t.target.url).replace(/\/+$/, ''));
+}
+
+// Claude's way to add a source: a suggestion she adds with one tap on the board. Nothing is
+// fetched until she does, so an address from a feed item or a search result can't become a
+// fetch target by itself.
+export function suggestTarget(ctx, args, origin = 'chat') {
+  const kind = args.kind || 'site';
+  const t = normaliseTarget({ ...args, kind });
+  if (!t.ok) return { ok: false, message: `Can't suggest that: ${t.reason}.` };
+  if (targetKnown(loadSources(ctx.store), t)) return { ok: false, message: 'That one is already on her list.' };
+  return ctx.tx((db) => {
+    const res = addProposals(ctx, db, [{ kind: 'source', op: 'add', target: { ...args, kind }, topic: args.topic, name: args.name, reason: args.reason }], origin);
+    if (res.rejected.length) return { ok: false, message: res.rejected[0].reason };
+    return { ok: true, suggested: true, proposal_ids: res.added, message: res.added.length ? `Suggested: ${t.label}. She adds it with one tap on the board's Sources page; nothing is read until she does.` : `${t.label} is already waiting for her on the Sources page.` };
+  });
+}
+
+// Her tap on a source proposal (board only). Adding may test-fetch; if that fails the proposal
+// stays open with the reason, so she can reject it or try again.
+export async function decideSource(ctx, { id, decision }) {
+  const p = ctx.tx((db) => db.proposals.find((x) => x.id === Number(id)));
+  if (!p || p.kind !== 'source') throw new Error(`No source proposal ${id}.`);
+  if (p.status !== 'open') return { ok: false, message: `That suggestion is already ${p.status}.` };
+  if (decision !== 'accept') return decideProposal(ctx, { id, decision: 'reject' });
+  let res;
+  try { res = await addTarget(ctx, { ...p.target, name: p.name || undefined, topic: p.target.topic }); }
+  catch (e) {
+    ctx.tx((db) => { const q = db.proposals.find((x) => x.id === p.id); if (q) q.error = clip(e.message, 300); });
+    return { ok: false, message: e.message };
+  }
+  ctx.tx((db) => { const q = db.proposals.find((x) => x.id === p.id); Object.assign(q, { status: 'accepted', decided_at: ctx.iso(), error: null }); });
+  return { ...res, ok: true };
+}
+
+// Pause, resume, remove or re-file any source. `list` names which list: feeds (daily news and
+// subreddits), reading, watch, trends or searches. A source is found by its address, or a search
+// by its words.
+const ALL_LISTS = ['feeds', 'reading', 'watch', 'trends', 'searches'];
+function findSource(src, l, { url, q }) {
+  let i;
+  if (l === 'trends') i = src.trends.length ? 0 : -1;
+  else if (l === 'searches') i = src.searches.findIndex((s) => s.q.toLowerCase() === oneLine(q || url).toLowerCase());
+  else if (l === 'watch') { const w = parseWatch(url); i = w.ok ? src.watch.findIndex((x) => x.url.toLowerCase() === w.url.toLowerCase()) : -1; }
+  else { const key = normaliseUrl(url); i = src[l].findIndex((f) => normaliseUrl(f.url) === key); }
   if (i < 0) throw new Error('No such source on the list.');
   return i;
 }
 
-export function editSource(ctx, { action, url, list, topic }) {
-  const l = listOf(list);
+export function editSource(ctx, { action, url, q, list, topic }) {
+  const l = list || 'feeds';
+  if (!ALL_LISTS.includes(l)) throw new Error(`list must be one of ${ALL_LISTS.join(', ')}`);
   const src = loadSources(ctx.store);
-  const i = findSource(src, l, url);
+  const i = findSource(src, l, { url, q });
   const f = src[l][i];
+  const nm = f.name || (l === 'searches' ? `"${f.q}"` : 'it');
   let message;
-  if (action === 'pause') { f.paused = true; message = `Paused ${f.name}. It won't be read until you turn it back on.`; }
-  else if (action === 'resume') { delete f.paused; message = `${f.name} is back on.`; }
-  else if (action === 'remove') { src[l].splice(i, 1); message = `Removed ${f.name}.`; }
+  if (action === 'pause') { f.paused = true; message = `Paused ${nm}. It won't be read until you turn it back on.`; }
+  else if (action === 'resume') { delete f.paused; message = `${nm} is back on.`; }
+  else if (action === 'remove') { src[l].splice(i, 1); message = `Removed ${nm}.`; }
   else if (action === 'topic') {
     const beat = loadBeat(ctx.store);
     if (topic !== 'other' && !beat.topics.includes(topic)) throw new Error('Pick one of your topics.');
-    f.topic = topic; message = `${f.name} now counts as ${topic}.`;
-  } else throw new Error('action must be add, pause, resume, remove or topic');
+    f.topic = topic; message = `${nm} now counts as ${topic}.`;
+  } else throw new Error('action must be pause, resume, remove, topic or suggest');
   saveSources(ctx, src);
   return { ok: true, message };
 }
@@ -137,7 +231,7 @@ export function editTopic(ctx, { action, topic, weight }) {
     // Sources filed under it move to "other" so they keep being read.
     const src = loadSources(ctx.store);
     let moved = 0;
-    for (const l of LISTS) for (const f of src[l]) if (f.topic === slug) { f.topic = 'other'; moved++; }
+    for (const l of ['feeds', 'reading', 'watch', 'trends', 'searches']) for (const f of src[l]) if (f.topic === slug) { f.topic = 'other'; moved++; }
     if (moved) saveSources(ctx, src);
     message = `Removed ${slug.replace(/-/g, ' ')}.${moved ? ` ${moved} source(s) filed under it now count as other.` : ''}`;
   } else if (action === 'weight') {

@@ -3,10 +3,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { safeHttpsUrl } from './urls.js';
+import { safeHttpsUrl, normaliseUrl } from './urls.js';
 import { instructionPhrase } from './fence.js';
 import { oneLine } from './text.js';
 import { FETCH_KEYS } from './schedule.js';
+import { parseSubreddit, parseWatch, parseSearch, feedKey, watchKey, searchKey, TRENDS_KEY } from './handles.js';
+import { canRead } from './accounts.js';
 
 export const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -55,7 +57,18 @@ export const topicWeight = (beat, topic) => beat.weights?.[topic] ?? 2;
 
 export function loadSources(store) {
   const s = parseJson(store.readFile('sources.json'), {});
-  return { feeds: [], reading: [], aggregator_hosts: [], ...s };
+  return { feeds: [], reading: [], watch: [], trends: [], searches: [], aggregator_hosts: [], ...s };
+}
+
+// Everything the studio would fetch or read, by a stable key: feed and page addresses, watched
+// accounts, trends, saved searches. Used to tell a new fetch target from an edit to an old one.
+export function fetchTargets(src) {
+  return new Set([
+    ...[...(src.feeds || []), ...(src.reading || [])].map((f) => (f.kind === 'reddit' ? feedKey(f) : `url:${normaliseUrl(f.url)}`)),
+    ...(src.watch || []).map(watchKey),
+    ...(src.trends || []).map(() => TRENDS_KEY),
+    ...(src.searches || []).map(searchKey),
+  ].map((k) => k.toLowerCase()));
 }
 
 export function loadPositions(store) {
@@ -167,17 +180,48 @@ const validators = {
     };
   },
   'sources.json': (o) => {
-    const feed = (f, i) => {
+    const topicOf = (t, who) => { if (t && !SLUG_RE.test(t)) throw new Error(`${who}: topic must be a slug`); return t || 'other'; };
+    const paused = (x) => (x.paused === true ? { paused: true } : {});
+    const feed = (list) => (f, i) => {
+      // A subreddit is a feed whose address is always built from its name (its public .rss).
+      if (f.kind === 'reddit') {
+        if (list !== 'feeds') throw new Error('Subreddits go on the daily news list');
+        const r = parseSubreddit(f.sub || f.url);
+        if (!r.ok) throw new Error(`Source "${f.name || i + 1}": ${r.reason}`);
+        return { kind: 'reddit', sub: r.sub, name: isStr(f.name, 80) ? oneLine(f.name) : r.name, url: r.url, topic: topicOf(f.topic, r.name), limit: clampInt(f.limit, 1, 40, 12), ...paused(f) };
+      }
       if (!isStr(f.name, 80)) throw new Error(`Source ${i + 1} needs a name`);
       const u = safeHttpsUrl(f.url);
       if (!u.ok) throw new Error(`Source "${f.name}": ${u.reason}`);
-      if (f.topic && !SLUG_RE.test(f.topic)) throw new Error(`Source "${f.name}": topic must be a slug`);
-      return { name: oneLine(f.name), url: u.url, topic: f.topic || 'other', limit: clampInt(f.limit, 1, 40, 12), ...(f.paused === true ? { paused: true } : {}) };
+      return { name: oneLine(f.name), url: u.url, topic: topicOf(f.topic, `Source "${f.name}"`), limit: clampInt(f.limit, 1, 40, 12), ...paused(f) };
     };
-    const feeds = (o.feeds || []).map(feed);
-    const reading = (o.reading || []).map(feed);
+    const feeds = (o.feeds || []).map(feed('feeds'));
+    const reading = (o.reading || []).map(feed('reading'));
     if (feeds.length > 90 || reading.length > 90) throw new Error('At most 90 feeds and 90 reading-list sources');
-    return { feeds, reading, aggregator_hosts: (o.aggregator_hosts || []).map((h) => String(h).toLowerCase()).slice(0, 20) };
+    // Accounts read logged out on their public page. `via` names how: "public" today; a signed-in
+    // read through an account slot ("account:<type>") is allowed only once that type can read.
+    const watch = (o.watch || []).map((w, i) => {
+      const p = parseWatch(w.url || w.handle);
+      if (!p.ok) throw new Error(`Watched account ${i + 1}: ${p.reason}`);
+      const via = w.via == null || w.via === 'public' ? 'public' : String(w.via);
+      if (via !== 'public' && !(/^account:[a-z][a-z0-9-]{0,29}$/.test(via) && canRead(via.slice(8)))) throw new Error(`Watched account ${p.handle}: no connected account can read yet, so it is read logged out ("via": "public")`);
+      return { platform: p.platform, handle: p.handle, url: p.url, name: isStr(w.name, 80) ? oneLine(w.name) : p.handle, topic: topicOf(w.topic, p.handle), via, ...paused(w) };
+    });
+    if (watch.length > 30) throw new Error('At most 30 watched accounts');
+    if (new Set(watch.map((w) => w.url.toLowerCase())).size !== watch.length) throw new Error('That account is already on the watch list');
+    const trends = (o.trends || []).map((t) => {
+      if ((t.platform || 'x') !== 'x') throw new Error('Trending topics come from X only');
+      return { platform: 'x', name: 'Trending on X', topic: topicOf(t.topic, 'Trending on X'), ...paused(t) };
+    });
+    if (trends.length > 1) throw new Error('X trending topics is on the list once');
+    const searches = (o.searches || []).map((s, i) => {
+      const p = parseSearch(s.q);
+      if (!p.ok) throw new Error(`Saved search ${i + 1}: ${p.reason}`);
+      return { q: p.q, topic: topicOf(s.topic, `Search "${p.q}"`), ...paused(s) };
+    });
+    if (searches.length > 20) throw new Error('At most 20 saved searches');
+    if (new Set(searches.map((s) => s.q.toLowerCase())).size !== searches.length) throw new Error('That search is already saved');
+    return { feeds, reading, watch, trends, searches, aggregator_hosts: (o.aggregator_hosts || []).map((h) => String(h).toLowerCase()).slice(0, 20) };
   },
   'positions.json': (o) => {
     const positions = (o.positions || []).map((p) => {
