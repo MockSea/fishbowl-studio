@@ -1,0 +1,105 @@
+/* Light skin: every colour, radius, font size, spacing step and shadow the board uses.
+   Component CSS (board.css) only ever says var(--token). A new skin is one file like this,
+   scoped to :root[data-skin="<name>"]; the board picks it up by file name. */
+:root, :root[data-skin="light"] {
+  color-scheme: light;
+
+  /* Surfaces */
+  --paper: #f6f4ef;          /* the app behind the cards */
+  --surface: #ffffff;        /* cards, sidebar */
+  --surface-2: #faf9f5;      /* inset areas: quoted story, thinking */
+  --hover: #f0ede6;
+  --selected: #e4f0ee;
+  --scrim: rgba(29, 28, 26, .32);
+
+  /* Ink */
+  --ink: #1d1c1a;
+  --ink-2: #514d46;
+  --ink-3: #6f6a61;
+  --ink-on-accent: #ffffff;
+  --line: #e6e1d7;
+  --line-strong: #d3ccbf;
+
+  /* Brand accent: deep fishbowl teal */
+  --accent: #0e6b65;
+  --accent-hover: #0a5853;
+  --accent-soft: #e4f0ee;
+  --accent-text: #0b5c57;
+
+  /* Meaning */
+  --ok: #1d7139;
+  --ok-hover: #175f2f;
+  --ok-soft: #e5f3e9;
+  --warn: #85500a;
+  --warn-soft: #fcf0d9;
+  --bad: #ae2a22;
+  --bad-soft: #fbe9e6;
+  --heart: #c93556;
+  --heart-soft: #fbe8ed;
+
+  /* Character-count ring */
+  --ring-track: #e6e1d7;
+  --ring-fill: #0e6b65;
+  --ring-near: #b9790f;
+  --ring-over: #ae2a22;
+
+  /* Persona avatars (initials on a colour) */
+  --avatar-ink: #ffffff;
+  --avatar-1: #0e6b65;
+  --avatar-2: #a8522c;
+  --avatar-3: #4f5aa3;
+  --avatar-4: #2f6b8f;
+  --avatar-5: #7a6418;
+  --avatar-6: #9b3b63;
+
+  /* Type */
+  --font-ui: var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  --font-post: var(--font-ui);
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --t-xs: 12px;
+  --t-sm: 13px;
+  --t-md: 14px;
+  --t-post: 15px;
+  --t-lg: 17px;
+  --t-xl: 22px;
+  --t-2xl: 28px;
+  --lh-tight: 1.25;
+  --lh: 1.5;
+  --w-regular: 400;
+  --w-medium: 500;
+  --w-bold: 650;
+
+  /* Space */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+
+  /* Shape */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-pill: 999px;
+  --border: 1px;
+
+  /* Depth */
+  --shadow-1: 0 1px 2px rgba(29, 28, 26, .05);
+  --shadow-2: 0 1px 2px rgba(29, 28, 26, .06), 0 8px 24px rgba(29, 28, 26, .08);
+  --focus-ring: 0 0 0 3px rgba(14, 107, 101, .28);
+
+  /* Layout */
+  --side-w: 244px;
+  --rail-w: 296px;
+  --content-max: 1180px;
+  --tap: 40px;
+
+  /* Motion */
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --dur: 160ms;
+}

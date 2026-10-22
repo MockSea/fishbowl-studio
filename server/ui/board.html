@@ -1,29 +1,48 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-skin="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="light">
 <title>Fishbowl Studio</title>
 <style>
+/*__SKINS__*/
 /*__CSS__*/
 </style>
 </head>
 <body>
-<div id="app">
-  <header class="top">
-    <div class="brandline"><strong id="brand">Fishbowl Studio</strong><span id="counter" class="muted"></span></div>
-    <nav class="nav" role="tablist" aria-label="Views">
-      <button class="navbtn active" data-view="drafts" role="tab">Drafts <span class="badge" id="badge-drafts"></span></button>
-      <button class="navbtn" data-view="reads" role="tab">Reads</button>
-      <button class="navbtn" data-view="playbook" role="tab">Playbook <span class="badge" id="badge-playbook"></span></button>
-      <button class="navbtn" data-view="settings" role="tab">Settings</button>
+<div id="app" class="shell">
+  <aside class="side" id="side" aria-label="Studio">
+    <div class="wordmark"><span class="mark" id="mark"></span><span class="txt">Fishbowl Studio</span></div>
+    <div class="persona" id="persona"></div>
+    <nav class="nav" id="nav" aria-label="Sections">
+      <button class="navbtn active" data-view="drafts" data-icon="drafts"><span class="lbl">Drafts</span><span class="badge" id="badge-drafts"></span></button>
+      <button class="navbtn" data-view="sources" data-icon="sources"><span class="lbl">Sources</span></button>
+      <button class="navbtn" data-view="topics" data-icon="topics"><span class="lbl">Topics</span></button>
+      <button class="navbtn" data-view="schedule" data-icon="schedule"><span class="lbl">Schedule</span></button>
+      <button class="navbtn" data-view="settings" data-icon="settings"><span class="lbl">Settings</span></button>
+      <span class="sep" role="separator"></span>
+      <button class="navbtn" data-view="reads" data-icon="reads"><span class="lbl">Reads</span></button>
+      <button class="navbtn" data-view="playbook" data-icon="playbook"><span class="lbl">Playbook</span><span class="badge" id="badge-playbook"></span></button>
     </nav>
-  </header>
-  <div id="stale" class="banner warn" hidden>A newer board is open further down the chat. This one won't update; use the newest.</div>
-  <div id="flash" class="banner" role="status" aria-live="polite" hidden></div>
-  <div id="jobs" class="banner info" hidden></div>
-  <main id="view"><p class="muted">Loading the board…</p></main>
+    <div class="side-foot" id="side-foot"></div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <button class="btn icon ghost" id="menu-btn" aria-label="Open the menu" aria-expanded="false"></button>
+      <span class="today" id="counter" aria-live="polite"></span>
+      <span class="grow"></span>
+      <span id="brand" class="sr">Fishbowl Studio</span>
+      <button class="btn sm ghost" id="full-btn"><span id="full-lbl">Full screen</span></button>
+    </header>
+    <div class="banners">
+      <div id="stale" class="banner warn" hidden>A newer board is open further down the chat. This one won't update; use the newest.</div>
+      <div id="flash" class="banner" role="status" aria-live="polite" hidden></div>
+      <div id="jobs" class="banner info" hidden></div>
+    </div>
+    <main id="view"><p class="muted">Loading the board…</p></main>
+  </div>
+  <div class="scrim" id="scrim" hidden></div>
 </div>
 <script>
 //__BRIDGE__

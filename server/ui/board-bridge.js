@@ -16,7 +16,13 @@
   function applyHostContext(c) {
     if (!c) return;
     const root = document.documentElement;
-    if (c.theme) { root.dataset.theme = c.theme; root.style.colorScheme = c.theme; }
+    // The board keeps its own look (skins/*.css). A skin named after the host theme wins if one
+    // exists (e.g. a future skins/dark.css); otherwise it stays light.
+    if (c.theme) {
+      root.dataset.theme = c.theme;
+      const skins = window.STUDIO_SKINS || ['light'];
+      root.dataset.skin = skins.includes(c.theme) ? c.theme : 'light';
+    }
     const vars = c.styles && c.styles.variables;
     if (vars) for (const k in vars) if (vars[k] != null) root.style.setProperty(k, vars[k]);
     const fonts = c.styles && c.styles.css && c.styles.css.fonts;
@@ -124,5 +130,6 @@
     onResult: (f) => listeners.result.push(f),
     isSuperseded: () => superseded,
     fullscreen: () => request('ui/request-display-mode', { mode: 'fullscreen' }).catch(() => null),
+    displayMode: (mode) => request('ui/request-display-mode', { mode }).catch(() => null),
   };
 })();

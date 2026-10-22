@@ -1,8 +1,11 @@
-// Board core and the Drafts view: tabs, chips, draft cards, takes cards and every action.
+// Board core: state, loading, the shell (sidebar, persona switcher, top bar, drawer) and the
+// small controls every page uses (segmented, switch, stepper, cards, empty states).
 // All text from the server is untrusted; it only ever reaches the DOM through textContent.
 (function () {
   const S = window.Studio;
-  const state = { view: 'drafts', tab: 'waiting', chip: 'all', platform: 'all', data: null, head: null, open: {}, busy: false };
+  const { icon } = window.StudioIcons;
+  const state = { view: 'drafts', tab: 'waiting', chip: 'all', platform: 'all', data: null, head: null, open: {}, menu: false, adding: false, drawer: false, display: 'inline' };
+  const $ = (id) => document.getElementById(id);
 
   function h(tag, props, ...kids) {
     const el = document.createElement(tag);
@@ -21,41 +24,33 @@
     if (!iso) return '';
     const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
     if (s < 60) return 'just now';
-    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-    return `${Math.floor(s / 86400)}d ago`;
+    if (s < 3600) return `${Math.floor(s / 60)}m`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h`;
+    return `${Math.floor(s / 86400)}d`;
   }
+  const hm = (iso) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
   const meter = (n, of = 5) => h('span', { class: 'meter', 'aria-label': `${n} of ${of}` }, [...Array(of)].map((_, i) => h('i', { class: i < n ? 'on' : '' })));
 
+  // ---------- feedback ----------
   let flashTimer;
   function flash(msg, kind = '') {
-    const el = document.getElementById('flash');
+    const el = $('flash');
     el.textContent = msg; el.className = `banner ${kind}`; el.hidden = !msg;
     clearTimeout(flashTimer);
     if (msg) flashTimer = setTimeout(() => { el.hidden = true; S.reportSize(); }, 6000);
     S.reportSize();
   }
 
-  function askClaudeButton(label, prompt) {
-    return h('button', { class: 'ghost', onclick: async () => {
+  function askClaudeButton(label, prompt, cls = 'btn ghost') {
+    return h('button', { class: cls, onclick: async () => {
       const ok = await S.askClaude(prompt);
       flash(ok ? 'Sent to Claude.' : `Ask Claude in the chat: "${prompt}"`, ok ? 'good' : 'warn');
     } }, label);
   }
 
-  function setHeader(head) {
-    if (!head) return;
-    state.head = head;
-    document.getElementById('brand').textContent = head.brand || 'Fishbowl Studio';
-    document.getElementById('counter').textContent = head.counter_text || '';
-    document.getElementById('badge-playbook').textContent = head.proposals || '';
-    const jobs = document.getElementById('jobs');
-    jobs.replaceChildren();
-    jobs.hidden = !head.jobs;
-    if (head.jobs) jobs.append(h('span', { text: `${head.jobs} rewrite/redo job(s) waiting for Claude.` }), askClaudeButton('Ask Claude now', 'Run my Fishbowl Studio rewrites and redos now.'));
-  }
-
+  // ---------- server calls ----------
   async function load(params) {
     Object.assign(state, params || {});
     const args = { view: state.view };
@@ -67,204 +62,193 @@
     } catch (e) { flash(`Couldn't load: ${e.message || e}`, 'bad'); }
   }
 
+  // Call a tool, show its message, reload the view. Returns the structured result (with ok).
+  async function call(name, args, { reload = true, quiet = false } = {}) {
+    if (S.isSuperseded()) { flash('This board is out of date. Use the newest one in the chat.', 'warn'); return null; }
+    try {
+      const res = await S.callTool(name, args);
+      const sc = res.structuredContent || {};
+      const ok = !res.isError && sc.ok !== false;
+      const msg = sc.message || (res.content && res.content[0] && res.content[0].text) || '';
+      if (!quiet || !ok) flash(msg, ok ? 'good' : 'bad');
+      if (ok) state.open = {};
+      if (reload) await load();
+      return { ...sc, ok, message: msg };
+    } catch (e) { flash(`That didn't work: ${e.message || e}`, 'bad'); return null; }
+  }
+  const act = (args, opts) => call('studio_act', args, opts);
+  const setting = (patch, opts) => call('studio_config', { action: 'patch', patch }, opts);
+
   function show(sc) {
     if (!sc) return;
     state.data = sc;
     if (sc.view) state.view = sc.view;
     if (sc.tab) state.tab = sc.tab;
     setHeader(sc.header);
-    if (sc.counts) document.getElementById('badge-drafts').textContent = sc.counts.waiting || '';
+    if (sc.counts) $('badge-drafts').textContent = sc.counts.waiting || '';
     render();
   }
 
-  async function act(args, { reload = true } = {}) {
-    if (S.isSuperseded()) { flash('This board is out of date. Use the newest one in the chat.', 'warn'); return null; }
-    try {
-      const res = await S.callTool('studio_act', args);
-      const sc = res.structuredContent || {};
-      const msg = sc.message || (res.content && res.content[0] && res.content[0].text) || '';
-      flash(msg, sc.ok ? 'good' : 'bad');
-      if (sc.ok) state.open = {};
-      if (reload) await load();
-      return sc;
-    } catch (e) { flash(`That didn't work: ${e.message || e}`, 'bad'); return null; }
+  // ---------- shell ----------
+  const avatarClass = (slug) => { let n = 0; for (const ch of String(slug || '')) n = (n * 31 + ch.charCodeAt(0)) >>> 0; return `c${(n % 6) + 1}`; };
+  const initials = (name) => String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
+  const avatar = (p, size = '') => h('span', { class: `avatar ${size} ${avatarClass(p.slug)}`, 'aria-hidden': 'true', text: initials(p.name) });
+  const personaStatus = (p) => !p.setup_complete && !p.feeds ? h('span', { class: 'tag warn' }, 'Needs setup') : p.waiting ? h('span', { class: 'tag accent' }, `${p.waiting} to review`) : h('span', { class: 'tag ok' }, icon('check'), 'All clear');
+
+  function setHeader(head) {
+    if (!head) return;
+    state.head = head;
+    $('brand').textContent = head.brand || 'Fishbowl Studio';
+    const c = head.counter || {};
+    const next = c.next ? `next batch ${hm(c.next)}` : 'no more batches today';
+    $('counter').replaceChildren(icon('schedule'), h('span', {}, h('b', { text: String(c.released ?? 0) }), ` of ${c.cap ?? 0} today`), h('span', { class: 'long', text: ` · ${c.held ?? 0} held · ${next}` }));
+    $('badge-playbook').textContent = head.proposals || '';
+    const jobs = $('jobs');
+    jobs.replaceChildren();
+    jobs.hidden = !head.jobs;
+    if (head.jobs) jobs.append(h('span', { text: `${plural(head.jobs, 'job')} waiting for Claude (rewrites, redos and links to draft).` }), askClaudeButton('Ask Claude now', 'Run my Fishbowl Studio rewrites and redos now.', 'btn sm primary'));
+    $('side-foot').textContent = head.home ? `Everything for ${head.brand} lives in ${head.home}` : '';
+    renderPersona();
+  }
+
+  function renderPersona() {
+    const head = state.head;
+    const box = $('persona');
+    if (!head || !head.persona) return box.replaceChildren();
+    const me = head.persona;
+    const btn = h('button', { class: 'persona-btn', 'aria-haspopup': 'true', 'aria-expanded': String(state.menu), title: me.name, onclick: () => { state.menu = !state.menu; state.adding = false; renderPersona(); S.reportSize(); } },
+      avatar(me, 'sm'), h('span', { class: 'who' }, h('span', { class: 'nm', text: me.name }), h('span', { class: 'hd', text: `@${me.slug}` })), h('span', { class: 'chev' }, icon('chevron')));
+    let menu = null;
+    if (state.menu) {
+      const items = (head.personas || []).map((p) => h('button', { class: 'item', role: 'menuitem', onclick: () => switchTo(p.slug) },
+        avatar(p, 'sm'), h('span', { class: 'nm', text: p.name }), p.active ? icon('check') : personaStatus(p)));
+      let add;
+      if (state.adding) {
+        const inp = h('input', { type: 'text', placeholder: 'Brand name', 'aria-label': 'New persona name', maxlength: '60' });
+        const go = async () => { const r = await call('studio_personas', { action: 'create', name: inp.value }, { reload: false }); if (r && r.ok) { state.menu = false; state.adding = false; await load({ view: 'drafts', tab: 'waiting', chip: 'all' }); } };
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); if (e.key === 'Escape') { state.adding = false; renderPersona(); } });
+        add = h('div', { class: 'newp' }, inp, h('div', { class: 'chips' }, h('button', { class: 'btn sm primary', onclick: go }, 'Create'), h('button', { class: 'btn sm ghost', onclick: () => { state.adding = false; renderPersona(); } }, 'Cancel')));
+        setTimeout(() => inp.focus && inp.focus(), 0);
+      } else add = h('button', { class: 'item add', onclick: () => { state.adding = true; renderPersona(); S.reportSize(); } }, icon('plus'), h('span', { class: 'nm' }, 'Add persona'));
+      menu = h('div', { class: 'menu', role: 'menu' }, items, h('hr'), add);
+    }
+    box.replaceChildren(...[btn, menu].filter(Boolean));
+  }
+
+  async function switchTo(slug) {
+    state.menu = false; setDrawer(false);
+    if (state.head && state.head.persona && state.head.persona.slug === slug) return renderPersona();
+    const r = await call('studio_personas', { action: 'switch', slug }, { reload: false });
+    if (r && r.ok) await load({ view: 'drafts', tab: 'waiting', chip: 'all', platform: 'all' });
+  }
+
+  function setDrawer(open) {
+    state.drawer = open;
+    $('app').classList.toggle('drawer-open', open);
+    $('scrim').hidden = !open;
+    $('menu-btn').setAttribute('aria-expanded', String(open));
+    S.reportSize();
   }
 
   function render() {
     document.querySelectorAll('.navbtn').forEach((b) => b.classList.toggle('active', b.dataset.view === state.view));
-    const root = document.getElementById('view');
     const pages = window.BoardPages || {};
-    const fn = state.view === 'drafts' ? renderDrafts : pages[state.view];
-    root.replaceChildren(fn ? fn(state.data) : h('p', { class: 'muted' }, 'Loading…'));
+    const fn = pages[state.view];
+    $('view').replaceChildren(fn && state.data && state.data.view === state.view ? fn(state.data) : h('p', { class: 'muted' }, 'Loading…'));
     S.reportSize();
   }
 
-  // ---------- Drafts ----------
-  const TAB_LABEL = { waiting: 'Waiting', passed: 'Passed', killed: 'Killed', scrapped: 'Scrapped' };
+  // ---------- page building blocks ----------
+  const page = (title, sub, actions, ...body) => h('section', { class: 'page' }, h('div', { class: 'page-head' }, h('div', {}, h('h1', { text: title }), sub ? h('p', { text: sub }) : null), actions || null), body);
+  const card = ({ icon: ic, title, sub, end, cls = '' }, ...body) => h('section', { class: `card ${cls}` },
+    title ? h('div', { class: 'card-head' }, ic ? h('span', { class: 'ico' }, icon(ic)) : null, h('div', {}, h('h2', { text: title }), sub ? h('p', { text: sub }) : null), end ? h('div', { class: 'end' }, end) : null) : null, body);
+  const empty = ({ icon: ic = 'spark', title, text, action }) => h('div', { class: 'empty' }, h('span', { class: 'ico' }, icon(ic)), h('h3', { text: title }), text ? h('p', { text }) : null, action || null);
 
-  function renderDrafts(d) {
-    if (!d || d.view !== 'drafts') return h('p', { class: 'muted' }, 'Loading…');
-    const tabs = h('div', { class: 'tabs', role: 'tablist' }, Object.keys(TAB_LABEL).map((t) =>
-      h('button', { class: `tab ${t === d.tab ? 'active' : ''}`, onclick: () => load({ tab: t, chip: 'all' }) }, `${TAB_LABEL[t]} ${d.counts[t] || 0}`)));
-    const chips = h('div', { class: 'chips' },
-      d.chips.map((c) => h('button', { class: `chip ${c === d.chip ? 'active' : ''}`, onclick: () => load({ chip: c }) }, c)),
-      ['all', 'linkedin', 'x'].map((p) => h('button', { class: `chip ${p === d.platform ? 'active' : ''}`, onclick: () => load({ platform: p }) }, p === 'all' ? 'all platforms' : p === 'x' ? 'X' : 'LinkedIn')));
-    const cards = d.units.length ? d.units.map((u) => (u.type === 'set' ? setCard(u) : draftCard(u, d.tab))) : [h('div', { class: 'empty' }, emptyText(d.tab))];
-    return h('div', {}, tabs, chips, cards, d.total > d.units.length ? h('p', { class: 'muted small' }, `Showing ${d.units.length} of ${d.total}.`) : null);
+  // seg([{value, label, n}], current, onpick, ariaLabel)
+  const seg = (opts, cur, onpick, label) => h('div', { class: 'seg', role: 'radiogroup', 'aria-label': label },
+    opts.map((o) => h('button', { class: o.value === cur ? 'on' : '', role: 'radio', 'aria-checked': String(o.value === cur), onclick: () => { if (o.value !== cur) onpick(o.value); } }, o.label, o.n != null ? h('span', { class: 'n', text: String(o.n) }) : null)));
+  const switchCtl = (on, label, onchange) => h('button', { class: 'switch', role: 'switch', 'aria-checked': String(!!on), 'aria-label': label, onclick: () => onchange(!on) });
+  function stepper(value, min, max, onchange, label) {
+    const set = (v) => { if (v >= min && v <= max && v !== value) onchange(v); };
+    return h('div', { class: 'stepper', role: 'group', 'aria-label': label },
+      h('button', { class: 'btn ghost', 'aria-label': `Fewer: ${label}`, disabled: value <= min, onclick: () => set(value - 1) }, '−'),
+      h('output', { 'aria-live': 'polite', text: String(value) }),
+      h('button', { class: 'btn ghost', 'aria-label': `More: ${label}`, disabled: value >= max, onclick: () => set(value + 1) }, '+'));
+  }
+  // A destructive button that asks once: the first click arms it, the second does it.
+  function confirmButton(label, armed, fn, cls = 'btn sm danger') {
+    const b = h('button', { class: cls, 'aria-label': label }, icon('trash'), h('span', { class: 'sr', text: label }));
+    b.addEventListener('click', () => {
+      if (b.classList.contains('armed')) return fn();
+      b.classList.add('armed'); b.replaceChildren(h('span', { text: armed }));
+      setTimeout(() => { if (b.classList.contains('armed')) { b.classList.remove('armed'); b.replaceChildren(icon('trash'), h('span', { class: 'sr', text: label })); } }, 4000);
+    });
+    return b;
+  }
+  function copyButton(text, label, cls = 'btn primary') {
+    return h('button', { class: cls, onclick: async (e) => {
+      const ok = await S.copy(text);
+      const b = e.target;
+      if (ok) { b.textContent = 'Copied ✓'; setTimeout(() => { b.textContent = label; }, 2000); }
+      else flash('Your browser blocked copying. Select the text and copy it by hand.', 'warn');
+    } }, label);
   }
 
-  function emptyText(tab) {
-    return { waiting: 'Nothing waiting. New drafts arrive at the next batch time.', passed: 'Nothing passed yet.', killed: 'Nothing killed.', scrapped: 'Nothing scrapped.' }[tab];
+  // ---------- rail and onboarding, shared by Drafts ----------
+  function todayCard(head) {
+    const c = head.counter || {};
+    return card({ icon: 'schedule', title: 'Today', sub: c.next ? `Next batch at ${hm(c.next)}` : 'No more batches today', cls: 'today-card' },
+      h('div', { class: 'nums' },
+        h('div', { class: 'num' }, h('b', { text: String(c.released ?? 0) }), h('span', { text: `of ${c.cap} released` })),
+        h('div', { class: 'num' }, h('b', { text: String(c.held ?? 0) }), h('span', { text: 'held for later' })),
+        h('div', { class: 'num' }, h('b', { text: String(c.scrapped ?? 0) }), h('span', { text: 'expired' }))));
   }
 
-  function sourceBlock(item) {
-    if (!item) return null;
-    return h('button', { class: 'source', title: 'Open the story', onclick: async () => { if (!(await S.openLink(item.url))) flash(item.url); } },
-      h('span', { class: 't', text: item.title }), h('span', { class: 's', text: `${item.source || ''}${item.published ? ' · ' + ago(item.published) : ''} · open ↗` }));
+  function profilesCard(head) {
+    return card({ icon: 'user', title: 'Your brands', sub: 'Each one has its own drafts, sources and voice.' },
+      h('div', { class: 'profiles' }, (head.personas || []).map((p) => h('button', { class: `profile ${p.active ? 'active' : ''}`, onclick: () => switchTo(p.slug) },
+        avatar(p), h('span', { class: 'who' }, h('span', { class: 'nm', text: p.name }), h('span', { class: 'sub', text: `${plural(p.feeds, 'source')}` })), personaStatus(p)))),
+      h('div', { class: 'chips card-foot' }, h('button', { class: 'btn sm ghost', onclick: () => { state.menu = true; state.adding = true; renderPersona(); setDrawer(true); } }, icon('plus'), 'Add persona')));
   }
 
-  function rankMarks(r) {
-    if (!r) return [];
-    const out = [];
-    if (r.pos) out.push(`#${r.pos} of ${r.of}`);
-    if (r.score != null) out.push(`rank ${r.score.toFixed(2)}`);
-    if (r.signals) out.push(Object.entries(r.signals).map(([k, v]) => `${k} ${v}`).join(' · '));
-    if (r.explore) out.push('novelty pick');
-    return out.map((t) => h('span', { text: t }));
+  const STEPS = {
+    sources: { title: 'Add your news sources', text: 'Paste a few sites you already read for work. It checks each one works.', go: 'sources', cta: 'Add sources' },
+    topics: { title: 'Pick your topics', text: 'Tell it what to pay attention to, and what to go easy on.', go: 'topics', cta: 'Choose topics' },
+    schedule: { title: 'Set it to run', text: 'Copy one line into a Cowork scheduled task. Drafts arrive here after its first run.', go: 'schedule', cta: 'Set the schedule' },
+  };
+  function firstRunCard(head) {
+    const fr = head.first_run;
+    if (!fr || !fr.show) return null;
+    return card({ icon: 'spark', title: `Here's how this works`, sub: `Three steps and ${head.brand} gets drafts every day. You approve the good ones and post them yourself.` },
+      h('ol', { class: 'steps' }, fr.steps.map((s, i) => { const d = STEPS[s.key]; return h('li', { class: `step ${s.done ? 'done' : ''}` },
+        h('span', { class: 'num' }, s.done ? icon('check') : String(i + 1)), h('h3', { text: d.title }), h('p', { text: d.text }),
+        h('button', { class: `btn sm ${s.done ? 'ghost' : 'primary'}`, onclick: () => load({ view: d.go }) }, s.done ? 'Done · change' : d.cta)); })),
+      h('p', { class: 'hint' }, 'Rather talk it through? ', askClaudeButton('Ask Claude to set it up with you', 'Set up Fishbowl Studio for my brand (/studio:setup).', 'btn sm ghost')));
   }
 
-  function marks(c) {
-    return h('div', { class: 'marks' },
-      c.experiment ? h('span', { class: 'pill warn', title: c.experiment }, 'experiment') : null,
-      c.shapes.map((s) => h('span', { class: 'pill' }, (c.hybrid ? '× ' : '') + s)),
-      c.flags.map((f) => h('span', { class: 'flag', text: `⚠ ${f}` })),
-      rankMarks(c.rank),
-      c.decided_at ? h('span', { text: `decided ${ago(c.decided_at)}` }) : null,
-      c.rewriting ? h('span', { text: '✎ rewriting…' }) : c.revised ? h('span', { text: '✎ revised from your note' }) : null,
-      c.notes ? h('span', { text: `${c.notes} note${c.notes > 1 ? 's' : ''}` }) : null,
-      c.resurrected ? h('span', { text: 'resurrected' }) : null);
-  }
-
-  const STATUS = { pending: ['waiting', ''], option: ['pick one', 'warn'], passed: ['passed · not posted yet', 'ok'], edited: ['passed (edited) · not posted yet', 'ok'], posted: ['posted', 'ok'], killed: ['killed', 'bad'], passed_over: ['passed over', 'bad'], unpicked: ['not picked', ''], scrapped: ['scrapped', ''] };
-
-  function head(c) {
-    const [label, kind] = STATUS[c.status] || [c.status, ''];
-    return h('div', { class: 'meta' }, h('span', { class: 'pill platform' }, c.platform_name), h('span', { text: ago(c.released_at || c.created_at) }), h('span', { class: `pill ${kind}` }, label),
-      c.scrap_reason ? h('span', { text: c.scrap_reason === 'stale' ? 'went stale' : 'over the daily cap' }) : null);
-  }
-
-  function context(c) {
-    const t = c.kind === 'evergreen' ? 'evergreen post' : c.origin === 'draft_thought' ? 'drafted from a thought you liked' : c.origin === 'redo' ? 'redo' : c.origin === 'owner_item' || c.origin === 'draft_item' ? 'you asked for this story' : null;
-    return t ? h('div', { class: 'context', text: t }) : null;
-  }
-
-  const heart = (c, target = 'draft', on = c.hearted) => h('button', { class: `heart ${on ? 'on' : ''}`, 'aria-label': on ? 'Remove heart' : 'Heart', 'aria-pressed': String(!!on), onclick: () => act({ action: 'heart', target, id: c.id }) }, on ? '♥' : '♡');
-
-  function draftCard(c, tab) {
-    const card = h('article', { class: 'card', id: `d${c.id}` },
-      head(c), context(c), h('div', { class: 'text', text: c.text }),
-      c.original ? h('div', { class: 'original', text: `original: ${c.original}` }) : null,
-      sourceBlock(c.item), marks(c),
-      c.restore_trail.map((r) => h('div', { class: 'trail', text: `killed → restored: ${r.reason}` })),
-      c.thinking ? h('details', {}, h('summary', {}, 'Thinking'), h('div', { class: 'thinking', text: c.thinking }),
-        h('div', { class: 'actions' }, heart(c, 'thinking', c.thinking_hearted), h('button', { onclick: () => act({ action: 'draft_this', id: c.id }) }, 'Draft this'),
-          h('span', { class: 'small muted', text: [c.topic, c.form].filter(Boolean).join(' · ') }))) : null,
-      actions(c), panels(c));
-    return card;
-  }
-
-  function actions(c) {
-    const o = state.open;
-    const btn = (label, cls, fn) => h('button', { class: cls, onclick: fn }, label);
-    const toggle = (k) => () => { state.open = o[k] === c.id ? {} : { [k]: c.id }; render(); };
-    const row = [heart(c)];
-    if (c.status === 'pending') row.push(btn('Edit', '', toggle('edit')), btn('Pass', 'pass', () => act({ action: 'pass', id: c.id, hash: c.hash })), btn('Kill', 'kill', () => act({ action: 'kill', id: c.id })));
-    if (['passed', 'edited'].includes(c.status)) row.push(copyButton(c), btn('Mark posted', '', toggle('posted')), btn('Kill', 'kill', () => act({ action: 'kill', id: c.id })));
-    if (c.status === 'posted') row.push(copyButton(c), btn('Numbers', '', toggle('metrics')), c.post_url ? btn('Open post ↗', 'ghost', () => S.openLink(c.post_url)) : null);
-    if (c.status === 'killed') row.push(btn('Restore', '', toggle('restore')));
-    if (c.status === 'scrapped') row.push(btn('Resurrect', '', () => act({ action: 'resurrect', id: c.id })));
-    row.push(h('span', { class: 'spacer' }), btn('Note', 'ghost', toggle('note')));
-    return h('div', { class: 'actions' }, row);
-  }
-
-  function copyButton(c) {
-    return h('button', { class: 'primary', onclick: async (e) => {
-      const ok = await S.copy(c.text);
-      e.target.textContent = ok ? 'Copied ✓' : 'Copy failed';
-      if (!ok) flash('Your browser blocked copying. Select the text and copy it by hand.', 'warn');
-    } }, `Copy · ${c.platform_name} · ${c.chars}/${c.max_chars}`);
-  }
-
-  function counted(ta, c) {
-    const n = h('span', { class: 'count' });
-    const upd = () => { n.textContent = `${ta.value.length}/${c.max_chars}`; n.classList.toggle('over', ta.value.length > c.max_chars); };
-    ta.addEventListener('input', upd); upd();
-    return n;
-  }
-
-  function panels(c) {
-    const o = state.open;
-    if (o.edit === c.id) {
-      const ta = h('textarea', { 'aria-label': 'Edit the post' }); ta.value = c.text;
-      return h('div', { class: 'panel' }, ta, h('div', { class: 'row' }, counted(ta, c),
-        h('button', { onclick: () => act({ action: 'edit', id: c.id, hash: c.hash, text: ta.value }) }, 'Save edit'),
-        h('button', { class: 'pass', onclick: () => act({ action: 'edit', id: c.id, hash: c.hash, text: ta.value, and_pass: true }) }, 'Save & pass'),
-        h('button', { class: 'ghost', onclick: () => { state.open = {}; render(); } }, 'Cancel')));
-    }
-    if (o.note === c.id) {
-      const ta = h('textarea', { placeholder: "What's off about it? Claude rewrites it with this in mind.", 'aria-label': 'Note' });
-      return h('div', { class: 'panel' }, ta, h('div', { class: 'row' }, h('button', { class: 'primary', onclick: () => act({ action: 'note', id: c.id, text: ta.value }) }, 'Save note'), h('button', { class: 'ghost', onclick: () => { state.open = {}; render(); } }, 'Cancel')));
-    }
-    if (o.restore === c.id) {
-      const ta = h('textarea', { placeholder: 'Why bring it back? (required; the drafter learns from it)', 'aria-label': 'Restore reason' });
-      return h('div', { class: 'panel' }, ta, h('div', { class: 'row' }, h('button', { class: 'primary', onclick: () => act({ action: 'restore', id: c.id, reason: ta.value }) }, 'Restore')));
-    }
-    if (o.posted === c.id) {
-      const inp = h('input', { type: 'url', placeholder: 'Link to the live post (optional)', 'aria-label': 'Post link' });
-      return h('div', { class: 'panel' }, inp, h('div', { class: 'row' }, h('button', { class: 'primary', onclick: () => act({ action: 'mark_posted', id: c.id, url: inp.value.trim() || undefined }) }, 'Mark as posted')));
-    }
-    if (o.metrics === c.id) {
-      const f = {}; const m = c.metrics || {};
-      const fields = ['views', 'likes', 'replies', 'reposts', 'quotes'].map((k) => { f[k] = h('input', { type: 'number', min: '0', 'aria-label': k, value: m[k] ?? '' }); return [h('label', { text: k }), f[k]]; });
-      return h('div', { class: 'panel' }, h('div', { class: 'kv' }, fields), h('div', { class: 'row' }, h('button', { class: 'primary', onclick: async () => {
-        const args = { action: 'add', draft_id: c.id }; for (const k in f) args[k] = Number(f[k].value) || 0;
-        try { const r = await S.callTool('studio_metrics', args); flash(r.content[0].text, r.isError ? 'bad' : 'good'); state.open = {}; load(); } catch (e) { flash(String(e.message || e), 'bad'); }
-      } }, 'Save numbers'), h('span', { class: 'small muted', text: 'Or paste a CSV export into the chat and ask Claude to import it.' })));
-    }
-    return null;
-  }
-
-  const REASONS = ['too generic', 'wrong tone', 'misses the point', 'too long', 'not our story'];
-
-  function setCard(u) {
-    const o = state.open;
-    const takes = h('div', { class: 'takes' }, u.takes.map((c) => h('div', { class: `take ${c.id === u.our_pick ? 'pick' : ''}` },
-      h('div', { class: 'meta' }, h('span', { text: `${c.take_n}/${u.takes.length}` }), c.id === u.our_pick ? h('span', { class: 'pill', title: 'Ranked best of the set' }, 'our pick') : null, c.experiment ? h('span', { class: 'pill warn' }, 'experiment') : null, c.shapes.map((s) => h('span', { class: 'pill' }, s))),
-      h('div', { class: 'text', text: c.text }), h('span', { class: 'count', text: `${c.chars}/${c.max_chars}` }),
-      c.flags.map((f) => h('span', { class: 'flag small', text: `⚠ ${f}` })),
-      c.thinking ? h('details', {}, h('summary', {}, 'Thinking'), h('div', { class: 'thinking', text: c.thinking })) : null,
-      h('div', { class: 'actions' }, heart(c), h('button', { class: 'primary', onclick: () => act({ action: 'pick', id: c.id, hash: c.hash }) }, 'Pick this one')))));
-    let none = null;
-    if (o.none === u.set_id) {
-      const ta = h('textarea', { placeholder: 'What was wrong with all of them? (optional, helps the redo)', 'aria-label': 'Note on the set' });
-      none = h('div', { class: 'panel' }, h('div', { class: 'chips' }, REASONS.map((r) => h('button', { class: 'chip', onclick: () => { ta.value = ta.value ? `${ta.value}; ${r}` : r; } }, r))), ta,
-        h('div', { class: 'row' }, h('button', { class: 'kill', onclick: () => act({ action: 'none', set_id: u.set_id, note: ta.value.trim() || undefined }) }, 'None of these'),
-          h('button', { onclick: () => act({ action: 'redo', set_id: u.set_id, note: ta.value.trim() || undefined }) }, 'None, redo these'),
-          h('button', { class: 'ghost', onclick: () => { state.open = {}; render(); } }, 'Cancel')));
-    }
-    return h('article', { class: 'card set', id: `s${u.set_id}` },
-      h('div', { class: 'meta' }, h('span', { class: 'pill platform' }, u.platform_name), h('span', { text: ago(u.released_at) }), h('span', { class: 'pill warn' }, 'pick one'), h('span', { text: `${u.takes.length} takes` })),
-      context(u.takes[0]), sourceBlock(u.item), h('div', { class: 'marks' }, rankMarks(u.rank)), takes,
-      none || h('div', { class: 'actions' }, h('button', { class: 'ghost', onclick: () => { state.open = { none: u.set_id }; render(); } }, 'None of these…')));
-  }
-
-  window.Board = { state, h, load, act, flash, render, ago, meter, sourceBlock, askClaudeButton };
+  window.Board = { state, h, icon, load, call, act, setting, flash, render, ago, hm, plural, meter, page, card, empty, seg, switchCtl, stepper, confirmButton, copyButton, askClaudeButton, avatar, todayCard, profilesCard, firstRunCard, switchTo };
+  window.BoardPages = window.BoardPages || {};
 
   // ---------- boot ----------
-  document.querySelectorAll('.navbtn').forEach((b) => b.addEventListener('click', () => { state.open = {}; load({ view: b.dataset.view }); }));
+  $('mark').append(icon('fish'));
+  $('menu-btn').append(icon('menu'));
+  $('menu-btn').addEventListener('click', () => setDrawer(!state.drawer));
+  $('scrim').addEventListener('click', () => setDrawer(false));
+  $('full-btn').prepend(icon('expand'));
+  $('full-btn').addEventListener('click', async () => {
+    const want = state.display === 'fullscreen' ? 'inline' : 'fullscreen';
+    const r = await S.displayMode(want);
+    state.display = (r && r.mode) || state.display;
+    $('full-lbl').textContent = state.display === 'fullscreen' ? 'Exit full screen' : 'Full screen';
+  });
+  document.querySelectorAll('.navbtn').forEach((b) => {
+    b.prepend(icon(b.dataset.icon || 'drafts'));
+    b.addEventListener('click', () => { state.open = {}; state.menu = false; setDrawer(false); load({ view: b.dataset.view }); });
+  });
+  if (document.addEventListener) document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && (state.menu || state.drawer)) { state.menu = false; setDrawer(false); renderPersona(); } });
   let got = false;
   S.onResult((r) => { if (r && r.structuredContent && r.structuredContent.view) { got = true; S.setStamp(r.structuredContent.stamp); show(r.structuredContent); } });
   S.connect().then(() => setTimeout(() => { if (!got) load(); }, 800)).catch((e) => {
-    document.getElementById('view').replaceChildren(h('p', { class: 'muted', text: `The board couldn't connect to Claude (${e.message || e}). Ask Claude to "review my drafts in chat" instead.` }));
+    $('view').replaceChildren(h('p', { class: 'muted', text: `The board couldn't connect to Claude (${e.message || e}). Ask Claude to "review my drafts in chat" instead.` }));
   });
 })();
