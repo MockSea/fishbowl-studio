@@ -9,6 +9,7 @@ test('pack includes the plugin and leaves out dev, tests and scripts', () => {
   assert.ok(files.includes('server/index.js'));
   assert.ok(files.includes('skills/daily-run/SKILL.md'));
   assert.ok(files.some((f) => f.startsWith('shapes/')));
+  assert.ok(files.includes('accounts/x.json'), 'account slot types ship with the plugin');
   assert.ok(!files.some((f) => /^(dev|test|scripts)\//.test(f)));
   assert.ok(!files.some((f) => f.startsWith('bin/')), 'a top-level bin/ breaks Cowork installs');
 });

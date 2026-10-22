@@ -1,0 +1,8 @@
+{
+  "id": "reddit",
+  "label": "Reddit",
+  "icon": "chat",
+  "enables": "Later: reading private or signed-in-only communities. Public subreddits already work as sources without an account.",
+  "connect": "Help me connect my Reddit account to Fishbowl Studio. Don't ask for my password, don't type it for me and don't store anything: walk me through signing in to reddit.com myself, in my own browser, one step at a time, then check with me which account is open. The studio only notes that it's connected.",
+  "capabilities": { "read": false, "post": false }
+}

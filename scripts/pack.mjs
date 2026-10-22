@@ -7,7 +7,7 @@ import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const INCLUDE = ['.claude-plugin', 'server', 'skills', 'commands', 'platforms', 'shapes', 'defaults', 'docs', 'README.md', 'LICENSE', 'package.json'];
+export const INCLUDE = ['.claude-plugin', 'server', 'skills', 'commands', 'platforms', 'shapes', 'accounts', 'defaults', 'docs', 'README.md', 'LICENSE', 'package.json'];
 const SKIP = /(^|\/)(\.DS_Store|node_modules|\.git)(\/|$)/;
 
 export function listFiles(root = ROOT) {
