@@ -4,21 +4,21 @@ Fishbowl Studio is a Claude plugin with three parts:
 
 1. **A local MCP server** (`server/`, plain Node.js, no dependencies). It does the bookkeeping: reading feeds, dedupe, ranking, release times, verdicts, caps and learning. Every formula lives here as a small pure function with tests.
 2. **Skills and commands** (`skills/`, `commands/`). They tell Claude what to do at each step: react to stories, write takes, rewrite from notes, write the weekly report. Claude does the thinking; the server hands it exactly the context it needs and checks what comes back.
-3. **The board** (`server/ui/`), an MCP App: one self-contained HTML page rendered inside the chat. Every button calls a server tool through the host bridge.
+3. **The board** (`server/ui/`), an MCP App: one self-contained HTML page rendered inside the chat, assembled at read time from small files (no build step): the skin (`skins/*.css`), the component CSS (`board.css`), the bridge and four scripts (icons, shell, drafts feed, the other pages). Every button calls a server tool through the host bridge.
 
 The model never sees raw files and the server never writes prose.
 
 ## The data folder
 
-Everything lives in one folder, `~/Documents/Fishbowl Studio/` by default (set `STUDIO_HOME` to move it). Files you might open:
+Everything lives in one folder, `~/Documents/Fishbowl Studio/` by default (set `STUDIO_HOME` to move it). It holds one folder per brand, `personas/<slug>/`, and `personas.json`, which lists them and names the active one. Each persona folder holds exactly what a single-brand studio held before. Files you might open in a persona's folder:
 
 | File | What it is | Who changes it |
 |---|---|---|
-| `settings.json` | platforms, daily cap, release times, takes per story, overused phrases | you (board Settings or Claude) |
+| `settings.json` | platforms, daily cap, release times, news frequency, takes per story, overused phrases | you (board Settings and Schedule, or Claude) |
 | `voice.md` | the brand and its voice | you, via `/studio:voice` |
 | `voice-samples.json` | posts you pasted as examples | you |
-| `beat.json` | topics, off-limits list, curiosity keywords, names you allow | you, via setup |
-| `sources.json` | news feeds and the reading list | you, via `/studio:add-source` |
+| `beat.json` | topics and how much you want of each, off-limits list, curiosity keywords, names you allow | you (board Topics, or setup) |
+| `sources.json` | news feeds and the reading list, each can be paused | you (board Sources, or `/studio:add-source`) |
 | `positions.json` | what the brand believes, strength 1-5 | you; Claude only proposes |
 | `audience.json` | who you write for and their "buttons" | you; Claude only proposes |
 | `playbook.md` | the learned rules injected into every draft | you; Claude only proposes |
@@ -28,12 +28,21 @@ Everything lives in one folder, `~/Documents/Fishbowl Studio/` by default (set `
 
 All writes are atomic (temp file + rename) under a folder lock, so a scheduled run and an open board can't overwrite each other.
 
+## Personas
+
+One studio per brand. `personas.json` is `{active, personas: [{slug, name, created_at}]}`; the slug is the folder name (lowercase letters, digits and hyphens, 40 at most, never changed by a rename) and the name is what the board shows (it is kept equal to that persona's `settings.brand`). Up to 12 personas.
+
+- **Every tool acts on the active persona**, or on the one named by its `persona` argument (every tool takes one). A tool call is pinned to one persona for its whole run, so switching on the board can't split a call between two brands. A `persona` that isn't in the registry is refused; it can't name a path.
+- `studio_personas`: `list` (with what's waiting per persona), `create` (a new empty folder plus `settings.json` with the brand name; it becomes active), `switch`, `rename`. There is no delete: removing a brand is moving its folder away by hand.
+- **The daily run goes through every persona** (the `daily-run` skill lists them and passes `persona` on each call), so one scheduled task serves all brands. The board's switcher only changes which brand the board and the chat work on.
+- **Migration.** On the first start of this version, a studio folder from before personas (config files and `state/` at its root) is moved, entry by entry with a rename, into `personas/<slug>/` (slug from its brand name), and `personas.json` is written last. Nothing is copied or rewritten, and files that aren't the studio's stay where they are. If a move was interrupted, the next start finishes it; where a file already exists at the destination, the leftover root copy is kept beside it as `<name>.legacy-<time>` rather than overwriting anything. A brand-new folder gets one empty persona, "My brand".
+
 ## The daily pipeline
 
 The scheduled task asks Claude to "Run the Fishbowl Studio daily run". The `daily-run` skill then calls:
 
 1. `studio_status`: setup check, plus any release that is due.
-2. `studio_fetch`: every feed in `sources.json`. The feed parser is hand-written and tolerant (RSS 2.0, RSS 1.0, Atom), refuses DTDs and entities, strips HTML, keeps HTTPS links only, takes 12 items per feed and at most 3 MB per fetch (it parses the first 1 MB and 200 items, in one linear pass). Redirects are followed by hand, at most 5, and every hop must be a public HTTPS host name; hosts that resolve to private, loopback or link-local addresses are refused. Titles, summaries and authors are flattened to one line with control, format and Unicode tag characters removed. A dead feed is reported and the rest carry on.
+2. `studio_fetch`: every feed in `sources.json` that isn't paused. It first checks her **news frequency** (below) and skips the fetch, saying why, if it is too soon. The feed parser is hand-written and tolerant (RSS 2.0, RSS 1.0, Atom), refuses DTDs and entities, strips HTML, keeps HTTPS links only, takes 12 items per feed and at most 3 MB per fetch (it parses the first 1 MB and 200 items, in one linear pass). Redirects are followed by hand, at most 5, and every hop must be a public HTTPS host name; hosts that resolve to private, loopback or link-local addresses are refused. Titles, summaries and authors are flattened to one line with control, format and Unicode tag characters removed. A dead feed is reported and the rest carry on.
    - **Dedupe**: exact URL (normalised: tracking parameters, `www.`, fragments and trailing slashes removed) and **story level**: titles are normalised (outlet suffix and punctuation dropped, light stemming) and compared by Jaccard similarity (≥ 0.5) or containment (≥ 0.8 for 4+ words) within 72 hours. The first outlet's item represents the story; the others are recorded as "also covered by" and feed the trending signal.
    - **Ageing**: items older than 30 days with no drafts are pruned. Only items from the last 48 hours are drafted.
 3. `studio_wander` / `studio_record_wander` (up to twice): slow curiosity reading over the reading list. The source is chosen by topic interest (7-day mean triage interest, default 4, plus up to 3 for curiosity keywords seen recently), neglect (every third trip takes the least recently visited source), and caps (12 visits a day, same host at most every 2 h, same source every 24 h). Instruction-shaped entries are dropped. Findings never become drafts directly; they feed evergreen posts.
@@ -42,6 +51,30 @@ The scheduled task asks Claude to "Run the Fishbowl Studio daily run". The `dail
 6. `studio_release`: rank and release the due batch.
 
 Running the skill twice is harmless: fetched items dedupe, triaged items aren't re-queued, drafted stories aren't drafted again, and each batch releases once.
+
+## How often it reads the news
+
+A plugin can't schedule itself: the trigger is a Cowork scheduled task she creates once. `settings.fetch_every` is one of five presets, validated on save; anything else is refused. Each preset says what task to set (the board's Schedule page shows it with copy buttons, times worked out from her release hours) and the least time between two fetches:
+
+| Preset | Task to set in Cowork | Fetches when |
+|---|---|---|
+| `hourly` | repeat Hourly | 45 min or more since the last fetch |
+| `every_3h` | repeat Hourly | 2 h 45 min or more since the last fetch |
+| `twice_daily` | two tasks, Daily, an hour before the first batch and an hour before the batch nearest 13:00 | 5 h or more |
+| `daily` | Daily, an hour before the first batch | 20 h or more |
+| `weekdays` (default) | Weekdays, an hour before the first batch | 20 h or more, never on Saturday or Sunday |
+
+The gaps are a little under the interval so a run that starts a few minutes early still fetches. A run that comes too soon (an hourly task with "every 3 hours", a second run on the same day, a weekend run on "weekdays") skips only the fetch: triage, drafting and the release still happen. Cowork's scheduler has no "every 3 hours", so that preset uses an hourly task and the in-between runs end almost at once; the cost is a short Claude session each hour, which the Schedule page says. When she asks for a run in chat (`/studio:run`), the skill passes `force: true` and the news is read regardless.
+
+## Sources, topics and links from the board
+
+- **Sources** (`studio_sources`): `add` takes an address and test-fetches it through the same safe path as the feeds (below). A feed is used as is; a web page is searched for its `<link rel="alternate" type="application/rss+xml|atom+xml">` and that feed is fetched instead, if it too is a public HTTPS address. The name is hers if given, else the feed's title (flattened to one line, capped at 80, and replaced by the host name if it reads like an instruction), else the host. `pause`, `resume`, `remove` and `topic` (re-file under one of her topics) find the source by normalised address. Every write goes through the `sources.json` validator.
+- **Topics** (`studio_topics`): `add` turns "Cargo bikes" into the slug `cargo-bikes`, `remove` drops it (and re-files its sources under "other"), `weight` sets 1 (less), 2 (normal) or 3 (more). Weights move the drafting bar by one point: a story's interest counts one higher on a "more" topic and one lower on a "less" one, for both the threshold (6) and the order. They also tilt wandering the same way, and the triage queue tells Claude plainly which topics she wants more or less of. Every write goes through the `beat.json` validator.
+- **Draft from a link** (`studio_draft_link`): one article address, checked like a source address and fetched through the same path (HTTPS, public hosts only, redirects followed by hand and checked at every hop, private addresses refused, 3 MB cap). The page is parsed in linear passes: title (Open Graph title or `<title>`), description, and the paragraphs of its `<article>` or `<main>`, with scripts, styles and tags removed, entities decoded, flattened to one line, control and invisible characters stripped, fence tags neutralised, capped at 3,000 characters. A feed pasted here is refused with "add it under Sources". It is stored as a story marked `from_link`, skips triage (she chose it), and is queued as a "draft this" job; the brief fences the page exactly like a feed item and adds one line, outside the fence, that she sent the link herself. Pasting the same article again while it waits queues it once; an article already read from a feed is reused rather than fetched again.
+
+## What it has learned, in her words
+
+The Topics page explains learning with the same numbers the ranker uses. For each draft feature (topic, shape, platform, source, length, question, number, "we/our", evergreen, experiment) it counts approvals against skips over 21 days and shows the ones whose shrunk lift `(approved + 4·base)/(n + 4) − base` is at least 0.03 with two or more verdicts, strongest first, each with its sentence ("You approved 0 of 6 in the last 3 weeks (0%, against 53% overall)"). Under it, the four rank weights as percentages with how they moved in the last week.
 
 ## A drafting brief
 
@@ -100,16 +133,22 @@ Your own settings are fenced too. The voice, playbook, positions and audience re
 
 In the chat review list, story headlines never share a line with a `[draft · hash]` marker: they come last, fenced, keyed by list number.
 
+Pages she pastes with "Draft from a link" are outside text like any feed: cleaned the same way on the way in, fenced the same way in the brief. Feed titles that become source names are flattened and dropped if instruction-shaped. Persona names are flattened, capped at 60 and refused if instruction-shaped.
+
 ## Tools
 
 | Tool | Purpose |
 |---|---|
+| `studio_personas` | list, create, switch or rename personas |
 | `studio_status` | setup state, counter, waiting, jobs; runs due releases |
 | `studio_board` | opens the board (MCP App) and returns a text fallback |
-| `studio_view` | board data and text: drafts tabs, reads, playbook, settings |
+| `studio_view` | board data and text: drafts tabs, reads, playbook, settings, sources, topics, schedule |
 | `studio_act` | pass, edit, kill, pick, none, redo, restore, resurrect, heart, note, draft_this, mark_posted, unpost |
-| `studio_config` | get/set/patch the files in the data folder, with validation |
-| `studio_fetch` | fetch, dedupe and store news |
+| `studio_config` | get/set/patch the files in the persona's folder, with validation |
+| `studio_sources` | add (test-fetched), pause, resume, re-file or remove a source |
+| `studio_topics` | add, remove or weight a topic |
+| `studio_draft_link` | fetch one article and queue it to be drafted |
+| `studio_fetch` | fetch, dedupe and store news (respects the news frequency unless `force`) |
 | `studio_wander`, `studio_record_wander` | curiosity reading |
 | `studio_triage_queue`, `studio_record_triage` | triage |
 | `studio_drafting_brief`, `studio_save_takes` | the drafting loop |
@@ -118,6 +157,15 @@ In the chat review list, story headlines never share a line with a `[draft · ha
 | `studio_proposals` | list or propose changes (Claude) |
 | `studio_proposal_decide` | accept or reject a proposal; board only, hidden from Claude |
 | `studio_metrics` | enter post numbers or import a CSV |
+
+Every tool except `studio_personas` also takes `persona`.
+
+## The board
+
+Sections: Drafts, Sources, Topics, Schedule, Settings, then Reads and Playbook, with the persona switcher at the top of the sidebar. Every setting is a control that saves on click (switch, − / + stepper, segmented choice, hour chips, preset cards); text fields appear only for text (an address, a name, an example post, a note). Lint flags are shown as plain-language chips; "Approve" and "Skip" are the pass and kill verdicts (Skip teaches, like kill always did, and **Bring back** undoes it with a reason).
+
+- **Look.** All colours, radii, type sizes, spacing, shadows and layout widths are CSS custom properties in `server/ui/skins/light.css`; `board.css` only refers to them (a test fails on any literal colour there). A second skin is one more file in `skins/` scoped to `:root[data-skin="<name>"]`; every skin file is bundled, and a skin named after the host theme (e.g. `dark.css`) is used when the host reports that theme. Without one the board stays light. The host's font is used when it provides one.
+- **Layout.** Over 900 px: sidebar, page, and (over 1180 px) a right column. 641-900 px (a chat-width window): the sidebar becomes a strip of icons with short labels. 640 px and under: a menu button opens the sidebar as a drawer. The board sits in an auto-height iframe, so nothing is fixed to the viewport or sized in `vh` (a bottom tab bar would sit at the end of the page, not the bottom of the screen).
 
 ## What changed from the original agent
 
