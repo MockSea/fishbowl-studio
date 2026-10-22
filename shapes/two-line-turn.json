@@ -5,7 +5,9 @@
   "corner": "comedy",
   "platforms": [
     "x",
-    "linkedin"
+    "linkedin",
+    "threads",
+    "bluesky"
   ],
   "origin": "seed",
   "form": "two-line"

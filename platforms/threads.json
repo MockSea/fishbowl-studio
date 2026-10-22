@@ -1,0 +1,13 @@
+{
+  "id": "threads",
+  "name": "Threads",
+  "max_chars": 500,
+  "target_chars": [80, 300],
+  "long_over": 300,
+  "length_words": { "short": 15, "mid": 45 },
+  "line_breaks": true,
+  "hashtags_max": 0,
+  "links_in_text": false,
+  "register": "Conversational and short. One idea, said the way you'd say it to a regular at the counter. A line break or two is fine; no thread, no \"1/\". At most 500 characters, usually far fewer.",
+  "how": "Write a Threads post that reacts to the story. Someone scrolling past should get the point without opening anything."
+}

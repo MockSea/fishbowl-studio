@@ -5,7 +5,9 @@
   "corner": "analysis",
   "platforms": [
     "linkedin",
-    "x"
+    "x",
+    "threads",
+    "bluesky"
   ],
   "origin": "seed"
 }

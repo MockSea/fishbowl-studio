@@ -1,0 +1,13 @@
+{
+  "id": "bluesky",
+  "name": "Bluesky",
+  "max_chars": 300,
+  "target_chars": [60, 240],
+  "long_over": 240,
+  "length_words": { "short": 12, "mid": 35 },
+  "line_breaks": true,
+  "hashtags_max": 0,
+  "links_in_text": false,
+  "register": "Short and plain. One or two sentences, at most 300 characters, usually fewer. Dry is fine, smug isn't. No thread, no preamble.",
+  "how": "Write a Bluesky post that reacts to the story. Someone who only sees this post should still get it."
+}
