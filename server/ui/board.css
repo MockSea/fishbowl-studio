@@ -332,6 +332,18 @@ input, textarea { caret-color: var(--accent); }
 * { scrollbar-color: var(--control-line) var(--paper); }
 a { color: var(--accent-text); text-underline-offset: .2em; }
 
+/* the flywheel: skip reasons, learned boosts, the coach */
+.why-ask { padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-3); }
+.why-ask .row { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.why-ask .row .grow { flex: 1; }
+.why-ask .hint { margin: 0; }
+.warn-text { color: var(--warn); }
+.row-item .sub.warn-text { color: var(--warn); }
+.sub-inline { color: var(--ink-3); font-size: var(--t-sm); }
+.learn.try .dir { background: var(--accent-soft); color: var(--accent-text); }
+.coach-summary { margin: 0 0 var(--s-2); font-size: var(--t-post); line-height: var(--lh); }
+.letter .i { width: 18px; height: 18px; }
+
 /* ---------- responsive ---------- */
 @media (max-width: 1180px) {
   .cols { grid-template-columns: minmax(0, 1fr); }

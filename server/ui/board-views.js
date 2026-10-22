@@ -4,7 +4,8 @@
 (function () {
   const S = window.Studio;
   const { icon } = window.StudioIcons;
-  const state = { view: 'drafts', tab: 'waiting', chip: 'all', platform: 'all', data: null, head: null, open: {}, menu: false, adding: false, drawer: false, display: 'inline' };
+  // why: the draft or set just skipped, for the optional one-tap reason.
+  const state = { view: 'drafts', tab: 'waiting', chip: 'all', platform: 'all', data: null, head: null, open: {}, why: null, menu: false, adding: false, drawer: false, display: 'inline' };
   const $ = (id) => document.getElementById(id);
 
   function h(tag, props, ...kids) {
@@ -102,7 +103,8 @@
     const c = head.counter || {};
     const next = c.next ? `next batch ${hm(c.next)}` : 'no more batches today';
     $('counter').replaceChildren(icon('schedule'), h('span', {}, h('b', { text: String(c.released ?? 0) }), ` of ${c.cap ?? 0} today`), h('span', { class: 'long', text: ` · ${c.held ?? 0} held · ${next}` }));
-    $('badge-playbook').textContent = head.proposals || '';
+    $('badge-coach').textContent = head.proposals || '';
+    $('badge-sources').textContent = head.suggestions || '';
     const jobs = $('jobs');
     jobs.replaceChildren();
     jobs.hidden = !head.jobs;
@@ -194,6 +196,18 @@
     } }, label);
   }
 
+  // A proposal she decides with one tap: what would change, and why it's suggested.
+  const KIND_LABEL = { playbook: 'Playbook', position: 'Position', audience: 'Audience', shape: 'Shape', phrase: 'Overused phrase' };
+  const OP_LABEL = { add: 'Add', remove: 'Remove', replace: 'Replace', strengthen: 'Stronger', weaken: 'Weaker', drop: 'Drop', raise: 'Raise', lower: 'Lower' };
+  function proposalRow(p) {
+    const decide = (decision) => () => call('studio_proposal_decide', { id: p.id, decision });
+    const text = p.kind === 'shape' ? `${p.name}: ${p.text}` : p.kind === 'phrase' ? `“${p.text}”: keep it rare` : p.text;
+    return h('div', { class: 'row-item' },
+      h('span', { class: 'who' }, h('span', { class: 'sub' }, h('span', { class: 'tag' }, KIND_LABEL[p.kind] || p.kind), ' ', h('span', { class: 'tag warn' }, OP_LABEL[p.op] || p.op), p.section ? ` ${p.section}` : '', p.source === 'edits' ? h('span', { class: 'tag accent' }, 'From your edits') : null),
+        p.old ? h('span', { class: 'sub', text: `Now: ${p.old}` }) : null, text ? h('span', { class: 'nm', text }) : null, p.reason ? h('span', { class: 'sub', text: `Why: ${p.reason}` }) : null),
+      h('span', { class: 'ctl' }, h('button', { class: 'btn sm approve', onclick: decide('accept') }, icon('check'), 'Accept'), h('button', { class: 'btn sm skip', onclick: decide('reject') }, 'Reject')));
+  }
+
   // ---------- rail and onboarding, shared by Drafts ----------
   function todayCard(head) {
     const c = head.counter || {};
@@ -212,7 +226,7 @@
   }
 
   const STEPS = {
-    sources: { title: 'Add your news sources', text: 'Paste a few sites you already read for work. It checks each one works.', go: 'sources', cta: 'Add sources' },
+    sources: { title: 'Add your sources', text: 'Paste a few sites you already read for work, or the accounts and searches your audience follows.', go: 'sources', cta: 'Add sources' },
     topics: { title: 'Pick your topics', text: 'Tell it what to pay attention to, and what to go easy on.', go: 'topics', cta: 'Choose topics' },
     schedule: { title: 'Set it to run', text: 'Copy one line into a Cowork scheduled task. Drafts arrive here after its first run.', go: 'schedule', cta: 'Set the schedule' },
   };
@@ -226,7 +240,7 @@
       h('p', { class: 'hint' }, 'Rather talk it through? ', askClaudeButton('Ask Claude to set it up with you', 'Set up Fishbowl Studio for my brand (/studio:setup).', 'btn sm ghost')));
   }
 
-  window.Board = { state, h, icon, load, call, act, setting, flash, render, ago, hm, plural, meter, page, card, empty, seg, switchCtl, stepper, confirmButton, copyButton, askClaudeButton, avatar, todayCard, profilesCard, firstRunCard, switchTo };
+  window.Board = { state, h, icon, load, call, act, setting, flash, render, ago, hm, plural, meter, page, card, empty, seg, switchCtl, stepper, confirmButton, copyButton, askClaudeButton, avatar, todayCard, profilesCard, firstRunCard, switchTo, proposalRow };
   window.BoardPages = window.BoardPages || {};
 
   // ---------- boot ----------
@@ -243,7 +257,7 @@
   });
   document.querySelectorAll('.navbtn').forEach((b) => {
     b.prepend(icon(b.dataset.icon || 'drafts'));
-    b.addEventListener('click', () => { state.open = {}; state.menu = false; setDrawer(false); load({ view: b.dataset.view }); });
+    b.addEventListener('click', () => { state.open = {}; state.why = null; state.menu = false; setDrawer(false); load({ view: b.dataset.view }); });
   });
   if (document.addEventListener) document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && (state.menu || state.drawer)) { state.menu = false; setDrawer(false); renderPersona(); } });
   let got = false;

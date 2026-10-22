@@ -11,6 +11,29 @@
   const NOTE_CHIPS = ['Too long', 'Too salesy', 'Not like us', 'Make it punchier', 'Too formal'];
   const SET_REASONS = ['Too generic', 'Wrong tone', 'Misses the point', 'Too long', 'Not our story'];
   const RESTORE_CHIPS = ['It grew on me', 'Right after all', 'Wrong button'];
+  // Why she skipped: one optional tap. Same keys as the server's KILL_REASONS.
+  const WHY = [['off_brand', 'Off-brand'], ['wrong_topic', 'Wrong topic'], ['too_salesy', 'Too salesy'], ['boring', 'Boring'], ['factually_off', 'Factually off'], ['other', 'Other']];
+
+  // After a skip: ask why, once, without getting in the way. Ignoring it is fine.
+  async function skip(args) {
+    const r = await act(args);
+    if (r && r.ok && r.ask_reason) { state.why = args.set_id != null ? { set_id: args.set_id } : { id: args.id }; B.render(); }
+  }
+  function whyAsk() {
+    const w = state.why;
+    if (!w) return null;
+    const pick = (reason) => async () => { state.why = null; await act({ action: 'kill_reason', ...w, reason }, { quiet: true }); B.flash('Thanks. It learns from that.', 'good'); };
+    return h('div', { class: 'card soft why-ask', role: 'group', 'aria-label': 'Why did you skip it?' },
+      h('div', { class: 'row' }, h('b', { text: w.set_id != null ? 'Why none of these?' : 'Why skip it?' }), h('span', { class: 'hint', text: 'Optional. One tap helps it learn.' }), h('span', { class: 'grow' }),
+        h('button', { class: 'btn sm icon ghost', 'aria-label': 'No reason', onclick: () => { state.why = null; B.render(); } }, icon('x'))),
+      h('div', { class: 'chips' }, WHY.map(([k, l]) => h('button', { class: 'chip', onclick: pick(k) }, l))));
+  }
+  function reasonLine(c) {
+    if (!['killed', 'passed_over'].includes(c.status)) return null;
+    if (c.kill_reason_label) return h('div', { class: 'post-ctx' }, icon('flag'), `Skipped as: ${c.kill_reason_label}`);
+    if (state.open.why !== c.id) return null;
+    return h('div', { class: 'panel' }, h('div', { class: 'chips' }, WHY.map(([k, l]) => h('button', { class: 'chip', onclick: () => act({ action: 'kill_reason', id: c.id, reason: k }) }, l))));
+  }
 
   // Lint flags in her words.
   function friendly(f) {
@@ -96,10 +119,11 @@
     if (c.status === 'pending') row.push(
       btn('Approve', 'approve', 'check', () => act({ action: 'pass', id: c.id, hash: c.hash })),
       btn('Edit', '', 'edit', toggle('edit', c)),
-      btn('Skip', 'skip', 'x', () => act({ action: 'kill', id: c.id }), { title: 'Not this one. It learns from that; you can bring it back.' }));
-    if (['passed', 'edited'].includes(c.status)) row.push(copyButton(c), btn('Mark as posted', '', 'check', toggle('posted', c)), btn('Skip', 'skip', 'x', () => act({ action: 'kill', id: c.id })));
+      btn('Skip', 'skip', 'x', () => skip({ action: 'kill', id: c.id }), { title: 'Not this one. It learns from that; you can bring it back.' }));
+    if (['passed', 'edited'].includes(c.status)) row.push(copyButton(c), btn('Mark as posted', '', 'check', toggle('posted', c)), btn('Skip', 'skip', 'x', () => skip({ action: 'kill', id: c.id })));
     if (c.status === 'posted') row.push(copyButton(c), btn('Add numbers', '', 'up', toggle('metrics', c)), c.post_url ? btn('Open post', 'ghost', 'external', () => S.openLink(c.post_url)) : null);
     if (c.status === 'killed') row.push(btn('Bring back', '', 'redo', toggle('restore', c)));
+    if (['killed', 'passed_over'].includes(c.status) && !c.kill_reason) row.push(btn('Say why', 'ghost', 'flag', toggle('why', c), { title: 'Optional: what was wrong with it' }));
     if (c.status === 'scrapped') row.push(btn('Bring back', '', 'redo', () => act({ action: 'resurrect', id: c.id })));
     row.push(h('span', { class: 'grow' }), heart(c));
     if (!['posted'].includes(c.status)) row.push(btn('Rewrite', 'ghost', 'note', toggle('note', c), { title: 'Leave a note and Claude rewrites it' }));
@@ -155,7 +179,7 @@
       h('div', { class: 'post-main' }, postHead(c), context(c), body(c),
         c.original ? h('div', { class: 'post-original', text: `Before your edit: ${c.original}` }) : null,
         flagChips(c), quote(c.item),
-        c.restore_trail.map((r) => h('div', { class: 'restore-trail', text: `Skipped, then brought back: ${r.reason}` })),
+        c.restore_trail.map((r) => h('div', { class: 'restore-trail', text: `Skipped, then brought back: ${r.reason}` })), reasonLine(c),
         why(c), state.open.edit === c.id ? null : actions(c), panels(c)));
   }
 
@@ -169,7 +193,7 @@
     if (o.none === u.set_id) {
       const ta = h('textarea', { placeholder: 'What was wrong with all of them? (optional, helps the next try)', 'aria-label': 'Note on the set' });
       none = h('div', { class: 'panel' }, chipsInto(ta, SET_REASONS), ta,
-        h('div', { class: 'row' }, h('button', { class: 'btn sm skip', onclick: () => act({ action: 'none', set_id: u.set_id, note: ta.value.trim() || undefined }) }, 'None of these'),
+        h('div', { class: 'row' }, h('button', { class: 'btn sm skip', onclick: () => skip({ action: 'none', set_id: u.set_id, note: ta.value.trim() || undefined }) }, 'None of these'),
           h('button', { class: 'btn sm', onclick: () => act({ action: 'redo', set_id: u.set_id, note: ta.value.trim() || undefined }) }, icon('redo'), 'None, try again'),
           h('button', { class: 'btn sm ghost', onclick: close }, 'Cancel')));
     } else none = h('div', { class: 'post-actions' }, h('button', { class: 'btn sm ghost', onclick: () => { state.open = { none: u.set_id }; B.render(); } }, 'None of these…'));
@@ -202,7 +226,7 @@
       : fr && d.tab === 'waiting' ? null : h('div', { class: 'feed' }, emptyFor(d));
     const more = d.total > d.units.length ? h('p', { class: 'hint', text: `Showing ${d.units.length} of ${d.total}.` }) : null;
     return B.page('Drafts', `Today's drafts for ${head.brand || 'your brand'}. Approve the good ones, fix the nearly-good ones.`, null,
-      h('div', { class: 'cols' }, h('div', { class: 'stack' }, fr, filters, list, more), h('aside', { class: 'rail', 'aria-label': 'Today and your brands' }, B.todayCard(head), B.profilesCard(head))));
+      h('div', { class: 'cols' }, h('div', { class: 'stack' }, fr, whyAsk(), filters, list, more), h('aside', { class: 'rail', 'aria-label': 'Today and your brands' }, B.todayCard(head), B.profilesCard(head))));
   }
 
   window.BoardPages.drafts = drafts;

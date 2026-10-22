@@ -22,27 +22,55 @@
   }
 
   // ---------- Sources ----------
-  const STATUS = { active: ['Active', 'ok'], paused: ['Paused', ''], failing: ['Not responding', 'bad'] };
+  const STATUS = { active: ['Active', 'ok'], paused: ['Paused', ''], failing: ['Not responding', 'bad'], login_wall: ['Asks to log in', 'warn'], no_browser: ['Read by web search', 'warn'], not_found: ['Not found', 'bad'], failed: ['Didn’t load', 'bad'] };
+  const KINDS = [
+    { value: 'site', label: 'Website', placeholder: 'https://example.com/news', aria: 'Source address', type: 'url', hint: (l) => (l === 'feeds' ? 'Daily news is read on every run and drafted from.' : 'Slow reading is browsed now and then for ideas. It never becomes a draft directly.') },
+    { value: 'reddit', label: 'Reddit', placeholder: 'r/bikecommuting', aria: 'Subreddit', type: 'text', hint: () => 'Its public posts are read like news. Usernames are left out.' },
+    { value: 'watch', label: 'X or LinkedIn', placeholder: '@handle, or a linkedin.com/company/… address', aria: 'Account to watch', type: 'text', hint: () => 'Claude reads the account’s public page on each run, logged out. It never signs in.' },
+    { value: 'search', label: 'Search', placeholder: 'e-bike regulation', aria: 'Saved search', type: 'text', hint: () => 'Claude runs this web search on each run and reads the results like news.' },
+  ];
+  const ARG = { site: 'url', reddit: 'sub', watch: 'url', search: 'q' };
 
+  // One source of any kind: name, what it brought in, how its drafts did, and its controls.
   function sourceRow(f, topics) {
-    const [st, kind] = STATUS[f.status] || ['Active', 'ok'];
-    const topicSel = h('select', { 'aria-label': `Topic for ${f.name}`, onchange: (e) => call('studio_sources', { action: 'topic', url: f.url, list: f.list, topic: e.target.value }) },
+    const [st, kind] = STATUS[f.status] || STATUS.active;
+    const ref = f.list === 'searches' ? { list: f.list, q: f.q } : { list: f.list, url: f.url };
+    const topicSel = h('select', { 'aria-label': `Topic for ${f.name}`, onchange: (e) => call('studio_sources', { action: 'topic', ...ref, topic: e.target.value }) },
       [...new Set([...topics, 'other'])].map((t) => h('option', { value: t, selected: t === f.topic }, label(t))));
-    const sub = f.status === 'failing' ? `${f.host} · last try: ${f.error}` : `${f.host} · ${f.week ? `${plural(f.week, 'story', 'stories')} this week` : 'nothing new this week'}`;
+    const where = f.kind === 'watch' ? `${f.platform === 'x' ? 'X' : 'LinkedIn'} · ${f.handle}` : f.kind === 'trends' ? 'x.com · trending' : f.kind === 'search' ? 'Web search' : f.host;
+    const brought = f.status === 'failing' ? `last try: ${f.error}` : f.week ? `${plural(f.week, f.kind === 'search' ? 'result' : f.kind === 'site' ? 'story' : 'post', f.kind === 'site' ? 'stories' : undefined)} this week` : 'nothing new this week';
+    const rec = f.record;
+    const tag = { site: null, reddit: 'Reddit', watch: f.platform === 'x' ? 'X' : 'LinkedIn', trends: 'X', search: 'Search' }[f.kind];
     return h('div', { class: `row-item ${f.paused ? 'paused' : ''}` },
-      h('span', { class: 'letter', text: (f.name.match(/[A-Za-z0-9]/) || ['?'])[0] }),
-      h('span', { class: 'who' }, h('span', { class: 'nm', text: f.name }), h('span', { class: 'sub', text: sub })),
-      h('span', { class: 'ctl' }, topicSel, h('span', { class: `tag ${kind}` }, st),
-        B.switchCtl(!f.paused, f.paused ? `Turn ${f.name} back on` : `Pause ${f.name}`, (on) => call('studio_sources', { action: on ? 'resume' : 'pause', url: f.url, list: f.list })),
-        B.confirmButton(`Remove ${f.name}`, 'Remove?', () => call('studio_sources', { action: 'remove', url: f.url, list: f.list }))));
+      h('span', { class: 'letter' }, f.kind === 'site' ? (f.name.match(/[A-Za-z0-9]/) || ['?'])[0] : icon({ reddit: 'chat', watch: 'eye', trends: 'trend', search: 'search' }[f.kind])),
+      h('span', { class: 'who' }, h('span', { class: 'nm', text: f.name }), h('span', { class: 'sub', text: `${where} · ${brought}` }),
+        rec ? h('span', { class: `sub ${rec.suggest_pause && !f.paused ? 'warn-text' : ''}`, text: rec.suggest_pause && !f.paused ? `Keeps losing: ${rec.why} Pause it?` : rec.why }) : null),
+      h('span', { class: 'ctl' }, tag ? h('span', { class: 'tag' }, tag) : null, rec ? h('span', { class: `tag ${rec.suggest_pause ? 'warn' : rec.approved / rec.decided >= 0.6 ? 'ok' : ''}`, title: rec.why }, `${rec.approved} of ${rec.decided} approved`) : null,
+        topicSel, h('span', { class: `tag ${kind}` }, st),
+        B.switchCtl(!f.paused, f.paused ? `Turn ${f.name} back on` : `Pause ${f.name}`, (on) => call('studio_sources', { action: on ? 'resume' : 'pause', ...ref })),
+        B.confirmButton(`Remove ${f.name}`, 'Remove?', () => call('studio_sources', { action: 'remove', ...ref }))));
   }
 
-  let addList = 'feeds', linkWhen = 'next';
+  function suggestionsCard(list) {
+    if (!list.length) return null;
+    const decide = (id, decision) => call('studio_proposal_decide', { id, decision });
+    const addAll = async () => { for (const x of list) await call('studio_proposal_decide', { id: x.id, decision: 'accept' }, { reload: false, quiet: true }); await B.load(); B.flash('Added the suggestions that worked.', 'good'); };
+    return card({ icon: 'spark', title: `Suggested sources (${list.length})`, sub: 'Nothing here is read until you add it.', end: list.length > 1 ? h('button', { class: 'btn sm', onclick: addAll }, 'Add all') : null },
+      h('div', { class: 'rows' }, list.map((x) => h('div', { class: 'row-item' },
+        h('span', { class: 'who' }, h('span', { class: 'nm', text: x.label }),
+          h('span', { class: 'sub', text: x.origin === 'discovery' ? `Found in your searches: ${x.why || ''}` : x.why ? `Claude suggested it: ${x.why}` : 'Claude suggested it.' }),
+          x.error ? h('span', { class: 'sub warn-text', text: `Last try: ${x.error}` }) : null),
+        h('span', { class: 'ctl' }, h('button', { class: 'btn sm approve', onclick: () => decide(x.id, 'accept') }, icon('plus'), 'Add'), h('button', { class: 'btn sm ghost', onclick: () => decide(x.id, 'reject') }, 'Dismiss'))))));
+  }
+
+  let addKind = 'site', addList = 'feeds', linkWhen = 'next';
   function sources(d) {
-    const add = card({ icon: 'sources', title: 'Add a news source', sub: 'Paste a website or feed address. It checks the source works before adding it.' },
-      B.seg([{ value: 'feeds', label: 'Daily news' }, { value: 'reading', label: 'Slow reading' }], addList, (v) => { addList = v; B.render(); }, 'Add to which list'),
-      h('div', { class: 'card-foot' }, inline({ type: 'url', placeholder: 'https://example.com/news', aria: 'Source address', button: 'Add', onsubmit: (url) => call('studio_sources', { action: 'add', url, list: addList }) })),
-      h('p', { class: 'hint', text: addList === 'feeds' ? 'Daily news is read on every run and drafted from.' : 'Slow reading is browsed now and then for ideas. It never becomes a draft directly.' }));
+    const k = KINDS.find((x) => x.value === addKind) || KINDS[0];
+    const add = card({ icon: 'sources', title: 'Add a source', sub: 'A website, a subreddit, an account your audience follows, or a search.' },
+      B.seg(KINDS.map((x) => ({ value: x.value, label: x.label })), addKind, (v) => { addKind = v; B.render(); }, 'What kind of source'),
+      addKind === 'site' ? h('div', { class: 'card-foot' }, B.seg([{ value: 'feeds', label: 'Daily news' }, { value: 'reading', label: 'Slow reading' }], addList, (v) => { addList = v; B.render(); }, 'Add to which list')) : null,
+      h('div', { class: 'card-foot' }, inline({ type: k.type, placeholder: k.placeholder, aria: k.aria, button: 'Add', onsubmit: (v) => call('studio_source_add', { kind: addKind, [ARG[addKind]]: v, ...(addKind === 'site' ? { list: addList } : {}) }) })),
+      h('p', { class: 'hint', text: k.hint(addList) }));
     const link = card({ icon: 'link', title: 'Draft from a link', sub: 'Paste one article and it becomes a draft, even if it isn’t from your sources.' },
       B.seg([{ value: 'next', label: 'With the next run' }, { value: 'now', label: 'Ask Claude now' }], linkWhen, (v) => { linkWhen = v; B.render(); }, 'When to draft it'),
       h('div', { class: 'card-foot' }, inline({ type: 'url', placeholder: 'https://example.com/article', aria: 'Article address', button: 'Draft it', onsubmit: async (url) => {
@@ -52,12 +80,18 @@
       d.links.length ? h('div', { class: 'rows card-foot' }, d.links.map((l) => h('div', { class: 'row-item' },
         h('span', { class: 'who' }, h('span', { class: 'nm', text: l.title || l.url }), h('span', { class: 'sub', text: `${l.host} · ${ago(l.at)} ago` })),
         h('span', { class: `tag ${l.status === 'drafted' ? 'ok' : 'accent'}` }, l.status === 'drafted' ? 'Drafted' : l.status === 'queued' ? 'Queued' : l.status)))) : null);
-    const list = (rows, title, sub, emptyText) => card({ icon: rows === d.feeds ? 'drafts' : 'reads', title: `${title} (${rows.length})`, sub },
-      rows.length ? h('div', { class: 'rows' }, rows.map((f) => sourceRow(f, d.topics))) : B.empty({ icon: 'sources', title: 'Nothing here yet', text: emptyText }));
-    return page('Sources', `Where it reads the news${d.last_fetch ? `. Last read ${ago(d.last_fetch)} ago` : ''}.`, null,
-      h('div', { class: 'stack' }, h('div', { class: 'duo' }, add, link),
-        list(d.feeds, 'Daily news', 'Read on every run. Pause one to skip it for a while.', 'Add a site you read for work, and drafts start from its stories.'),
-        list(d.reading, 'Slow reading', 'Browsed a little each day for ideas and evergreen posts.', 'Optional: blogs or journals worth a slow read.')));
+    const list = (rows, ic, title, sub, emptyText, extra) => card({ icon: ic, title: `${title} (${rows.length})`, sub },
+      rows.length ? h('div', { class: 'rows' }, rows.map((f) => sourceRow(f, d.topics))) : B.empty({ icon: ic, title: 'Nothing here yet', text: emptyText }), extra || null);
+    const trendsOff = !d.trends.length ? h('div', { class: 'setting card-foot' }, h('div', { class: 'lbl' }, h('b', { text: 'Trending on X' }), h('span', { text: 'What’s trending, checked on each run.' })),
+      h('button', { class: 'btn sm', onclick: () => call('studio_source_add', { kind: 'trends' }) }, icon('plus'), 'Add')) : null;
+    const browser = d.browser && !d.browser.ok ? h('div', { class: 'banner warn', role: 'status' },
+      h('span', { text: `On the last run (${ago(d.browser.at)} ago) Claude couldn’t use its browser, so it looked your accounts up with web search instead. To read the pages themselves, turn on Claude in Chrome.` })) : null;
+    return page('Sources', `Where it reads${d.last_fetch ? `. News last read ${ago(d.last_fetch)} ago` : ''}.`, null,
+      h('div', { class: 'stack' }, suggestionsCard(d.suggestions), browser, h('div', { class: 'duo' }, add, link),
+        list(d.feeds, 'drafts', 'Daily news', 'Websites and subreddits, read on every run. Pause one to skip it for a while.', 'Add a site you read for work, and drafts start from its stories.'),
+        list([...d.watch, ...d.trends], 'eye', 'Accounts you watch', 'Public posts, read logged out by Claude on each run.', 'Add an X handle or a LinkedIn page your audience follows.', trendsOff),
+        list(d.searches, 'search', 'Saved searches', 'Run with Claude’s web search on each run. Sites that keep showing up in good results are suggested above.', 'Save a search like “bike commuting” and its results are read like news.'),
+        list(d.reading, 'reads', 'Slow reading', 'Browsed a little each day for ideas and evergreen posts.', 'Optional: blogs or journals worth a slow read.')));
   }
 
   // ---------- Topics ----------
@@ -78,14 +112,22 @@
         h('div', {}, h('div', {}, h('span', { class: 'nm', text: l.label }), h('span', { class: 'dots', 'aria-label': `strength ${l.strength} of 3` }, [1, 2, 3].map((i) => h('i', { class: i <= l.strength ? 'on' : '' })))),
           h('div', { class: 'why', text: `${l.direction === 'up' ? 'Writing more of these.' : 'Writing fewer of these.'} ${l.why}` })))))
         : B.empty({ icon: 'spark', title: 'Nothing learned yet', text: 'It starts noticing patterns once you have approved or skipped a few drafts.' }));
+    const boosts = card({ icon: 'trend', title: 'What it drafts first', sub: 'Stories it moves up or down the queue, from your verdicts, hearts and skip reasons.' },
+      d.boosts.length ? h('div', { class: 'learned' }, d.boosts.map((b) => h('div', { class: `learn ${b.direction}` },
+        h('span', { class: 'dir' }, icon(b.direction === 'up' ? 'up' : 'down')),
+        h('div', {}, h('div', {}, h('span', { class: 'nm', text: b.label }), h('span', { class: 'sub-inline', text: ` ${b.points > 0 ? '+' : ''}${b.points} interest` })),
+          b.why.map((w) => h('div', { class: 'why', text: `Because: ${w}` }))))))
+        : B.empty({ icon: 'trend', title: 'Nothing moved yet', text: 'Once you approve, skip or heart a few, the stories it picks first follow your taste.' }));
+    const edits = d.edits.patterns.length || d.edits.phrases.length ? card({ icon: 'edit', title: 'From your edits', sub: `What you change before approving (${plural(d.edits.n, 'edit')} in the last two months). Each one is a suggestion on the Coach page; nothing changes until you accept it.` },
+      h('ul', { class: 'list small' }, [...d.edits.patterns.map((p) => h('li', { text: `${p.why} Suggests: “${p.line}”.` })), ...d.edits.phrases.map((p) => h('li', { text: p.why }))])) : null;
     const ranking = d.ranking.length ? card({ icon: 'settings', title: 'How it picks your drafts', sub: 'What counts most when it chooses which drafts reach you. It adjusts a little each day.' },
       h('div', { class: 'bars' }, d.ranking.map((r) => h('div', { class: 'bar-row' },
         h('span', {}, h('span', { text: `${r.label[0].toUpperCase()}${r.label.slice(1)}` }), r.change ? h('span', { class: `delta ${r.change > 0 ? 'up' : 'down'}`, text: ` ${r.change > 0 ? '+' : ''}${r.change} this week` }) : null),
         h('span', { class: 'pct', text: `${r.weight}%` }), h('span', { class: 'track' }, h('span', { style: `width: ${Math.max(2, Math.min(100, r.weight * 1.6))}%` })))))) : null;
     return page('Topics', 'What it pays attention to, and what it has learned from you.', null,
-      h('div', { class: 'cols' }, h('div', { class: 'stack' }, list, learned), h('aside', { class: 'rail' }, ranking,
+      h('div', { class: 'cols' }, h('div', { class: 'stack' }, list, learned, boosts, edits), h('aside', { class: 'rail' }, ranking,
         card({ icon: 'bulb', title: 'How learning works', cls: 'soft' }, h('ul', { class: 'list small muted' },
-          h('li', { text: 'Every approve, skip and edit is a vote.' }), h('li', { text: 'Hearts count double: “more like this”.' }), h('li', { text: 'Big changes to the playbook always wait for your yes on the Playbook page.' }))))));
+          h('li', { text: 'Every approve, skip and edit is a vote. Your edits are compared with the draft to see what you change.' }), h('li', { text: 'Hearts count double: “more like this”. Hearting a read moves similar stories up.' }), h('li', { text: 'A reason when you skip (“wrong topic”, “too salesy”) tells it what to fix.' }), h('li', { text: 'Changes to the voice and playbook always wait for your yes on the Coach page.' }))))));
   }
 
   // ---------- Schedule ----------
@@ -154,8 +196,20 @@
     const phraseCard = card({ icon: 'flag', title: 'Phrases we overuse', sub: 'It keeps these rare. Tap one to remove it.' },
       phrases.length ? h('div', { class: 'chips' }, phrases.map((p) => h('button', { class: 'chip', 'aria-label': `Remove ${p}`, onclick: () => setting({ overused_phrases: phrases.filter((x) => x !== p) }) }, p, h('span', { class: 'x' }, icon('x'))))) : h('p', { class: 'hint', text: 'None yet.' }),
       h('div', { class: 'card-foot' }, inline({ placeholder: 'A phrase, like “game-changer”', aria: 'New phrase', button: 'Add', onsubmit: (p) => setting({ overused_phrases: [...phrases, p] }) })));
+    const capText = (v) => (v === true ? 'yes' : v === 'prompt' ? 'when you ask' : 'not yet');
+    const accounts = card({ icon: 'user', title: 'Accounts', sub: 'Sign in to a platform yourself, in your own browser, with Claude walking you through it. The studio never stores a password and never posts for you.' },
+      h('div', { class: 'rows' }, (d.accounts || []).map((a) => h('div', { class: 'row-item' },
+        h('span', { class: 'letter' }, a.icon && window.StudioIcons.has(a.icon) ? icon(a.icon) : a.label[0]),
+        h('span', { class: 'who' }, h('span', { class: 'nm', text: a.label }), h('span', { class: 'sub', text: a.enables }),
+          h('span', { class: 'sub', text: `Reading signed in: ${capText(a.capabilities.read)} · Posting: ${capText(a.capabilities.post)}` })),
+        h('span', { class: 'ctl' }, a.connected
+          ? [h('span', { class: 'tag ok' }, icon('check'), `Connected ${ago(a.connected_at)} ago`), B.confirmButton(`Remove ${a.label}`, 'Remove?', () => call('studio_account_set', { action: 'remove', type: a.id }))]
+          : h('button', { class: 'btn sm', onclick: async () => {
+            const r = await call('studio_account_set', { action: 'connect', type: a.id });
+            if (r && r.ok && r.prompt) { const sent = await S.askClaude(r.prompt); if (!sent) B.flash(`Ask Claude in the chat: "${r.prompt}"`, 'warn'); }
+          } }, icon('plus'), 'Add account'))))));
     return page('Settings', `How ${head.brand || 'the brand'}'s studio works. Changes save as you click.`, null,
-      h('div', { class: 'cols' }, h('div', { class: 'stack' }, platforms, amounts, voice, phraseCard, brand),
+      h('div', { class: 'cols' }, h('div', { class: 'stack' }, platforms, amounts, voice, phraseCard, accounts, brand),
         h('aside', { class: 'rail' }, card({ icon: 'bulb', title: 'Rather just say it?', cls: 'soft', sub: 'Anything here can also be changed by asking Claude in the chat.' },
           B.askClaudeButton('Change the brand voice', 'I want to change my Fishbowl Studio brand voice.', 'btn sm'), ' ', B.askClaudeButton('Change positions', 'I want to change my Fishbowl Studio positions or audience.', 'btn sm ghost')))));
   }
@@ -164,8 +218,9 @@
   function reads(d) {
     const cards = d.reads.map((r) => h('article', { class: 'post read' }, h('span', { class: 'letter', text: (r.source || '?')[0] }),
       h('div', { class: 'post-main' },
-        h('div', { class: 'meta-line' }, h('span', { text: `${r.source || 'A story'} · read ${ago(r.triaged_at)} ago` }), Number.isFinite(r.interest) ? h('span', { class: `tag ${r.interest >= 6 ? 'ok' : ''}` }, `interest ${r.interest}/10`) : h('span', { class: 'tag accent' }, 'You sent this'), r.topic ? h('span', { class: 'tag' }, label(r.topic)) : null, r.also ? h('span', { text: `+${r.also} other outlet${r.also > 1 ? 's' : ''}` }) : null),
+        h('div', { class: 'meta-line' }, h('span', { text: `${r.source || 'A story'} · read ${ago(r.triaged_at)} ago` }), r.web ? h('span', { class: 'tag' }, { watch: 'Post', trends: 'Trending', search: 'Search result', reddit: 'Reddit' }[r.web] || r.web) : null, Number.isFinite(r.interest) ? h('span', { class: `tag ${r.interest >= 6 ? 'ok' : ''}` }, `interest ${r.interest}/10`) : h('span', { class: 'tag accent' }, 'You sent this'), r.topic ? h('span', { class: 'tag' }, label(r.topic)) : null, r.also ? h('span', { text: `+${r.also} other outlet${r.also > 1 ? 's' : ''}` }) : null),
         h('div', { class: 'post-text', text: r.note || r.title }),
+        r.boost ? h('div', { class: 'post-ctx', title: r.boost.why.join(' ') }, icon(r.boost.points > 0 ? 'up' : 'down'), `${r.boost.points > 0 ? 'Moved up' : 'Moved down'}: ${r.boost.why[0]}`) : null,
         r.note ? h('button', { class: 'quote', onclick: async () => { if (!(await S.openLink(r.url))) B.flash(r.url); } }, h('span', { class: 'src' }, icon('external'), h('span', { text: 'Open the story' })), h('span', { class: 'ttl', text: r.title })) : null,
         h('div', { class: 'post-actions' },
           r.drafted ? h('span', { class: 'tag ok' }, 'Drafted') : r.queued ? h('span', { class: 'tag accent' }, 'Queued for Claude') : h('button', { class: 'btn sm', onclick: () => B.act({ action: 'draft_this', item_id: r.id }) }, 'Draft this'),
@@ -178,16 +233,12 @@
 
   // ---------- Playbook ----------
   function playbook(d) {
-    const decide = (id, decision) => () => call('studio_proposal_decide', { id, decision });
-    const props = d.proposals.length ? h('div', { class: 'rows' }, d.proposals.map((p) => h('div', { class: 'row-item' },
-      h('span', { class: 'who' }, h('span', { class: 'sub' }, h('span', { class: 'tag' }, p.kind), ' ', h('span', { class: 'tag warn' }, p.op), p.section ? ` ${p.section}` : ''),
-        p.old ? h('span', { class: 'sub', text: `Now: ${p.old}` }) : null, p.text ? h('span', { class: 'nm', text: p.kind === 'shape' ? `${p.name}: ${p.text}` : p.text }) : null, p.reason ? h('span', { class: 'sub', text: `Why: ${p.reason}` }) : null),
-      h('span', { class: 'ctl' }, h('button', { class: 'btn sm approve', onclick: decide(p.id, 'accept') }, icon('check'), 'Accept'), h('button', { class: 'btn sm skip', onclick: decide(p.id, 'reject') }, 'Reject')))))
-      : B.empty({ icon: 'playbook', title: 'No proposals waiting', text: 'The weekly report suggests changes here. Nothing changes until you accept it.' });
+    const props = d.proposals.length ? h('div', { class: 'rows' }, d.proposals.map(B.proposalRow))
+      : B.empty({ icon: 'playbook', title: 'No proposals waiting', text: 'The weekly coach and your edits suggest changes here. Nothing changes until you accept it.' });
     const rows = (list, key) => (list.length ? h('ul', { class: 'list' }, list.map((x) => h('li', {}, B.meter(x[key]), x.text))) : h('p', { class: 'hint', text: 'None yet.' }));
     return page('Playbook', 'The rules it has learned and what the brand believes. Only you can change them.', null,
       h('div', { class: 'stack' },
-        card({ icon: 'spark', title: `Proposed changes (${d.proposals.length})`, sub: 'Suggested by the weekly report.' }, props),
+        card({ icon: 'spark', title: `Proposed changes (${d.proposals.length})`, sub: 'Suggested by the weekly coach and by your edits.' }, props),
         card({ icon: 'playbook', title: 'Playbook' }, d.playbook.length ? h('ul', { class: 'list' }, d.playbook.map((b) => h('li', { text: b }))) : h('p', { class: 'hint', text: 'Empty.' })),
         h('div', { class: 'duo' }, card({ icon: 'flag', title: 'Positions', sub: 'Yours; Claude only suggests.' }, rows(d.positions, 'strength')),
           card({ icon: 'user', title: 'Who we write for' }, rows(d.audience.who, 'confidence'), h('p', { class: 'section-title', text: 'Buttons' }), rows(d.audience.buttons, 'confidence'))),
@@ -196,5 +247,28 @@
         h('div', {}, B.askClaudeButton('Ask Claude to change positions or audience', 'I want to change my Fishbowl Studio positions or audience.', 'btn'))));
   }
 
-  Object.assign(window.BoardPages, { sources, topics, schedule, settings, reads, playbook });
+  // ---------- Coach ----------
+  function coach(d) {
+    const r = d.report;
+    const lines = (xs, dir, ic) => h('div', { class: 'learned' }, xs.map((x) => h('div', { class: `learn ${dir}` }, h('span', { class: 'dir' }, icon(ic)), h('div', { class: 'nm', text: x }))));
+    const report = r ? card({ icon: 'coach', title: `Week of ${r.week}`, sub: `Written ${ago(r.at)} ago from your verdicts, edits and numbers.` },
+      r.summary ? h('p', { class: 'coach-summary', text: r.summary }) : null,
+      r.working.length ? [h('p', { class: 'section-title', text: 'What’s working' }), lines(r.working, 'up', 'up')] : null,
+      r.not_working.length ? [h('p', { class: 'section-title', text: 'What isn’t' }), lines(r.not_working, 'down', 'down')] : null,
+      r.try.length ? [h('p', { class: 'section-title', text: 'Try next week' }), lines(r.try, 'try', 'bulb')] : null)
+      : card({}, B.empty({ icon: 'coach', title: 'No report yet', text: 'Every Friday the coach looks at the week: what worked, what didn’t, and two or three things to try.', action: B.askClaudeButton('Write this week’s report', 'Run the Fishbowl Studio weekly report.', 'btn sm primary') }));
+    const waiting = card({ icon: 'spark', title: `Waiting for your yes (${d.proposals.length})`, sub: 'Nothing about your voice, playbook or beliefs changes until you accept it.' },
+      d.proposals.length ? h('div', { class: 'rows' }, d.proposals.map(B.proposalRow)) : B.empty({ icon: 'check', title: 'Nothing waiting', text: 'Suggestions from the coach and from your edits appear here.' }));
+    const noticed = card({ icon: 'bulb', title: 'What it noticed', cls: 'soft' },
+      d.skips.length ? [h('p', { class: 'section-title', text: 'Why you skipped (30 days)' }), h('ul', { class: 'list small' }, d.skips.map((x) => h('li', { text: `${x.label}: ${x.n}${x.topics.length ? ` (mostly ${x.topics[0].topic})` : ''}` })))] : null,
+      d.edits.patterns.length ? [h('p', { class: 'section-title', text: 'Your edits' }), h('ul', { class: 'list small' }, d.edits.patterns.map((p) => h('li', { text: p.why })))] : null,
+      d.pause.length ? [h('p', { class: 'section-title', text: 'Sources that keep losing' }), h('div', { class: 'rows' }, d.pause.map((x) => h('div', { class: 'row-item' }, h('span', { class: 'who' }, h('span', { class: 'nm', text: x.name }), h('span', { class: 'sub', text: x.why })),
+        h('span', { class: 'ctl' }, h('button', { class: 'btn sm', onclick: () => call('studio_sources', { action: 'pause', list: x.list, url: x.url }) }, 'Pause it')))))] : null,
+      !d.skips.length && !d.edits.patterns.length && !d.pause.length ? h('p', { class: 'hint', text: 'Nothing yet. Skip reasons, edits and source results show up here as they build.' }) : null);
+    const history = d.history.length ? card({ icon: 'schedule', title: 'Earlier weeks', cls: 'soft' }, d.history.map((x) => h('details', {}, h('summary', { class: 'small muted', text: `Week of ${x.week}` }), h('p', { class: 'small', text: x.summary || '' })))) : null;
+    return page('Coach', 'Your weekly report, and the changes waiting for your yes.', null,
+      h('div', { class: 'cols' }, h('div', { class: 'stack' }, report, waiting), h('aside', { class: 'rail' }, noticed, history)));
+  }
+
+  Object.assign(window.BoardPages, { sources, topics, schedule, settings, reads, coach, playbook });
 })();
