@@ -10,6 +10,10 @@ import { FETCH_PRESETS, scheduleTasks, nextFetchAt } from './schedule.js';
 import { hostOf } from './urls.js';
 import { cleanField } from './fence.js';
 import { oneLine } from './text.js';
+import { byId } from './state.js';
+import { sourceRecords, interestBoosts, boostFor, editPatterns, killReasons, tallyReasons, sourceLabel, KILL_REASONS, KILL_REASON_KEYS } from './learn.js';
+import { feedKey, watchKey, searchKey, TRENDS_KEY } from './handles.js';
+import { accountsView } from './accounts.js';
 
 // Item text in board data is cleaned again on the way out, so items stored before the
 // parser cleaned titles can't carry line breaks or invisible characters into a view.
@@ -47,7 +51,7 @@ export function card(d, db, plats, shapeNames) {
     restore_trail: d.restore_trail || [], scrap_reason: d.scrap_reason || null, resurrected: !!d.resurrected_at,
     hearted: db.hearts.some((h) => h.target === 'draft' && h.ref === d.id), thinking_hearted: db.hearts.some((h) => h.target === 'thinking' && h.ref === d.id),
     metrics: d.metrics || null, redo_queued: d.set_id ? db.jobs.some((j) => j.kind === 'redo' && j.set_id === d.set_id && j.status === 'queued') : false,
-    redos_left: null,
+    redos_left: null, kill_reason: d.kill_reason || null, kill_reason_label: d.kill_reason ? KILL_REASONS[d.kill_reason] : null,
   };
 }
 
@@ -89,27 +93,35 @@ export function draftsView(ctx, db, { tab = 'waiting', chip = 'all', platform = 
 export function readsView(ctx, db, { offset = 0, limit = 40 } = {}) {
   const drafted = new Set(db.drafts.map((d) => d.item_id));
   const queued = new Set(db.jobs.filter((j) => j.kind === 'draft_item' && j.status === 'queued').map((j) => j.item_id));
+  const boosts = interestBoosts({ drafts: db.drafts, items: db.items, hearts: db.hearts, now: ctx.now() });
   const reads = db.items.filter((i) => i.triaged_at && !i.explore).sort((a, b) => Date.parse(b.triaged_at) - Date.parse(a.triaged_at))
-    .slice(offset, offset + limit).map((i) => ({
-      id: i.id, title: itemLine(i.title), url: itemLine(i.url, 2000), source: itemLine(i.source_name, 80), published: i.published, triaged_at: i.triaged_at, note: i.note, interest: i.interest, topic: i.topic,
-      also: (i.also || []).length, drafted: drafted.has(i.id), queued: queued.has(i.id), hearted: db.hearts.some((h) => h.target === 'read' && h.ref === i.id),
-    }));
+    .slice(offset, offset + limit).map((i) => {
+      const b = boostFor(i, boosts);
+      return {
+        id: i.id, title: itemLine(i.title), url: itemLine(i.url, 2000), source: itemLine(i.source_name, 80), published: i.published, triaged_at: i.triaged_at, note: i.note, interest: i.interest, topic: i.topic,
+        also: (i.also || []).length, drafted: drafted.has(i.id), queued: queued.has(i.id), hearted: db.hearts.some((h) => h.target === 'read' && h.ref === i.id),
+        web: i.web || null, boost: b.points ? { points: b.points, why: b.why } : null,
+      };
+    });
   const wander = db.discoveries.slice(-10).reverse().map((d) => { const i = db.items.find((x) => x.id === d.item_id); return { id: d.id, finding: d.finding, question: d.question, interest: d.interest, topic: d.topic, title: itemLine(i?.title), url: itemLine(i?.url, 2000), source: itemLine(i?.source_name, 80) }; });
   return { view: 'reads', reads, wander, offset };
 }
+
+// Open proposals she decides on the Coach and Playbook pages (source suggestions live on Sources).
+const openProposals = (db) => db.proposals.filter((p) => p.status === 'open' && p.kind !== 'source');
 
 export function playbookView(ctx, db) {
   const votes = shapeVotes(db.drafts, db.hearts), mult = resultsMultipliers(db.drafts);
   const settings = ctx.settings();
   return {
     view: 'playbook',
-    proposals: db.proposals.filter((p) => p.status === 'open'),
+    proposals: openProposals(db),
     playbook: loadPlaybook(ctx.store), positions: loadPositions(ctx.store), audience: loadAudience(ctx.store),
     shapes: loadShapes(ctx.store).map((s) => ({ id: s.id, name: s.name, mechanism: s.mechanism, platforms: s.platforms, home: !!s.home, weight: round(shapeWeight(s, votes, mult, settings.home_weight)), up: votes[s.id]?.up || 0, down: votes[s.id]?.down || 0 })),
   };
 }
 
-export function settingsView(ctx) {
+export function settingsView(ctx, db) {
   const s = ctx.settings();
   const src = loadSources(ctx.store);
   const voice = loadVoice(ctx.store);
@@ -119,6 +131,7 @@ export function settingsView(ctx) {
     platforms: Object.values(allPlatforms()).map((p) => ({ id: p.id, name: p.name, max_chars: p.max_chars, enabled: !!s.platforms[p.id]?.enabled })),
     feeds: src.feeds.map((f) => ({ name: f.name, url: f.url, topic: f.topic })), reading: src.reading.map((f) => ({ name: f.name, url: f.url, topic: f.topic })),
     samples: voice.samples.map((x) => ({ text: x.text, platform: x.platform })), has_voice: !!voice.text.trim(),
+    accounts: accountsView(ctx, db),
   };
 }
 
@@ -130,19 +143,40 @@ export function sourcesView(ctx, db) {
   const beat = loadBeat(ctx.store);
   const now = ctx.now();
   const failing = new Map((db.runs.feed_errors || []).map((e) => [e.name, e.error]));
-  const row = (f, list) => {
-    const mine = db.items.filter((i) => i.source === `${list === 'feeds' ? 'rss' : 'explore'}:${f.name}`);
+  const rec = sourceRecords(db.drafts, byId(db.items), now);
+  const web = db.runs.web_status || {};
+  const stats = (key) => {
+    const mine = db.items.filter((i) => i.source === key);
     const week = mine.filter((i) => now - Date.parse(i.fetched_at) < 7 * DAY).length;
     const last = mine.reduce((m, i) => Math.max(m, Date.parse(i.fetched_at) || 0), 0);
+    const r = rec[key];
+    return { week, last_at: last ? new Date(last).toISOString() : null, record: r ? { approved: r.approved, decided: r.decided, why: r.why, suggest_pause: r.suggest_pause } : null };
+  };
+  const row = (f, list) => {
+    const key = list === 'feeds' ? feedKey(f) : `explore:${f.name}`;
     const status = f.paused ? 'paused' : list === 'feeds' && failing.has(f.name) ? 'failing' : 'active';
-    return { name: f.name, url: f.url, host: hostOf(f.url), topic: f.topic, list, paused: !!f.paused, status, error: status === 'failing' ? failing.get(f.name) : null, week, last_at: last ? new Date(last).toISOString() : null };
+    return { kind: f.kind === 'reddit' ? 'reddit' : 'site', name: f.name, url: f.url, host: f.kind === 'reddit' ? `reddit.com/r/${f.sub}` : hostOf(f.url), topic: f.topic, list, paused: !!f.paused, status, error: status === 'failing' ? failing.get(f.name) : null, ...stats(key) };
+  };
+  const webRow = (kind, x, key, extra) => {
+    const w = web[key];
+    const status = x.paused ? 'paused' : w && ['login_wall', 'not_found', 'failed', 'no_browser'].includes(w.status) ? w.status : 'active';
+    return { kind, topic: x.topic, paused: !!x.paused, status, read_via: w?.via || null, read_at: w?.at || null, ...stats(key), ...extra };
   };
   const links = db.jobs.filter((j) => j.kind === 'draft_item' && j.from_link).slice(-8).reverse().map((j) => {
     const i = db.items.find((x) => x.id === j.item_id);
     const drafted = db.drafts.some((d) => d.item_id === j.item_id);
     return { job_id: j.id, title: itemLine(i?.title), host: hostOf(i?.url), url: itemLine(i?.url, 2000), status: drafted ? 'drafted' : j.status, at: j.created_at };
   });
-  return { view: 'sources', feeds: src.feeds.map((f) => row(f, 'feeds')), reading: src.reading.map((f) => row(f, 'reading')), topics: beat.topics, links, last_fetch: db.runs.last_fetch || null };
+  // Suggestions: sources Claude suggested or discovery found. Nothing here is read until she adds it.
+  const suggestions = db.proposals.filter((p) => p.kind === 'source' && p.status === 'open').map((p) => ({ id: p.id, label: p.text, kind: p.target.kind, origin: p.source, why: p.reason || null, error: p.error || null, at: p.created_at }));
+  return {
+    view: 'sources', feeds: src.feeds.map((f) => row(f, 'feeds')), reading: src.reading.map((f) => row(f, 'reading')),
+    watch: src.watch.map((w) => webRow('watch', w, watchKey(w), { list: 'watch', name: w.name, handle: w.handle, platform: w.platform, url: w.url })),
+    trends: src.trends.map((t) => webRow('trends', t, TRENDS_KEY, { list: 'trends', name: t.name, platform: 'x' })),
+    searches: src.searches.map((q) => webRow('search', q, searchKey(q), { list: 'searches', name: q.q, q: q.q })),
+    suggestions, browser: db.runs.browser || null, last_web_read: db.runs.last_web_read || null,
+    topics: beat.topics, links, last_fetch: db.runs.last_fetch || null,
+  };
 }
 
 // Ranker features in her words. Internal ones (form, caps) are left out.
@@ -153,7 +187,7 @@ function featureLabel(f, shapeNames) {
   if (k === 'shape') return `"${shapeNames[v] || label(v)}" posts`;
   if (k === 'len') return { short: 'Short posts', mid: 'Medium-length posts', long: 'Longer posts' }[v];
   if (k === 'platform') return `${allPlatforms()[v]?.name || v} posts`;
-  if (k === 'source') return `Stories from ${itemLine(v.replace(/^(rss|explore|link):/, ''), 80)}`;
+  if (k === 'source') return `Stories from ${itemLine(v.startsWith('rss:') || v.startsWith('explore:') || v.startsWith('link:') ? v.replace(/^(rss|explore|link):/, '') : sourceLabel(v), 80)}`;
   if (k === 'kind') return v === 'evergreen' ? 'Evergreen posts' : null;
   if (k === 'experiment') return v === 'yes' ? 'Experiments' : null;
   return { question: 'Posts that ask a question', number: 'Posts with a number in them', 'first-person': 'Posts that say "we" or "our"' }[f] || null;
@@ -205,7 +239,41 @@ export function topicsView(ctx, db) {
       approved: ds.filter((d) => ['passed', 'edited', 'posted'].includes(d.status)).length, skipped: ds.filter((d) => ['killed', 'passed_over'].includes(d.status)).length,
     };
   });
-  return { view: 'topics', topics, ...learnedInterests(ctx, db) };
+  return { view: 'topics', topics, ...learnedInterests(ctx, db), boosts: boostRows(ctx, db), edits: editSummary(ctx, db) };
+}
+
+// What moves stories up or down the drafting queue, each with why.
+export function boostRows(ctx, db) {
+  const src = loadSources(ctx.store);
+  const names = Object.fromEntries(src.feeds.map((f) => [feedKey(f), f.name]));
+  const b = interestBoosts({ drafts: db.drafts, items: db.items, hearts: db.hearts, now: ctx.now(), sourceNames: names });
+  const rows = [
+    ...Object.entries(b.topic).map(([k, r]) => ({ kind: 'topic', label: `Stories about ${label(k)}`, points: r.points, why: r.why })),
+    ...Object.entries(b.source).map(([k, r]) => ({ kind: 'source', label: `Stories from ${itemLine(names[k] || sourceLabel(k), 80)}`, points: r.points, why: r.why })),
+  ].filter((r) => Math.abs(r.points) >= 0.1);
+  return rows.sort((a, b2) => Math.abs(b2.points) - Math.abs(a.points)).slice(0, 8).map((r) => ({ ...r, direction: r.points > 0 ? 'up' : 'down' }));
+}
+
+// What her edits and skips say, in her words.
+export function editSummary(ctx, db) {
+  const ed = editPatterns(db.edits, ctx.now());
+  return { n: ed.n, patterns: ed.patterns.map((p) => ({ key: p.key, why: p.why, line: p.line })), phrases: ed.phrases.map((p) => ({ phrase: p.phrase, why: p.why })) };
+}
+
+// The Coach page: the latest weekly report, what's waiting for her, and the signals behind it.
+export function coachView(ctx, db) {
+  const now = ctx.now();
+  const reports = db.coach.slice().sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  const reasons = tallyReasons(killReasons(db.drafts, byId(db.items), now, 30));
+  const rec = sourceRecords(db.drafts, byId(db.items), now);
+  const src = loadSources(ctx.store);
+  const pause = src.feeds.filter((f) => !f.paused && rec[feedKey(f)]?.suggest_pause).map((f) => ({ name: f.name, url: f.url, list: 'feeds', why: rec[feedKey(f)].why }));
+  return {
+    view: 'coach', report: reports[0] || null, history: reports.slice(1, 6).map((r) => ({ week: r.week, summary: r.summary })),
+    proposals: openProposals(db),
+    skips: KILL_REASON_KEYS.filter((k) => reasons[k]).map((k) => ({ reason: k, label: KILL_REASONS[k], n: reasons[k].n, topics: Object.entries(reasons[k].topics).sort((a, b) => b[1] - a[1]).map(([t, n]) => ({ topic: label(t), n })) })),
+    edits: editSummary(ctx, db), pause,
+  };
 }
 
 export function scheduleView(ctx, db) {
@@ -235,7 +303,7 @@ export function personasSummary(ctx) {
 // The three first-run steps, done or not. Shown until there is a draft.
 export function firstRun(ctx, db) {
   const steps = [
-    { key: 'sources', done: loadSources(ctx.store).feeds.length > 0 },
+    { key: 'sources', done: (({ feeds, watch, searches }) => feeds.length + watch.length + searches.length > 0)(loadSources(ctx.store)) },
     { key: 'topics', done: loadBeat(ctx.store).topics.length > 0 },
     { key: 'schedule', done: !!db.runs.last_fetch },
   ];
@@ -246,7 +314,7 @@ export function header(ctx, db) {
   const c = counterLine(db.drafts, db.days, ctx.settings(), ctx.now());
   const me = ctx.personas.get(ctx.slug);
   return {
-    counter: c, counter_text: counterText(c), jobs: db.jobs.filter((j) => j.status === 'queued').length, proposals: db.proposals.filter((p) => p.status === 'open').length,
+    counter: c, counter_text: counterText(c), jobs: db.jobs.filter((j) => j.status === 'queued').length, proposals: openProposals(db).length, suggestions: db.proposals.filter((p) => p.kind === 'source' && p.status === 'open').length,
     brand: me.name || ctx.settings().brand, home: ctx.store.home, persona: { slug: me.slug, name: me.name }, personas: personasSummary(ctx), setup_complete: !!ctx.settings().setup_complete, first_run: firstRun(ctx, db),
   };
 }

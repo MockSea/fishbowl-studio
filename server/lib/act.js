@@ -1,7 +1,8 @@
 // Her verdicts and actions on the board (or in chat). Pass and edit carry a fingerprint of the
 // text she saw; if a rewrite landed while the board was open, the write is refused.
-import { sha12, cleanPost, clip } from './text.js';
+import { sha12, cleanPost, clip, oneLine } from './text.js';
 import { safeHttpsUrl } from './urls.js';
+import { editDiff, KILL_REASONS, KILL_REASON_KEYS } from './learn.js';
 
 export const fingerprint = (d) => sha12(d.final_text || d.text);
 const LIVE = new Set(['pending', 'passed', 'edited', 'killed']);
@@ -44,6 +45,25 @@ function pickTake(db, d, iso) {
   Object.assign(d, { status: 'pending', picked_at: iso });
 }
 
+function setReason(ds, reason, note) {
+  if (reason !== 'clear' && !KILL_REASONS[reason]) refuse(`Reason must be one of: ${KILL_REASON_KEYS.join(', ')}.`);
+  for (const d of ds) {
+    if (reason === 'clear') { delete d.kill_reason; delete d.kill_note; continue; }
+    d.kill_reason = reason;
+    if (note) d.kill_note = clip(oneLine(note), 300); else delete d.kill_note;
+  }
+}
+
+// Her version against the draft's, kept with what changed, for the weekly pass. One record per
+// draft (the latest edit wins); undoing the edit removes it.
+function recordEdit(db, d, ctx, iso) {
+  const i = db.edits.findIndex((e) => e.draft_id === d.id);
+  if (!d.final_text) { if (i >= 0) db.edits.splice(i, 1); return; }
+  const row = { id: i >= 0 ? db.edits[i].id : ctx.id('edit'), draft_id: d.id, before: d.text, after: d.final_text, platform: d.platform, topic: d.tags?.topic || 'other', shape_ids: d.tags?.shape_ids || [], at: iso, diff: editDiff(d.text, d.final_text) };
+  if (i >= 0) db.edits[i] = row; else db.edits.push(row);
+  if (db.edits.length > 300) db.edits.splice(0, db.edits.length - 300);
+}
+
 function setDrafts(db, setId) {
   const ds = db.drafts.filter((x) => x.set_id === Number(setId));
   if (!ds.length) refuse(`No set ${setId}.`);
@@ -79,23 +99,34 @@ const ACTIONS = {
     if (/^\s*(https?:\/\/\S+\s*)+$/.test(t)) refuse('An edit can\'t be only a link.');
     pickTake(db, d, iso);
     d.final_text = t === d.text ? null : t;
+    recordEdit(db, d, ctx, iso);
     if (and_pass) Object.assign(d, { status: d.final_text ? 'edited' : 'passed', decided_at: iso, verdict_fp: fingerprint(d) });
     return { message: and_pass ? 'Saved your edit and passed it.' : 'Saved your edit. Pass it when you\'re happy.', id: d.id, hash: fingerprint(d) };
   },
 
-  kill(db, { id }, { iso }) {
+  kill(db, { id, reason }, { iso }) {
     const d = draftOf(db, id);
     if (!['pending', 'passed', 'edited'].includes(d.status)) refuse(`Draft ${id} can't be killed from ${d.status}${d.status === 'option' ? ' (use "none of these" for a set)' : ''}.`);
     Object.assign(d, { status: 'killed', decided_at: iso, killed_from: d.status });
-    return { message: 'Killed. It will count against its shape.', id: d.id };
+    if (reason) setReason([d], reason);
+    return { message: 'Killed. It will count against its shape.', id: d.id, ask_reason: !reason };
   },
 
-  none(db, { set_id, note }, { ctx, iso }) {
+  // One tap after a skip: why. Optional; a skip without a reason teaches the same as before.
+  kill_reason(db, { id, set_id, reason, note }) {
+    const ds = set_id != null ? setDrafts(db, set_id).filter((x) => x.status === 'passed_over') : [draftOf(db, id)];
+    if (!ds.length || ds.some((d) => !['killed', 'passed_over'].includes(d.status))) refuse('Only a skipped draft can have a reason.');
+    setReason(ds, reason, note);
+    return { message: reason === 'clear' ? 'Reason cleared.' : `Noted: ${KILL_REASONS[reason].toLowerCase()}.`, id: ds[0].id, reason };
+  },
+
+  none(db, { set_id, note, reason }, { ctx, iso }) {
     const ds = setDrafts(db, set_id).filter((x) => x.status === 'option');
     if (!ds.length) refuse(`Set ${set_id} has no takes waiting.`);
     for (const d of ds) Object.assign(d, { status: 'passed_over', decided_at: iso });
+    if (reason) setReason(ds, reason);
     if (note) db.feedback.push({ id: ctx.id('feedback'), set_id: Number(set_id), text: clip(note, 1000), prior_text: ds.map((d) => d.text).join('\n---\n'), at: iso, on_set: true, rewrite: 'n/a' });
-    return { message: 'Passed over all takes. Ask for a redo if the story deserves another go.', set_id: Number(set_id) };
+    return { message: 'Passed over all takes. Ask for a redo if the story deserves another go.', set_id: Number(set_id), ask_reason: !reason };
   },
 
   redo(db, { set_id, note }, { ctx, settings, iso }) {
@@ -118,6 +149,7 @@ const ACTIONS = {
     if (!r) refuse('Restoring needs a reason: what did you see in it the second time?');
     db.reversals.push({ id: ctx.id('reversal'), draft_id: d.id, reason: clip(r, 500), line: d.final_text || d.text, at: iso });
     Object.assign(d, { status: 'pending', decided_at: null, restored_at: iso, restore_trail: [...(d.restore_trail || []), { reason: clip(r, 500), at: iso }] });
+    delete d.kill_reason; delete d.kill_note;
     return { message: 'Restored. Your reason will reach the drafter.', id: d.id };
   },
 

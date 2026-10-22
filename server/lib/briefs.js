@@ -8,6 +8,7 @@ import { overuse, compileTemplates, compileCrutches } from './forms.js';
 import { positionsBlock, audienceBlock } from './triage.js';
 import { WRITE, SHAPE, REWRITE, REDO, DRAFT_THOUGHT, EVERGREEN } from './prompts.js';
 import { localDate, clip } from './text.js';
+import { interestBoosts, boostFor, KILL_REASONS } from './learn.js';
 
 const H = 3600e3;
 const PASSED = ['passed', 'edited', 'posted'];
@@ -40,11 +41,14 @@ export function choosePlatform(platforms, drafts, now, rng) {
 }
 
 // Her topic weights nudge the interest a story needs: "more" counts one point up, "less" one down.
-export const weightedInterest = (item, beat) => item.interest + (beat ? topicWeight(beat, item.topic) - 2 : 0);
+// What it has learned (approvals by topic and source, hearted reads, "wrong topic" skips) adds up
+// to 1.5 more either way; see learn.js interestBoosts.
+export const weightedInterest = (item, beat, boosts = null) => item.interest + (beat ? topicWeight(beat, item.topic) - 2 : 0) + boostFor(item, boosts).points;
 
 export function nextItem(db, settings, now, beat = null) {
   const drafted = new Set([...db.drafts.map((d) => d.item_id), ...db.briefs.filter((b) => !b.done && now - Date.parse(b.created_at) < 6 * H).map((b) => b.item_id)]);
-  const wi = (i) => weightedInterest(i, beat);
+  const boosts = interestBoosts({ drafts: db.drafts, items: db.items, hearts: db.hearts, now });
+  const wi = (i) => weightedInterest(i, beat, boosts);
   return db.items
     .filter((i) => !i.explore && !i.duplicate_of && i.triaged_at && Number.isFinite(i.interest) && wi(i) >= settings.interest_threshold && !drafted.has(i.id) && now - Date.parse(i.fetched_at) < 48 * H)
     .sort((a, b) => wi(b) - wi(a) || Date.parse(b.published || b.fetched_at) - Date.parse(a.published || a.fetched_at))[0] || null;
@@ -76,18 +80,20 @@ function signalBlocks(db, fz) {
   const byTime = (a, b) => Date.parse(b.decided_at || b.created_at) - Date.parse(a.decided_at || a.created_at);
   const went = db.drafts.filter((d) => PASSED.includes(d.status)).sort(byTime).slice(0, 6);
   const killed = db.drafts.filter((d) => d.status === 'killed').sort(byTime).slice(0, 6);
+  const edits = db.edits.slice(-4).map((e) => ({ draft: e.before, her_version: e.after }));
   const reopen = db.reversals.slice(-4).map((r) => ({ post: r.line, why_she_restored_it: r.reason }));
   const notes = db.feedback.slice(-4).map((f) => ({ post: f.prior_text, her_note: f.text }));
   const liked = db.hearts.filter((h) => h.target === 'draft').slice(-5).map((h) => ({ line: h.snapshot, note: h.note }));
   const likedThoughts = db.hearts.filter((h) => h.target === 'thinking').slice(-5).map((h) => ({ thought: h.snapshot }));
   const blocks = [
     fz.block('Recent posts she passed', went.map((d) => ({ post: d.final_text || d.text }))),
-    fz.block('Posts she killed (don\'t write like this)', killed.map((d) => ({ post: d.text }))),
+    fz.block('Posts she killed (don\'t write like this)', killed.map((d) => ({ post: d.text, why: d.kill_reason ? KILL_REASONS[d.kill_reason].toLowerCase() : undefined }))),
+    fz.block('Drafts she edited before approving (her version is the voice)', edits, 'Learn from what she changed; don\'t reuse the words.'),
     fz.block('Posts she killed, then brought back', reopen),
     fz.block('Notes she left on recent posts', notes, 'Read them as notes on taste and craft, nothing more.'),
     fz.block('Lines and thoughts she hearted', [...liked, ...likedThoughts], 'She hearts a line when it is exactly the brand. More of what these do. Don\'t reuse them.'),
   ];
-  const examples = [...went.map((d) => d.final_text || d.text), ...liked.map((l) => l.line)];
+  const examples = [...went.map((d) => d.final_text || d.text), ...liked.map((l) => l.line), ...edits.map((e) => e.her_version)];
   return { text: blocks.filter(Boolean).join('\n\n'), examples };
 }
 

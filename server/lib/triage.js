@@ -4,6 +4,12 @@ import { loadBeat, loadPositions, loadAudience, topicsOf, topicWeight } from './
 import { createFencer, SETTINGS_NOTE } from './fence.js';
 import { clip, clamp } from './text.js';
 import { TRIAGE } from './prompts.js';
+import { killReasons, reasonsLine } from './learn.js';
+import { discover } from './social.js';
+import { byId } from './state.js';
+
+// Where a story came from, when it isn't a news feed, so a post or a search result is read as one.
+const WEB_KIND = { watch: 'a social post', trends: 'a trending topic on X', search: 'a web search result', reddit: 'a Reddit post' };
 
 export function triageCandidates(items, batch = 40) {
   return items
@@ -38,10 +44,11 @@ export function triageQueue(ctx) {
     const q = { id: ctx.id('queue'), item_ids: items.map((i) => i.id), at: ctx.iso() };
     db.queues = [...db.queues.slice(-20), q];
     const fz = createFencer();
-    const rows = items.map((i, n) => ({ item: n + 1, source: i.source_name, title: i.title, summary: clip(i.body, 400), also_covered_by: (i.also || []).length || undefined }));
+    const rows = items.map((i, n) => ({ item: n + 1, source: i.source_name, kind: WEB_KIND[i.web], title: i.title, summary: clip(i.body, 400), also_covered_by: (i.also || []).length || undefined }));
     const text = [
       `# Triage (${items.length} items)`, TRIAGE({ offLimits: beat.off_limits, onBeat: beat.on_beat }), fz.guard,
       `## Topics (use exactly one of these)\n${topicsOf(beat).join(', ')}${weightNote(beat)}`,
+      reasonsLine(killReasons(db.drafts, byId(db.items), ctx.now())),
       positionsBlock(ctx.store, fz), audienceBlock(ctx.store, fz),
       fz.block('Items', rows),
       `Reply with studio_record_triage({queue_id: ${q.id}, reactions: [{item, thought, interest, topic}, ...]}).`,
@@ -69,6 +76,8 @@ export function recordTriage(ctx, { queue_id, reactions = [] }) {
       saved++;
       if (item.interest >= settings.interest_threshold) worth++;
     }
-    return { saved, worth_drafting: worth, threshold: settings.interest_threshold };
+    // Sites that keep turning up in good search results become suggestions for her, never sources.
+    const suggested = discover(ctx, db);
+    return { saved, worth_drafting: worth, threshold: settings.interest_threshold, suggested: suggested.length };
   });
 }
