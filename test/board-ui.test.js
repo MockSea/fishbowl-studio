@@ -15,7 +15,7 @@ import { BOARD_SCRIPTS, boardHtml } from '../server/lib/rpc.js';
 const tick = () => new Promise((r) => setTimeout(r, 5));
 async function settle(n = 20) { for (let i = 0; i < n; i++) await tick(); }
 
-async function boot({ fetchImpl } = {}) {
+async function boot({ fetchImpl, displayModes, refuseDisplay } = {}) {
   const home = tempHome();
   seed(home);
   const ctx = makeContext({ home, fetchImpl });
@@ -26,9 +26,9 @@ async function boot({ fetchImpl } = {}) {
     postMessage: async (m) => {
       sent.push(m);
       const reply = (result) => listeners.forEach((f) => f({ source: parent, data: { jsonrpc: '2.0', id: m.id, result } }));
-      if (m.method === 'ui/initialize') reply({ protocolVersion: '2026-01-26', hostContext: { theme: 'dark', styles: { variables: { '--color-text-primary': '#fff' } } } });
+      if (m.method === 'ui/initialize') reply({ protocolVersion: '2026-01-26', hostContext: { theme: 'dark', ...(displayModes && { availableDisplayModes: displayModes }), styles: { variables: { '--color-text-primary': '#fff' } } } });
       else if (m.method === 'tools/call') reply(await callTool(ctx, m.params.name, m.params.arguments));
-      else if (m.method === 'ui/message' || m.method === 'ui/open-link' || m.method === 'ui/request-display-mode') reply(m.method === 'ui/request-display-mode' ? { mode: m.params.mode } : {});
+      else if (m.method === 'ui/message' || m.method === 'ui/open-link' || m.method === 'ui/request-display-mode') reply(m.method === 'ui/request-display-mode' && !refuseDisplay ? { mode: m.params.mode } : {});
       else if (m.method === 'ui/notifications/initialized') {
         const r = await callTool(ctx, 'studio_board', {});
         listeners.forEach((f) => f({ source: parent, data: { jsonrpc: '2.0', method: 'ui/notifications/tool-result', params: r } }));
@@ -255,7 +255,14 @@ test('component CSS takes every colour from the skin; the board ships every skin
   assert.equal(literal, null, `literal colours in board.css: ${literal}`);
   const html = boardHtml();
   assert.match(html, /:root, :root\[data-skin="light"\]/);
-  assert.match(html, /window\.STUDIO_SKINS = \["light"\]/);
+  assert.match(html, /window\.STUDIO_SKINS = \["light","dark"\]/);
+  assert.match(html, /:root\[data-skin="dark"\]/);
+  // Dark mode must not leave a light colour behind: every colour token in light.css is redefined in dark.css.
+  const skin = (f) => fs.readFileSync(path.join(PLUGIN_ROOT, 'server', 'ui', 'skins', f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const colourTokens = (css) => new Set([...css.matchAll(/(--[\w-]+):\s*([^;]+);/g)].filter(([, , v]) => /#|rgba?\(|shadow/.test(v) || /^--shadow/.test(v)).map(([, k]) => k));
+  const dark = colourTokens(skin('dark.css'));
+  const missing = [...colourTokens(skin('light.css'))].filter((k) => !dark.has(k));
+  assert.deepEqual(missing, [], `dark.css is missing colour tokens: ${missing}`);
   assert.doesNotMatch(html, /__(CSS|SKINS|BRIDGE|VIEWS)__/);
 });
 
@@ -483,4 +490,17 @@ test('Posting on the board: missed and failed posts are never silent; approve to
   // Schedule now includes the posting task.
   await b.nav('schedule');
   assert.match(b.view().textContent, /Fishbowl Studio posting.*Run the Fishbowl Studio posting\./);
+});
+
+test('Full screen: shown only when the host offers it, hidden for good when a request fails', async () => {
+  const none = await boot();
+  assert.equal(none.document.getElementById('full-btn').hidden, true);
+  const offered = await boot({ displayModes: ['inline', 'fullscreen'] });
+  assert.equal(offered.document.getElementById('full-btn').hidden, false);
+  const inlineOnly = await boot({ displayModes: ['inline'] });
+  assert.equal(inlineOnly.document.getElementById('full-btn').hidden, true);
+  const refused = await boot({ displayModes: ['inline', 'fullscreen'], refuseDisplay: true });
+  await refused.document.getElementById('full-btn').click();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(refused.document.getElementById('full-btn').hidden, true);
 });

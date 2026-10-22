@@ -38,7 +38,7 @@ Fishbowl Studio was built against a written reference of the MCP, MCP Apps and C
 17. **`ui/open-link`** opens the story; local servers always get a confirmation prompt. If refused, the board shows the URL.
 18. **Every tool call mounts a new board.** Older boards listen on a `BroadcastChannel` and show "a newer board is open" when a newer one announces itself. If `BroadcastChannel` isn't available in the sandbox, old boards stay live; fingerprints still stop them overwriting newer text.
 19. **No board in some surfaces.** MCP App panels reportedly don't mount in mobile Cowork or in cloud-run sessions. Reviewing works in chat (`studio_board` returns a text list) and so does the setup wizard (`studio_wizard`), but their board-only decisions (keeping proposals, adding sources, turning posting on, approving to post) wait until they open the board on the desktop.
-20. **HTML size.** The assembled board is about 140 KB; no size limit was found in the reference.
+20. **HTML size.** The assembled board is about 150 KB with both skins; no size limit was found in the reference.
 
 ## Scheduling and runtime
 
