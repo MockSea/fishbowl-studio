@@ -58,6 +58,7 @@ async function mount() {
   const iframe = document.createElement('iframe');
   iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms');
   iframe.setAttribute('allow', 'clipboard-write');
+  if (qs.get('viewport')) iframe.style.height = `${Number(qs.get('viewport'))}px`;
   iframe.srcdoc = html;
   box.prepend(iframe);
   const f = { iframe, ready: false };
@@ -88,10 +89,16 @@ window.addEventListener('message', async (ev) => {
       send(f, { method: 'ui/notifications/tool-result', params: r.result });
       // ?drawer=1 opens the phone menu once the board has drawn.
       if (qs.get('drawer')) setTimeout(() => { const b = f.iframe.contentDocument && f.iframe.contentDocument.getElementById('menu-btn'); if (b) b.click(); }, 300);
+      // ?hide=<css selector> hides those parts of the board (README screenshots leave out the demo's alert banners).
+      if (qs.get('hide')) { const st = f.iframe.contentDocument.createElement('style'); st.textContent = `${qs.get('hide')} { display: none !important; }`; f.iframe.contentDocument.head.append(st); }
+      // ?scroll=<css selector> scrolls the board to that part of it (for README screenshots, with ?viewport=).
+      if (qs.get('scroll')) setTimeout(() => { const el = f.iframe.contentDocument && f.iframe.contentDocument.querySelector(qs.get('scroll')); if (el) el.scrollIntoView({ block: 'start' }); }, 600);
       return;
     }
     case 'ui/notifications/size-changed':
-      f.iframe.style.height = Math.max(200, m.params.height) + 'px'; return;
+      // ?viewport=<px> keeps the board that tall and lets it scroll inside, like a fixed-size host.
+      // (Headless Chrome's screenshot is taller than innerHeight, so the height is passed in.)
+      f.iframe.style.height = qs.get('viewport') ? `${Number(qs.get('viewport'))}px` : Math.max(200, m.params.height) + 'px'; return;
     case 'tools/call': {
       const r = await rpc('tools/call', m.params);
       return r.error ? fail(r.error.code, r.error.message) : reply(r.result);

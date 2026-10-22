@@ -4,6 +4,7 @@
 // adds a brand-new persona partway through the setup wizard (first-run card and every wizard
 // step), then drives headless Chrome.
 // Usage: node dev/shots.mjs   (set CHROME=/path/to/chrome if it isn't found)
+//        node dev/shots.mjs --readme   the cropped, sharp set the README shows, into docs/screenshots/
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,7 +12,8 @@ import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const DEV = path.dirname(fileURLToPath(import.meta.url));
-const OUT = path.join(DEV, 'shots');
+const README = process.argv.includes('--readme');
+const OUT = README ? path.join(DEV, '..', 'docs', 'screenshots') : path.join(DEV, 'shots');
 const PORT = Number(process.env.PORT || 7631);
 const HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-shots-'));
 const WIDTHS = { desktop: [1280, 1800], phone: [390, 2600] };
@@ -56,12 +58,28 @@ shots.push({ file: 'settings-chat-width.png', q: 'view=settings', w: 760, hgt: 2
 shots.push({ file: 'drawer-phone.png', q: 'view=drafts&drawer=1', w: 390, hgt: 1200 });
 shots.push({ file: 'drafts-chat-width.png', q: 'view=drafts', w: 760, hgt: 1800 });
 
+// The README set: one viewport each, at 2x so text stays sharp when GitHub scales it down.
+// The demo's alert banners are hidden unless a shot is about them.
+const README_SHOTS = [
+  { file: 'drafts.png', q: 'view=drafts', w: 1280, hgt: 860 },
+  { file: 'pick-one.png', q: 'view=drafts', w: 1280, hgt: 760, scroll: '.post.set' },
+  { file: 'wizard.png', q: 'view=wizard&persona=fernhollow-bakery', w: 1280, hgt: 900 },
+  { file: 'sources.png', q: 'view=sources', w: 1280, hgt: 900 },
+  { file: 'topics.png', q: 'view=topics', w: 1280, hgt: 900 },
+  { file: 'coach.png', q: 'view=coach', w: 1280, hgt: 900 },
+  { file: 'accounts.png', q: 'view=settings', w: 1280, hgt: 760, scroll: 'section.card:has(.acct)' },
+  { file: 'approved.png', q: 'view=drafts&tab=passed', w: 1280, hgt: 860, hide: '#jobs' },
+  { file: 'phone-drafts.png', q: 'view=drafts', w: 390, hgt: 844 },
+  { file: 'phone-menu.png', q: 'view=drafts&drawer=1', w: 390, hgt: 844 },
+];
+if (README) shots.splice(0, shots.length, ...README_SHOTS.map((r) => ({ hide: '#jobs, #posting', ...r })));
+
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-chrome-'));
 try {
   for (const s of shots) {
-    const url = `http://localhost:${PORT}/?bare=1&width=${s.w}&${s.q}`;
-    execFileSync(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', `--user-data-dir=${profile}`, `--window-size=${s.w},${s.hgt}`, '--virtual-time-budget=6000', `--screenshot=${path.join(OUT, s.file)}`, url], { stdio: 'ignore' });
-    console.log(`dev/shots/${s.file}`);
+    const url = `http://localhost:${PORT}/?bare=1&width=${s.w}&${s.q}${README ? `&viewport=${s.hgt}` : ''}${s.scroll ? `&scroll=${encodeURIComponent(s.scroll)}` : ''}${s.hide ? `&hide=${encodeURIComponent(s.hide)}` : ''}`;
+    execFileSync(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', ...(README ? ['--force-device-scale-factor=2'] : []), `--user-data-dir=${profile}`, `--window-size=${s.w},${s.hgt}`, '--virtual-time-budget=6000', `--screenshot=${path.join(OUT, s.file)}`, url], { stdio: 'ignore' });
+    console.log(path.relative(process.cwd(), path.join(OUT, s.file)));
   }
 } finally {
   server.kill();
