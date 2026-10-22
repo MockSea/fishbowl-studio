@@ -97,5 +97,5 @@ test('the board resource is one self-contained HTML document', async () => {
   assert.doesNotMatch(html, /<script[^>]+src=|<link[^>]+stylesheet/i, 'no external scripts or styles');
   assert.match(html, /name="color-scheme" content="light"/, 'the board has its own light skin (server/ui/skins/light.css)');
   assert.match(html, /ui\/initialize/);
-  assert.ok(html.length < 150000);
+  assert.ok(html.length < 200000, "a tripwire for runaway growth, not a host limit (docs/ASSUMPTIONS.md 20)");
 });

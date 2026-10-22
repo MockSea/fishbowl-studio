@@ -128,6 +128,7 @@
   window.Studio = {
     connect, callTool, askClaude, openLink, copy, reportSize, setStamp,
     onResult: (f) => listeners.result.push(f),
+    onContext: (f) => listeners.context.push(f),
     isSuperseded: () => superseded,
     fullscreen: () => request('ui/request-display-mode', { mode: 'fullscreen' }).catch(() => null),
     displayMode: (mode) => request('ui/request-display-mode', { mode }).catch(() => null),

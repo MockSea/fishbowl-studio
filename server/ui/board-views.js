@@ -289,11 +289,14 @@
   $('menu-btn').append(icon('menu'));
   $('menu-btn').addEventListener('click', () => setDrawer(!state.drawer));
   $('scrim').addEventListener('click', () => setDrawer(false));
+  // Full screen shows only when the host says it can do it, and hides for good if a request fails.
   $('full-btn').prepend(icon('expand'));
+  S.onContext((c) => { if (Array.isArray(c.availableDisplayModes)) $('full-btn').hidden = !c.availableDisplayModes.includes('fullscreen'); });
   $('full-btn').addEventListener('click', async () => {
     const want = state.display === 'fullscreen' ? 'inline' : 'fullscreen';
     const r = await S.displayMode(want);
-    state.display = (r && r.mode) || state.display;
+    if (!r || !r.mode) { $('full-btn').hidden = true; return; }
+    state.display = r.mode;
     $('full-lbl').textContent = state.display === 'fullscreen' ? 'Exit full screen' : 'Full screen';
   });
   document.querySelectorAll('.navbtn').forEach((b) => {
