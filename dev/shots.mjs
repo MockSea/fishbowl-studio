@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Screenshots of every board section at desktop and phone width, into dev/shots/.
 // Reseeds a throwaway demo folder, starts the dev host (dev/serve.mjs) on PORT (default 7631),
-// adds a brand-new persona for the first-run screen, then drives headless Chrome.
+// adds a brand-new persona partway through the setup wizard (first-run card and every wizard
+// step), then drives headless Chrome.
 // Usage: node dev/shots.mjs   (set CHROME=/path/to/chrome if it isn't found)
 import fs from 'node:fs';
 import os from 'node:os';
@@ -33,8 +34,11 @@ const rpc = async (name, args) => {
   const r = await fetch(`http://127.0.0.1:${PORT}/rpc`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ method: 'tools/call', params: { name, arguments: args } }) });
   return r.json();
 };
-// A brand-new persona for the first-run card, then back to the populated one.
-await rpc('studio_personas', { action: 'create', name: 'Juniper Lane Books' });
+// A brand-new persona, waiting for Claude's setup drafts, for the first-run card and the wizard
+// steps; Fernhollow (seeded) shows the review step. Then back to the populated one.
+await rpc('studio_wizard', { action: 'create', name: 'Juniper Lane Books', link: 'https://juniper-lane-books.example.com/' });
+await rpc('studio_wizard', { action: 'answer', answers: { audience: 'Neighbours who read, and the Thursday book club', tone: 'Bookish and warm, never twee', topics: 'new fiction, author events', off_limits: '' } });
+await rpc('studio_wizard', { action: 'draft' });
 await rpc('studio_personas', { action: 'switch', slug: 'northwind-bicycles' });
 
 fs.mkdirSync(OUT, { recursive: true });
@@ -42,7 +46,13 @@ const shots = [];
 for (const [kind, [w, hgt]] of Object.entries(WIDTHS)) {
   for (const view of SECTIONS) shots.push({ file: `${view}-${kind}.png`, q: `view=${view}`, w, hgt });
   shots.push({ file: `first-run-${kind}.png`, q: 'view=drafts&persona=juniper-lane-books', w, hgt });
+  for (const step of ['brand', 'questions', 'drafting', 'posting', 'finish']) shots.push({ file: `wizard-${step}-${kind}.png`, q: `view=wizard&persona=juniper-lane-books${step === 'drafting' ? '' : `&step=${step}`}`, w, hgt });
+  shots.push({ file: `wizard-new-${kind}.png`, q: 'view=wizard&new=1', w, hgt });
+  shots.push({ file: `wizard-review-${kind}.png`, q: 'view=wizard&persona=fernhollow-bakery', w, hgt });
+  shots.push({ file: `posting-${kind}.png`, q: 'view=drafts&tab=passed', w, hgt });
 }
+shots.push({ file: 'wizard-review-chat-width.png', q: 'view=wizard&persona=fernhollow-bakery', w: 760, hgt: 2400 });
+shots.push({ file: 'settings-chat-width.png', q: 'view=settings', w: 760, hgt: 2400 });
 shots.push({ file: 'drawer-phone.png', q: 'view=drafts&drawer=1', w: 390, hgt: 1200 });
 shots.push({ file: 'drafts-chat-width.png', q: 'view=drafts', w: 760, hgt: 1800 });
 

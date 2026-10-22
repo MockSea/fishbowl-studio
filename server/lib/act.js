@@ -3,6 +3,7 @@
 import { sha12, cleanPost, clip, oneLine } from './text.js';
 import { safeHttpsUrl } from './urls.js';
 import { editDiff, KILL_REASONS, KILL_REASON_KEYS } from './learn.js';
+import { postingOn } from './accounts.js';
 
 export const fingerprint = (d) => sha12(d.final_text || d.text);
 const LIVE = new Set(['pending', 'passed', 'edited', 'killed']);
@@ -64,6 +65,11 @@ function recordEdit(db, d, ctx, iso) {
   if (db.edits.length > 300) db.edits.splice(0, db.edits.length - 300);
 }
 
+// Approving here (chat or board) never schedules a post: only the board's Approve for an account
+// with "Post for me" on does (studio_post_schedule). Say so when it matters.
+const noPostNote = (db, d) => (postingOn(db.accounts.find((a) => a.type === d.platform))
+  ? ' It won\'t be posted for you: only Approve on the board counts as her OK to post. She can tap "Post it for me" on the board, or copy it.' : '');
+
 function setDrafts(db, setId) {
   const ds = db.drafts.filter((x) => x.set_id === Number(setId));
   if (!ds.length) refuse(`No set ${setId}.`);
@@ -85,7 +91,7 @@ const ACTIONS = {
     checkHash(d, hash, true);
     pickTake(db, d, iso);
     Object.assign(d, { status: d.final_text ? 'edited' : 'passed', decided_at: iso, verdict_fp: fingerprint(d) });
-    return { message: `Passed. Copy it from the Passed tab (${d.platform}, ${(d.final_text || d.text).length} characters).`, id: d.id };
+    return { message: `Passed. Copy it from the Passed tab (${d.platform}, ${(d.final_text || d.text).length} characters).${noPostNote(db, d)}`, id: d.id };
   },
 
   edit(db, { id, hash, text, and_pass }, { ctx, iso }) {
@@ -101,7 +107,7 @@ const ACTIONS = {
     d.final_text = t === d.text ? null : t;
     recordEdit(db, d, ctx, iso);
     if (and_pass) Object.assign(d, { status: d.final_text ? 'edited' : 'passed', decided_at: iso, verdict_fp: fingerprint(d) });
-    return { message: and_pass ? 'Saved your edit and passed it.' : 'Saved your edit. Pass it when you\'re happy.', id: d.id, hash: fingerprint(d) };
+    return { message: and_pass ? `Saved your edit and passed it.${noPostNote(db, d)}` : 'Saved your edit. Pass it when you\'re happy.', id: d.id, hash: fingerprint(d) };
   },
 
   kill(db, { id, reason }, { iso }) {

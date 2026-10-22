@@ -345,6 +345,50 @@ a { color: var(--accent-text); text-underline-offset: .2em; }
 .coach-summary { margin: 0 0 var(--s-2); font-size: var(--t-post); line-height: var(--lh); }
 .letter .i { width: 18px; height: 18px; }
 
+/* setup wizard */
+.wizard { display: flex; flex-direction: column; gap: var(--s-5); max-width: 760px; }
+.wsteps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-2); }
+.wsteps li { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3); border-radius: var(--r-md); border: var(--border) solid var(--line); background: var(--surface); color: var(--ink-3); font-size: var(--t-sm); min-width: 0; }
+.wsteps li .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wsteps .num { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--hover); color: var(--ink-2); font-weight: var(--w-bold); font-size: var(--t-xs); }
+.wsteps .num .i { width: 14px; height: 14px; }
+.wsteps li.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); font-weight: var(--w-bold); }
+.wsteps li.on .num { background: var(--accent); color: var(--ink-on-accent); }
+.wsteps li.done .num { background: var(--ok); color: var(--ink-on-accent); }
+.q { display: flex; flex-direction: column; gap: var(--s-1); margin-top: var(--s-4); }
+.q:first-of-type { margin-top: 0; }
+.q > b { font-weight: var(--w-medium); }
+.q .hint { margin: 0; }
+.q textarea { min-height: 64px; }
+.qs { display: flex; flex-direction: column; }
+.q .skip-q { align-self: flex-start; }
+.draft-rows { display: flex; flex-direction: column; gap: var(--s-3); }
+.draft-row { display: flex; flex-direction: column; gap: var(--s-2); }
+.draft-row.decided input, .draft-row.decided textarea { color: var(--ink-3); background: var(--surface-2); }
+.voice-edit { min-height: 200px; font-family: var(--font-post); }
+.wait-line { display: flex; align-items: center; gap: var(--s-3); color: var(--ink-2); }
+.dots-wait { display: inline-flex; gap: 4px; }
+.dots-wait i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); opacity: .35; animation: wait 1.2s var(--ease) infinite; }
+.dots-wait i:nth-child(2) { animation-delay: .2s; } .dots-wait i:nth-child(3) { animation-delay: .4s; }
+@keyframes wait { 50% { opacity: 1; } }
+.row-item .nm.pre { white-space: pre-wrap; font-weight: var(--w-regular); }
+
+/* posting: the switch, its warning, and posts that didn't go out */
+.row-item .full { flex: 1 1 100%; min-width: 0; }
+.row-item.acct .full .setting { border-top: 0; padding: 0; }
+/* Post for me sits under its account's name, not under the icon. */
+@media (min-width: 480px) { .row-item.acct .full { padding-left: calc(36px + var(--s-3)); } }
+.warn-box { margin-top: var(--s-3); padding: var(--s-4); border-radius: var(--r-md); background: var(--warn-soft); color: var(--ink); display: flex; flex-direction: column; gap: var(--s-2); }
+.warn-box > b { color: var(--warn); }
+.warn-box p { margin: 0; }
+.post-problem { margin-top: var(--s-2); padding: var(--s-3); border-radius: var(--r-md); background: var(--warn-soft); color: var(--ink); display: flex; flex-direction: column; gap: var(--s-2); font-size: var(--t-sm); }
+.post-problem .row { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.post-problem .row b { color: var(--warn); }
+.post-problem .row .i { color: var(--warn); }
+details.by-hand { margin-top: var(--s-3); }
+details.by-hand summary { cursor: pointer; min-height: 30px; display: inline-flex; align-items: center; }
+.chips .grow { flex: 1; }
+
 /* ---------- responsive ---------- */
 @media (max-width: 1180px) {
   .cols { grid-template-columns: minmax(0, 1fr); }
@@ -364,6 +408,7 @@ a { color: var(--accent-text); text-underline-offset: .2em; }
   .nav .sep { width: 32px; }
   .top, .banners, #view { padding-left: var(--s-4); padding-right: var(--s-4); }
   .steps { grid-template-columns: minmax(0, 1fr); }
+  .wizard { max-width: none; }
 }
 /* phone: a menu button opens the full sidebar as a drawer over the page */
 @media (max-width: 640px) {
@@ -417,5 +462,7 @@ a { color: var(--accent-text); text-underline-offset: .2em; }
   .seg button { padding: 0 var(--s-2); }
   .rail { grid-template-columns: minmax(0, 1fr); }
   .menu { max-width: calc(100vw - var(--s-10)); }
+  .wsteps li { flex-direction: column; gap: 2px; padding: var(--s-2) var(--s-1); text-align: center; font-size: var(--t-xs); }
+  .wsteps li .lbl { max-width: 100%; }
 }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

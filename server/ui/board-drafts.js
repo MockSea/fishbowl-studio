@@ -69,6 +69,11 @@
   }
 
   const me = () => (state.head && state.head.persona) || { slug: 'studio', name: 'Fishbowl Studio' };
+  // "Post for me" is on for this draft's account: her Approve here is her OK to post it.
+  const posts = (c) => ((state.head && state.head.posting && state.head.posting.on) || []).includes(c.platform);
+  const approve = (c, text) => (posts(c)
+    ? B.call('studio_post_schedule', { id: c.id, hash: c.hash, ...(text != null ? { text } : {}) })
+    : act(text != null ? { action: 'edit', id: c.id, hash: c.hash, text, and_pass: true } : { action: 'pass', id: c.id, hash: c.hash }));
 
   function postHead(c, extra) {
     const [label, kind] = STATUS[c.status] || [c.status, ''];
@@ -117,10 +122,16 @@
   function actions(c) {
     const row = [];
     if (c.status === 'pending') row.push(
-      btn('Approve', 'approve', 'check', () => act({ action: 'pass', id: c.id, hash: c.hash })),
+      btn(posts(c) ? 'Approve & post' : 'Approve', 'approve', 'check', () => approve(c), posts(c) ? { title: `Claude posts it to ${c.platform_name} at the next release time` } : {}),
       btn('Edit', '', 'edit', toggle('edit', c)),
       btn('Skip', 'skip', 'x', () => skip({ action: 'kill', id: c.id }), { title: 'Not this one. It learns from that; you can bring it back.' }));
-    if (['passed', 'edited'].includes(c.status)) row.push(copyButton(c), btn('Mark as posted', '', 'check', toggle('posted', c)), btn('Skip', 'skip', 'x', () => skip({ action: 'kill', id: c.id })));
+    if (['passed', 'edited'].includes(c.status)) {
+      const p = c.post;
+      const live = p && ['scheduled', 'posting'].includes(p.status);
+      row.push(copyButton(c));
+      if (posts(c) && !live && (!p || ['cancelled'].includes(p.status) || p.seen)) row.push(btn('Post it for me', '', 'at', () => B.call('studio_post_schedule', { id: c.id, hash: c.hash })));
+      row.push(btn('Mark as posted', '', 'check', toggle('posted', c)), btn('Skip', 'skip', 'x', () => skip({ action: 'kill', id: c.id })));
+    }
     if (c.status === 'posted') row.push(copyButton(c), btn('Add numbers', '', 'up', toggle('metrics', c)), c.post_url ? btn('Open post', 'ghost', 'external', () => S.openLink(c.post_url)) : null);
     if (c.status === 'killed') row.push(btn('Bring back', '', 'redo', toggle('restore', c)));
     if (['killed', 'passed_over'].includes(c.status) && !c.kill_reason) row.push(btn('Say why', 'ghost', 'flag', toggle('why', c), { title: 'Optional: what was wrong with it' }));
@@ -169,14 +180,30 @@
     ta.addEventListener('input', upd); upd();
     setTimeout(() => ta.focus && ta.focus(), 0);
     return h('div', { class: 'panel' }, ta, h('div', { class: 'row' },
-      h('button', { class: 'btn sm approve', onclick: () => act({ action: 'edit', id: c.id, hash: c.hash, text: ta.value, and_pass: true }) }, icon('check'), 'Save & approve'),
+      h('button', { class: 'btn sm approve', onclick: () => approve(c, ta.value) }, icon('check'), posts(c) ? 'Save & approve to post' : 'Save & approve'),
       h('button', { class: 'btn sm', onclick: () => act({ action: 'edit', id: c.id, hash: c.hash, text: ta.value }) }, 'Save edit'),
       h('button', { class: 'btn sm ghost', onclick: close }, 'Cancel'), h('span', { class: 'grow' }), count));
   }
 
+  // Where an approved post stands when Claude posts it: scheduled, posted, or why it didn't go
+  // out. A missed or failed post stays here until she picks what to do; nothing retries by itself.
+  function postLine(c) {
+    const p = c.post;
+    if (!p || (p.seen && !['scheduled', 'posting', 'posted'].includes(p.status))) return c.posted_by === 'claude' ? h('div', { class: 'post-ctx' }, icon('check'), 'Posted by Claude') : null;
+    const at = p.slot ? `${B.hm(p.slot)}${new Date(p.slot).toDateString() !== new Date().toDateString() ? ` on ${new Date(p.slot).toLocaleDateString([], { weekday: 'long' })}` : ''}` : '';
+    if (p.status === 'scheduled') return h('div', { class: 'post-ctx' }, icon('schedule'), `Claude posts this to ${p.platform} at ${at}, if your computer is awake.`);
+    if (p.status === 'posting') return h('div', { class: 'post-ctx' }, icon('at'), `Claude is posting this to ${p.platform} now.`);
+    if (p.status === 'posted') return h('div', { class: 'post-ctx' }, icon('check'), `Posted to ${p.platform} by Claude ${B.ago(p.done_at)} ago.`, p.unchecked ? h('span', { class: 'tag warn' }, 'text not checked') : null);
+    if (p.status === 'cancelled') return h('div', { class: 'post-ctx' }, icon('x'), `Not posted: ${p.reason}`);
+    const label = { missed: `Missed the ${B.hm(p.slot)} slot`, failed: 'Didn’t post', blocked: 'Held back' }[p.status] || p.status;
+    return h('div', { class: 'post-problem', role: 'status' }, h('div', { class: 'row' }, icon('flag'), h('b', { text: label }), h('span', { text: p.reason || '' })),
+      h('div', { class: 'chips' }, p.status !== 'blocked' ? h('button', { class: 'btn sm', onclick: () => B.call('studio_post_schedule', { id: c.id, hash: c.hash, again: true }) }, 'Try the next slot') : null,
+        h('button', { class: 'btn sm ghost', onclick: () => B.call('studio_post_schedule', { dismiss: p.id }) }, 'I’ll copy it myself')));
+  }
+
   function draftCard(c) {
     return h('article', { class: 'post', id: `d${c.id}` }, B.avatar(me()),
-      h('div', { class: 'post-main' }, postHead(c), context(c), body(c),
+      h('div', { class: 'post-main' }, postHead(c), context(c), postLine(c), body(c),
         c.original ? h('div', { class: 'post-original', text: `Before your edit: ${c.original}` }) : null,
         flagChips(c), quote(c.item),
         c.restore_trail.map((r) => h('div', { class: 'restore-trail', text: `Skipped, then brought back: ${r.reason}` })), reasonLine(c),
@@ -220,7 +247,7 @@
     const filters = h('div', { class: 'filters' },
       B.seg(TABS.map(([v, l]) => ({ value: v, label: l, n: d.counts[v] || 0 })), d.tab, (t) => B.load({ tab: t, chip: 'all' }), 'Which drafts'),
       h('div', { class: 'chips', role: 'group', 'aria-label': 'Filter' },
-        ['all', 'linkedin', 'x'].map((p) => h('button', { class: `chip ${p === d.platform ? 'on' : ''}`, 'aria-pressed': String(p === d.platform), onclick: () => B.load({ platform: p }) }, p === 'all' ? 'All platforms' : p === 'x' ? 'X' : 'LinkedIn')),
+        [{ id: 'all', name: 'All platforms' }, ...(d.platforms || [])].map((p) => h('button', { class: `chip ${p.id === d.platform ? 'on' : ''}`, 'aria-pressed': String(p.id === d.platform), onclick: () => B.load({ platform: p.id }) }, p.name)),
         d.chips.filter((c) => c !== 'all').map((c) => h('button', { class: `chip ${c === d.chip ? 'on' : ''}`, 'aria-pressed': String(c === d.chip), onclick: () => B.load({ chip: c === d.chip ? 'all' : c }) }, CHIP_LABEL[c] || c))));
     const list = d.units.length ? h('div', { class: 'feed' }, d.units.map((u) => (u.type === 'set' ? setCard(u) : draftCard(u))))
       : fr && d.tab === 'waiting' ? null : h('div', { class: 'feed' }, emptyFor(d));

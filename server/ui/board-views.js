@@ -4,8 +4,10 @@
 (function () {
   const S = window.Studio;
   const { icon } = window.StudioIcons;
-  // why: the draft or set just skipped, for the optional one-tap reason.
-  const state = { view: 'drafts', tab: 'waiting', chip: 'all', platform: 'all', data: null, head: null, open: {}, why: null, menu: false, adding: false, drawer: false, display: 'inline' };
+  // why: the draft or set just skipped, for the optional one-tap reason. wnew: the wizard is
+  // setting up a brand-new persona (nothing is created until step 1 is sent). wstep: the wizard
+  // step on screen. arming: the account whose "Post for me" warning is showing.
+  const state = { view: 'drafts', tab: 'waiting', chip: 'all', platform: 'all', data: null, head: null, open: {}, why: null, menu: false, adding: false, drawer: false, display: 'inline', wnew: false, wstep: null, arming: null };
   const $ = (id) => document.getElementById(id);
 
   function h(tag, props, ...kids) {
@@ -56,6 +58,7 @@
     Object.assign(state, params || {});
     const args = { view: state.view };
     if (state.view === 'drafts') Object.assign(args, { tab: state.tab, chip: state.chip, platform: state.platform });
+    if (state.view === 'wizard' && state.wnew) args.new_persona = true;
     try {
       const res = await S.callTool('studio_view', args);
       if (res.isError) throw new Error(res.content && res.content[0] && res.content[0].text);
@@ -85,6 +88,7 @@
     state.data = sc;
     if (sc.view) state.view = sc.view;
     if (sc.tab) state.tab = sc.tab;
+    if (sc.view === 'wizard') { if (sc.fresh) state.wnew = true; if (sc.step) state.wstep = sc.step; }
     setHeader(sc.header);
     if (sc.counts) $('badge-drafts').textContent = sc.counts.waiting || '';
     render();
@@ -110,6 +114,14 @@
     jobs.hidden = !head.jobs;
     if (head.jobs) jobs.append(h('span', { text: `${plural(head.jobs, 'job')} waiting for Claude (rewrites, redos and links to draft).` }), askClaudeButton('Ask Claude now', 'Run my Fishbowl Studio rewrites and redos now.', 'btn sm primary'));
     $('side-foot').textContent = head.home ? `Everything for ${head.brand} lives in ${head.home}` : '';
+    // Posts that didn't go out: never silent. One line, and a way to see them.
+    const ps = head.posting || {};
+    const posting = $('posting');
+    posting.replaceChildren();
+    const bad = (ps.missed || 0) + (ps.failed || 0) + (ps.blocked || 0);
+    posting.hidden = !bad;
+    if (bad) posting.append(h('span', { text: `${plural(bad, 'approved post')} didn’t go out (${[ps.missed ? `${ps.missed} missed` : '', ps.failed ? `${ps.failed} failed` : '', ps.blocked ? `${ps.blocked} changed after you approved` : ''].filter(Boolean).join(', ')}). Nothing is retried by itself.` }),
+      h('button', { class: 'btn sm', onclick: () => { setDrawer(false); load({ view: 'drafts', tab: 'passed', chip: 'all', platform: 'all' }); } }, 'See which'));
     renderPersona();
   }
 
@@ -124,17 +136,17 @@
     if (state.menu) {
       const items = (head.personas || []).map((p) => h('button', { class: 'item', role: 'menuitem', onclick: () => switchTo(p.slug) },
         avatar(p, 'sm'), h('span', { class: 'nm', text: p.name }), p.active ? icon('check') : personaStatus(p)));
-      let add;
-      if (state.adding) {
-        const inp = h('input', { type: 'text', placeholder: 'Brand name', 'aria-label': 'New persona name', maxlength: '60' });
-        const go = async () => { const r = await call('studio_personas', { action: 'create', name: inp.value }, { reload: false }); if (r && r.ok) { state.menu = false; state.adding = false; await load({ view: 'drafts', tab: 'waiting', chip: 'all' }); } };
-        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); if (e.key === 'Escape') { state.adding = false; renderPersona(); } });
-        add = h('div', { class: 'newp' }, inp, h('div', { class: 'chips' }, h('button', { class: 'btn sm primary', onclick: go }, 'Create'), h('button', { class: 'btn sm ghost', onclick: () => { state.adding = false; renderPersona(); } }, 'Cancel')));
-        setTimeout(() => inp.focus && inp.focus(), 0);
-      } else add = h('button', { class: 'item add', onclick: () => { state.adding = true; renderPersona(); S.reportSize(); } }, icon('plus'), h('span', { class: 'nm' }, 'Add persona'));
+      // Add persona opens the setup wizard; the persona is made when she sends step 1.
+      const add = h('button', { class: 'item add', onclick: () => openWizard({ fresh: true }) }, icon('plus'), h('span', { class: 'nm' }, 'Add persona'));
       menu = h('div', { class: 'menu', role: 'menu' }, items, h('hr'), add);
     }
     box.replaceChildren(...[btn, menu].filter(Boolean));
+  }
+
+  function openWizard({ fresh = false } = {}) {
+    state.menu = false; state.adding = false; state.wnew = fresh; state.wstep = fresh ? 'brand' : null; state.open = {};
+    setDrawer(false); renderPersona();
+    return load({ view: 'wizard' });
   }
 
   async function switchTo(slug) {
@@ -197,14 +209,14 @@
   }
 
   // A proposal she decides with one tap: what would change, and why it's suggested.
-  const KIND_LABEL = { playbook: 'Playbook', position: 'Position', audience: 'Audience', shape: 'Shape', phrase: 'Overused phrase' };
-  const OP_LABEL = { add: 'Add', remove: 'Remove', replace: 'Replace', strengthen: 'Stronger', weaken: 'Weaker', drop: 'Drop', raise: 'Raise', lower: 'Lower' };
+  const KIND_LABEL = { playbook: 'Playbook', position: 'Position', audience: 'Audience', shape: 'Shape', phrase: 'Overused phrase', voice: 'Voice', topic: 'Topic' };
+  const OP_LABEL = { add: 'Add', remove: 'Remove', replace: 'Replace', strengthen: 'Stronger', weaken: 'Weaker', drop: 'Drop', raise: 'Raise', lower: 'Lower', set: 'New version', avoid: 'Off limits' };
   function proposalRow(p) {
     const decide = (decision) => () => call('studio_proposal_decide', { id: p.id, decision });
     const text = p.kind === 'shape' ? `${p.name}: ${p.text}` : p.kind === 'phrase' ? `“${p.text}”: keep it rare` : p.text;
     return h('div', { class: 'row-item' },
-      h('span', { class: 'who' }, h('span', { class: 'sub' }, h('span', { class: 'tag' }, KIND_LABEL[p.kind] || p.kind), ' ', h('span', { class: 'tag warn' }, OP_LABEL[p.op] || p.op), p.section ? ` ${p.section}` : '', p.source === 'edits' ? h('span', { class: 'tag accent' }, 'From your edits') : null),
-        p.old ? h('span', { class: 'sub', text: `Now: ${p.old}` }) : null, text ? h('span', { class: 'nm', text }) : null, p.reason ? h('span', { class: 'sub', text: `Why: ${p.reason}` }) : null),
+      h('span', { class: 'who' }, h('span', { class: 'sub' }, h('span', { class: 'tag' }, KIND_LABEL[p.kind] || p.kind), ' ', h('span', { class: 'tag warn' }, OP_LABEL[p.op] || p.op), p.section ? ` ${p.section}` : '', p.source === 'edits' ? h('span', { class: 'tag accent' }, 'From your edits') : p.source === 'wizard' ? h('span', { class: 'tag accent' }, 'From setup') : null),
+        p.old ? h('span', { class: 'sub', text: `Now: ${p.old}` }) : null, text ? h('span', { class: `nm ${p.kind === 'voice' ? 'pre' : ''}`, text }) : null, p.reason ? h('span', { class: 'sub', text: `Why: ${p.reason}` }) : null),
       h('span', { class: 'ctl' }, h('button', { class: 'btn sm approve', onclick: decide('accept') }, icon('check'), 'Accept'), h('button', { class: 'btn sm skip', onclick: decide('reject') }, 'Reject')));
   }
 
@@ -218,29 +230,58 @@
         h('div', { class: 'num' }, h('b', { text: String(c.scrapped ?? 0) }), h('span', { text: 'expired' }))));
   }
 
+  // "Post for me" on one account: off by default; turning it on shows the plain warning first and
+  // only her second tap (Turn it on) sends it. Used in Settings and in the setup wizard.
+  function postingControl(a) {
+    if (!a.capabilities || a.capabilities.post !== true) return null;
+    const on = a.posting && a.posting.on;
+    const sw = switchCtl(on, `Post for me on ${a.label}`, (want) => {
+      if (!a.connected) return flash(`Connect ${a.label} first.`, 'warn');
+      if (want) { state.arming = a.id; render(); } else { state.arming = null; call('studio_account_posting', { type: a.id, on: false }); }
+    });
+    if (!a.connected) sw.disabled = true;
+    const since = a.posting && a.posting.since ? `${on ? 'On' : 'Off'} since ${new Date(a.posting.since).toLocaleDateString([], { day: 'numeric', month: 'short' })}` : 'Off';
+    const row = h('div', { class: 'setting post-for-me' }, h('div', { class: 'lbl' }, h('b', { text: 'Post for me' }),
+      h('span', { text: a.connected ? `${since}. Approving a draft on the board means Claude posts it at the next release time.` : 'Connect the account first. Off until you turn it on.' })), sw);
+    if (state.arming !== a.id) return row;
+    return h('div', {}, row, h('div', { class: 'warn-box', role: 'group', 'aria-label': `Before you turn on posting for ${a.label}` },
+      h('b', { text: 'Before you turn this on' }),
+      h('p', { text: `${a.post_warning} Claude posts through your own signed-in browser, which is automation, so this is your call.` }),
+      h('ul', { class: 'list small' }, h('li', { text: 'Only drafts you approve on the board are posted, exactly as you approved them.' }), h('li', { text: 'Your computer has to be awake at the release time. A missed or failed post shows here with the reason; nothing is retried by itself.' }), h('li', { text: 'You can turn it off any time.' })),
+      h('div', { class: 'chips' }, h('button', { class: 'btn sm primary', onclick: async () => { state.arming = null; await call('studio_account_posting', { type: a.id, on: true, confirmed: true }); } }, 'Turn it on'),
+        h('button', { class: 'btn sm ghost', onclick: () => { state.arming = null; render(); } }, 'Keep it off'))));
+  }
+
   function profilesCard(head) {
     return card({ icon: 'user', title: 'Your brands', sub: 'Each one has its own drafts, sources and voice.' },
       h('div', { class: 'profiles' }, (head.personas || []).map((p) => h('button', { class: `profile ${p.active ? 'active' : ''}`, onclick: () => switchTo(p.slug) },
         avatar(p), h('span', { class: 'who' }, h('span', { class: 'nm', text: p.name }), h('span', { class: 'sub', text: `${plural(p.feeds, 'source')}` })), personaStatus(p)))),
-      h('div', { class: 'chips card-foot' }, h('button', { class: 'btn sm ghost', onclick: () => { state.menu = true; state.adding = true; renderPersona(); setDrawer(true); } }, icon('plus'), 'Add persona')));
+      h('div', { class: 'chips card-foot' }, h('button', { class: 'btn sm ghost', onclick: () => openWizard({ fresh: true }) }, icon('plus'), 'Add persona')));
   }
 
+  // The first-run card: the setup wizard (the one setup flow), then sources and the first run.
   const STEPS = {
-    sources: { title: 'Add your sources', text: 'Paste a few sites you already read for work, or the accounts and searches your audience follows.', go: 'sources', cta: 'Add sources' },
-    topics: { title: 'Pick your topics', text: 'Tell it what to pay attention to, and what to go easy on.', go: 'topics', cta: 'Choose topics' },
-    schedule: { title: 'Set it to run', text: 'Copy one line into a Cowork scheduled task. Drafts arrive here after its first run.', go: 'schedule', cta: 'Set the schedule' },
+    setup: { title: 'Set up the brand', text: 'Four short steps: the brand, a few questions, Claude’s drafts for you to keep or change, and whether it posts for you.', cta: 'Start setup' },
+    sources: { title: 'Add your sources', text: 'Add the sources Claude suggested, or paste sites you read for work.', go: 'sources', cta: 'Add sources' },
+    schedule: { title: 'Set it to run', text: 'One click asks Claude to make the scheduled task. Drafts arrive here after its first run.', go: 'schedule', cta: 'Set the schedule' },
   };
+  const WIZ_STEP_N = { brand: 1, questions: 2, drafting: 3, review: 3, posting: 4 };
   function firstRunCard(head) {
     const fr = head.first_run;
+    const w = head.wizard;
+    // A half-finished setup is offered again, wherever she left it.
+    if (w && (!fr || !fr.show || fr.setup)) return card({ icon: 'spark', title: `Finish setting up ${head.brand}`, sub: `You stopped at step ${WIZ_STEP_N[w.step] || 1} of 4. Everything you answered is saved.` },
+      h('div', { class: 'chips' }, h('button', { class: 'btn sm primary', onclick: () => openWizard() }, 'Pick up where you left off')));
     if (!fr || !fr.show) return null;
-    return card({ icon: 'spark', title: `Here's how this works`, sub: `Three steps and ${head.brand} gets drafts every day. You approve the good ones and post them yourself.` },
-      h('ol', { class: 'steps' }, fr.steps.map((s, i) => { const d = STEPS[s.key]; return h('li', { class: `step ${s.done ? 'done' : ''}` },
-        h('span', { class: 'num' }, s.done ? icon('check') : String(i + 1)), h('h3', { text: d.title }), h('p', { text: d.text }),
-        h('button', { class: `btn sm ${s.done ? 'ghost' : 'primary'}`, onclick: () => load({ view: d.go }) }, s.done ? 'Done · change' : d.cta)); })),
-      h('p', { class: 'hint' }, 'Rather talk it through? ', askClaudeButton('Ask Claude to set it up with you', 'Set up Fishbowl Studio for my brand (/studio:setup).', 'btn sm ghost')));
+    return card({ icon: 'spark', title: `Here's how this works`, sub: `Three steps and ${head.brand} gets drafts every day. You approve the good ones.` },
+      h('ol', { class: 'steps' }, fr.steps.map((s, i) => { const d = STEPS[s.key]; const go = s.key === 'setup' ? () => openWizard() : () => load({ view: d.go });
+        const cta = s.key === 'setup' && !s.done && s.step ? `Continue (step ${WIZ_STEP_N[s.step] || 1} of 4)` : d.cta;
+        return h('li', { class: `step ${s.done ? 'done' : ''}` },
+          h('span', { class: 'num' }, s.done ? icon('check') : String(i + 1)), h('h3', { text: d.title }), h('p', { text: d.text }),
+          h('button', { class: `btn sm ${s.done ? 'ghost' : 'primary'}`, onclick: go }, s.done ? 'Done · change' : cta)); })));
   }
 
-  window.Board = { state, h, icon, load, call, act, setting, flash, render, ago, hm, plural, meter, page, card, empty, seg, switchCtl, stepper, confirmButton, copyButton, askClaudeButton, avatar, todayCard, profilesCard, firstRunCard, switchTo, proposalRow };
+  window.Board = { state, h, icon, load, call, act, setting, flash, render, ago, hm, plural, meter, page, card, empty, seg, switchCtl, stepper, confirmButton, copyButton, askClaudeButton, avatar, todayCard, profilesCard, firstRunCard, switchTo, proposalRow, postingControl, openWizard, setDrawer, KIND_LABEL, OP_LABEL };
   window.BoardPages = window.BoardPages || {};
 
   // ---------- boot ----------
@@ -257,7 +298,7 @@
   });
   document.querySelectorAll('.navbtn').forEach((b) => {
     b.prepend(icon(b.dataset.icon || 'drafts'));
-    b.addEventListener('click', () => { state.open = {}; state.why = null; state.menu = false; setDrawer(false); load({ view: b.dataset.view }); });
+    b.addEventListener('click', () => { state.open = {}; state.why = null; state.menu = false; state.wnew = false; state.wstep = null; state.arming = null; setDrawer(false); load({ view: b.dataset.view }); });
   });
   if (document.addEventListener) document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && (state.menu || state.drawer)) { state.menu = false; setDrawer(false); renderPersona(); } });
   let got = false;

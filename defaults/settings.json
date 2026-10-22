@@ -3,7 +3,9 @@
   "setup_complete": false,
   "platforms": {
     "linkedin": { "enabled": true, "share": 0.5 },
-    "x": { "enabled": true, "share": 0.5 }
+    "x": { "enabled": true, "share": 0.5 },
+    "threads": { "enabled": false, "share": 0.5 },
+    "bluesky": { "enabled": false, "share": 0.5 }
   },
   "posts_per_day": 2,
   "daily_cap": 10,

@@ -81,8 +81,9 @@ window.addEventListener('message', async (ev) => {
       $('status').textContent = 'board connected';
       send(f, { method: 'ui/notifications/tool-input', params: { arguments: {} } });
       // ?view=sources&persona=<slug> opens a section directly (for screenshots); default is the board tool.
+      // ?view=wizard&step=<step> opens a setup wizard step; &new=1 starts one for a new brand; &tab= picks a Drafts tab.
       const r = qs.get('view') || qs.get('persona')
-        ? await rpc('tools/call', { name: 'studio_view', arguments: { view: qs.get('view') || 'drafts', ...(qs.get('persona') ? { persona: qs.get('persona') } : {}) } })
+        ? await rpc('tools/call', { name: 'studio_view', arguments: { view: qs.get('view') || 'drafts', ...(qs.get('persona') ? { persona: qs.get('persona') } : {}), ...(qs.get('step') ? { step: qs.get('step') } : {}), ...(qs.get('tab') ? { tab: qs.get('tab') } : {}), ...(qs.get('new') ? { new_persona: true } : {}) } })
         : await rpc('tools/call', { name: 'studio_board', arguments: {} });
       send(f, { method: 'ui/notifications/tool-result', params: r.result });
       // ?drawer=1 opens the phone menu once the board has drawn.

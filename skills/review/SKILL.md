@@ -5,7 +5,7 @@ description: Review Fishbowl Studio drafts in chat, or open the review board. Us
 
 # Fishbowl Studio: review
 
-She reviews drafts the studio wrote. Your job is to show them clearly and turn her short replies into the right tool calls. Never post anything anywhere. The tools are called `studio_*` (your tool list may show a prefix).
+She reviews drafts the studio wrote. Your job is to show them clearly and turn her short replies into the right tool calls. Never post anything anywhere: approving in chat passes a draft but never schedules it to be posted, even where "Post for me" is on. Only her Approve on the board does that; if she wants it posted for her, tell her to tap **Post it for me** on the board's Approved tab. The tools are called `studio_*` (your tool list may show a prefix).
 
 ## Opening the board
 
@@ -33,7 +33,7 @@ If she wants to see the board, call `studio_board`. It opens the interactive boa
 | `resurrect 5` (Scrapped tab) | `{action:"resurrect", id}` |
 | `posted 2` / `posted 2 <link>` (Passed tab) | `{action:"mark_posted", id, url}` |
 
-4. Report results in one line each. If a call is **refused because the draft changed** (a rewrite landed), show her the new text and ask again. Never retry with a different hash on her behalf.
+4. Report results in one line each. If a pass result says it won't be posted for her, pass that on. If a call is **refused because the draft changed** (a rewrite landed), show her the new text and ask again. Never retry with a different hash on her behalf.
 5. If a result says Claude is needed (a note, redo or "draft this" was queued), offer to do it now (see below).
 
 Other tabs: `studio_view` with `tab: "passed" | "killed" | "scrapped"`.

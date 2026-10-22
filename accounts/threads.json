@@ -1,0 +1,11 @@
+{
+  "id": "threads",
+  "label": "Threads",
+  "icon": "replies",
+  "enables": "Posting approved Threads drafts for you, if you turn it on.",
+  "connect": "Help me connect my brand's Threads account to Fishbowl Studio. Don't ask for my password, don't type it for me and don't store anything: walk me through signing in to threads.net myself, in my own browser (the one Claude in Chrome uses), one step at a time, then check with me which account is open. The studio only notes that it's connected.",
+  "capabilities": { "read": false, "post": true },
+  "compose": "https://www.threads.net/",
+  "prefill": "https://www.threads.com/intent/post?text={text}",
+  "post_warning": "Posting to Threads by automation may break Meta's terms for Threads, and Meta can restrict the account."
+}

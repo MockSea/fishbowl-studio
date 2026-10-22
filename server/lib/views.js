@@ -6,7 +6,7 @@ import { counterText } from './run.js';
 import { loadPlaybook, loadPositions, loadAudience, loadShapes, loadSources, loadBeat, loadVoice, topicWeight, allPlatforms, parseJson } from './config.js';
 import { shapeVotes, resultsMultipliers, shapeWeight } from './shapes.js';
 import { labelled, features, DEFAULT_WEIGHTS, SIGNALS } from './rank.js';
-import { FETCH_PRESETS, scheduleTasks, nextFetchAt } from './schedule.js';
+import { FETCH_PRESETS, scheduleTasks, nextFetchAt, postingTask, schedulePrompt } from './schedule.js';
 import { hostOf } from './urls.js';
 import { cleanField } from './fence.js';
 import { oneLine } from './text.js';
@@ -14,6 +14,8 @@ import { byId } from './state.js';
 import { sourceRecords, interestBoosts, boostFor, editPatterns, killReasons, tallyReasons, sourceLabel, KILL_REASONS, KILL_REASON_KEYS } from './learn.js';
 import { feedKey, watchKey, searchKey, TRENDS_KEY } from './handles.js';
 import { accountsView } from './accounts.js';
+import { postFor, postingSummary } from './posting.js';
+import { wizardHead } from './wizard.js';
 
 // Item text in board data is cleaned again on the way out, so items stored before the
 // parser cleaned titles can't carry line breaks or invisible characters into a view.
@@ -52,6 +54,7 @@ export function card(d, db, plats, shapeNames) {
     hearted: db.hearts.some((h) => h.target === 'draft' && h.ref === d.id), thinking_hearted: db.hearts.some((h) => h.target === 'thinking' && h.ref === d.id),
     metrics: d.metrics || null, redo_queued: d.set_id ? db.jobs.some((j) => j.kind === 'redo' && j.set_id === d.set_id && j.status === 'queued') : false,
     redos_left: null, kill_reason: d.kill_reason || null, kill_reason_label: d.kill_reason ? KILL_REASONS[d.kill_reason] : null,
+    post: ['passed', 'edited', 'posted', 'pending', 'killed'].includes(d.status) ? postFor(db, d.id) : null, posted_by: d.posted_by || null,
   };
 }
 
@@ -87,7 +90,9 @@ export function draftsView(ctx, db, { tab = 'waiting', chip = 'all', platform = 
   units.sort((a, b) => (tab === 'waiting' ? (when(b) - when(a)) || ((a.rank?.pos ?? 99) - (b.rank?.pos ?? 99)) : when(b) - when(a)));
   const filtered = chip === 'all' || !CHIP[chip] ? units : units.filter(CHIP[chip]);
   const counts = Object.fromEntries(Object.entries(TABS).map(([k, v]) => [k, new Set(db.drafts.filter((d) => v.statuses.includes(d.status)).map((d) => (d.status === 'option' ? `s${d.set_id}` : d.id))).size]));
-  return { view: 'drafts', tab, chip, platform, chips: t.chips, counts, total: filtered.length, offset, units: filtered.slice(offset, offset + limit) };
+  const settings = ctx.settings();
+  const platforms = Object.values(plats).filter((p) => settings.platforms[p.id]?.enabled || db.drafts.some((d) => d.platform === p.id)).map((p) => ({ id: p.id, name: p.name }));
+  return { view: 'drafts', tab, chip, platform, chips: t.chips, counts, total: filtered.length, offset, units: filtered.slice(offset, offset + limit), platforms };
 }
 
 export function readsView(ctx, db, { offset = 0, limit = 40 } = {}) {
@@ -289,13 +294,28 @@ export function coachView(ctx, db) {
   };
 }
 
+// The posting task covers every brand with "Post for me" on, at each of their release hours.
+function postingHours(ctx) {
+  const hours = [];
+  for (const p of ctx.personas.list()) {
+    const c = ctx.persona(p.slug);
+    let on = false;
+    try { on = c.store.read('accounts', []).some((a) => a.posting?.on === true); } catch {}
+    if (on) hours.push(...c.settings().release_hours);
+  }
+  return hours;
+}
+
 export function scheduleView(ctx, db) {
   const s = ctx.settings();
   const preset = FETCH_PRESETS[s.fetch_every] ? s.fetch_every : 'weekdays';
+  const hours = postingHours(ctx);
+  const tasks = [...scheduleTasks(preset, s.release_hours), ...(hours.length ? [postingTask(hours)] : [])];
   return {
     view: 'schedule', fetch_every: preset, release_hours: s.release_hours, daily_cap: s.daily_cap,
     presets: Object.entries(FETCH_PRESETS).map(([key, p]) => ({ key, label: p.label, blurb: p.blurb, note: p.note || null })),
-    tasks: scheduleTasks(preset, s.release_hours), last_fetch: db.runs.last_fetch || null, next_fetch: nextFetchAt(preset, db.runs.last_fetch, ctx.now()),
+    tasks, setup_prompt: schedulePrompt(tasks, ctx.root), posting: hours.length > 0,
+    last_fetch: db.runs.last_fetch || null, next_fetch: nextFetchAt(preset, db.runs.last_fetch, ctx.now()),
     home: ctx.store.home,
   };
 }
@@ -313,14 +333,16 @@ export function personasSummary(ctx) {
   });
 }
 
-// The three first-run steps, done or not. Shown until there is a draft.
+// The first-run card, shown until there is a draft: the setup wizard first, then the two things
+// that make drafts arrive (sources she has added, and a first run).
 export function firstRun(ctx, db) {
+  const setup = !!ctx.settings().setup_complete || db.wizard?.step === 'done';
   const steps = [
+    { key: 'setup', done: setup, step: db.wizard?.step || null },
     { key: 'sources', done: (({ feeds, watch, searches }) => feeds.length + watch.length + searches.length > 0)(loadSources(ctx.store)) },
-    { key: 'topics', done: loadBeat(ctx.store).topics.length > 0 },
     { key: 'schedule', done: !!db.runs.last_fetch },
   ];
-  return { show: !db.drafts.length, steps };
+  return { show: !db.drafts.length, setup, steps };
 }
 
 export function header(ctx, db) {
@@ -329,6 +351,7 @@ export function header(ctx, db) {
   return {
     counter: c, counter_text: counterText(c), jobs: db.jobs.filter((j) => j.status === 'queued').length, proposals: openProposals(db).length, suggestions: db.proposals.filter((p) => p.kind === 'source' && p.status === 'open').length,
     brand: me.name || ctx.settings().brand, home: ctx.store.home, persona: { slug: me.slug, name: me.name }, personas: personasSummary(ctx), setup_complete: !!ctx.settings().setup_complete, first_run: firstRun(ctx, db),
+    wizard: wizardHead(db), posting: postingSummary(db),
   };
 }
 

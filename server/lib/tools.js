@@ -14,6 +14,8 @@ import { configFiles, validateConfig, parseJson, loadSources, fetchTargets } fro
 import { addTarget, suggestTarget, decideSource, editSource, editTopic, draftLink } from './sources.js';
 import { readQueue, recordReads } from './social.js';
 import { accountsView, setAccount } from './accounts.js';
+import { setPosting, schedulePost, postQueue, postCheck, postResult, sweepPosts, FAIL_CODES } from './posting.js';
+import { wizardTool, wizardBrief, wizardSave, wizardState, wizardSummaryText } from './wizard.js';
 import { KILL_REASON_KEYS } from './learn.js';
 import { createFencer, SETTINGS_NOTE } from './fence.js';
 
@@ -21,7 +23,8 @@ export const UI_URI = 'ui://studio/board';
 const BOARD_META = { ui: { resourceUri: UI_URI, visibility: ['model', 'app'] }, 'ui/resourceUri': UI_URI };
 const BOTH = { ui: { visibility: ['model', 'app'] } };
 // Her own decisions come only from the board, never from the model: accepting a proposal, adding
-// a source (anything the studio will fetch or read), connecting an account.
+// a source (anything the studio will fetch or read), connecting an account, turning "Post for me"
+// on, and approving a draft to be posted.
 const APP_ONLY = { ui: { visibility: ['app'] } };
 
 const obj = (properties = {}, required = []) => ({ type: 'object', properties, ...(required.length ? { required } : {}), additionalProperties: false });
@@ -42,8 +45,8 @@ const proposal = { type: 'object', properties: { op: str('add | remove | replace
 
 export const TOOLS = [
   { name: 'studio_status', title: 'Studio status', description: 'Where the studio stands: setup state, today\'s counter (released of cap, held, next batch, scrapped), drafts waiting, queued jobs, untriaged items, open proposals. Also releases any batch that is due. Call this first in any studio skill.', inputSchema: NONE },
-  { name: 'studio_board', title: 'Open the review board', description: 'Open the review board (drafts, sources, topics, schedule, settings, reads, playbook; persona switcher). Use when she wants to review drafts or says "show me the board". Also returns a text list, for when the board can\'t render.', inputSchema: NONE, _meta: BOARD_META },
-  { name: 'studio_view', title: 'Board data', description: 'List drafts or other board views as text plus data. view: drafts | reads | coach | playbook | settings | sources | topics | schedule. For drafts: tab waiting | passed | killed | scrapped, chip filter, platform. Used by the board and by the chat review.', inputSchema: obj({ view: str('drafts | reads | coach | playbook | settings | sources | topics | schedule'), tab: str('waiting | passed | killed | scrapped'), chip: str('filter chip, default all'), platform: str('all | linkedin | x'), offset: int('paging offset') }), _meta: BOTH },
+  { name: 'studio_board', title: 'Open the review board', description: 'Open the review board (drafts, sources, topics, schedule, settings, reads, playbook; persona switcher). Use when she wants to review drafts or says "show me the board". view "wizard" opens the setup wizard instead (/studio:setup); add new_persona:true to start one for a new brand. Also returns a text list, for when the board can\'t render.', inputSchema: obj({ view: str('drafts (default) | wizard'), new_persona: { type: 'boolean', description: 'wizard: start with a new brand' } }), _meta: BOARD_META },
+  { name: 'studio_view', title: 'Board data', description: 'List drafts or other board views as text plus data. view: drafts | reads | coach | playbook | settings | sources | topics | schedule | wizard. For drafts: tab waiting | passed | killed | scrapped, chip filter, platform. Used by the board and by the chat review.', inputSchema: obj({ view: str('drafts | reads | coach | playbook | settings | sources | topics | schedule | wizard'), tab: str('waiting | passed | killed | scrapped'), chip: str('filter chip, default all'), platform: str('all | linkedin | x | threads | bluesky'), offset: int('paging offset'), step: str('wizard: which step to show'), new_persona: { type: 'boolean' } }), _meta: BOTH },
   { name: 'studio_act', title: 'Act on a draft', description: `Her verdicts and actions. action: ${ACTION_NAMES.join(' | ')}. pass and edit need the draft's hash (from the list) so a stale view can't overwrite a rewrite. pick = choose a take from a set; none = none of these (set_id, optional note); redo = new takes for a set (set_id, note); restore needs reason; kill takes an optional reason, and kill_reason (id, or set_id for "none of these") adds one after the fact: ${KILL_REASON_KEYS.join(' | ')} (note optional); heart target draft | thinking | read; note queues a rewrite; draft_this takes id (a draft's thinking) or item_id (a read); mark_posted takes optional url.`, inputSchema: obj({ action: str('the action'), id: int('draft id (or item id for heart target read)'), set_id: int('set id'), item_id: int('item id for draft_this on a read'), hash: str('fingerprint of the text she saw'), text: str('edited text, or the note'), and_pass: { type: 'boolean' }, note: str('note on a set, a heart note, or a skip reason note'), reason: str(`restore: why; kill, none, kill_reason: ${KILL_REASON_KEYS.join(' | ')}`), url: str('link to the live post'), target: str('heart target: draft | thinking | read') }, ['action']), _meta: BOTH },
   { name: 'studio_config', title: 'Studio settings files', description: `Read or write the studio's files in the data folder: ${configFiles().join(', ')}. action get (no file = all), set (replace a file; JSON files take an object, .md files take text) or patch (settings.json only: merge keys).`, inputSchema: obj({ action: str('get | set | patch'), file: str('file name'), content: { description: 'object for .json, string for .md' }, patch: { type: 'object', description: 'settings keys to change' } }, ['action']), _meta: BOTH },
   { name: 'studio_fetch', title: 'Fetch the news', description: 'Fetch every feed in sources.json that isn\'t paused, dedupe by URL and by story, and store new items. Returns counts and any dead feeds. Skips the fetch (and says so) when the last one was sooner than her news setting allows, or on a weekend with "weekdays"; pass force:true only when she asks for fresh news right now.', inputSchema: obj({ force: { type: 'boolean', description: 'fetch even if her news setting says not yet' } }) },
@@ -52,8 +55,14 @@ export const TOOLS = [
   { name: 'studio_source_add', title: 'Add a source', description: 'The board\'s Add buttons on the Sources page: add a website (test-fetched), a subreddit (test-fetched), a watched account, X trending topics or a saved search.', inputSchema: obj(sourceArgs), _meta: APP_ONLY },
   { name: 'studio_read_queue', title: 'Accounts and searches to read', description: 'The watched X and LinkedIn accounts, X trending topics and saved searches due this run, each numbered, with the exact public address to open or the search to run, and how to report. Reply with studio_record_reads. Says done when there is nothing to read or it is too soon (pass force:true only when she asks now).', inputSchema: obj({ force: { type: 'boolean' } }) },
   { name: 'studio_record_reads', title: 'Record what was read', description: 'Hand back the posts, trending topics and search results you read for a studio_read_queue, by target number. They are stored as stories (untrusted, fenced like feed items) and triaged with the news.', inputSchema: obj({ read_id: int('from studio_read_queue'), results: { type: 'array', items: obj({ target: int('target number'), status: str('read | no_browser | login_wall | not_found | failed'), via: str('browser | search'), posts: { type: 'array', items: obj({ text: str('the post text as written, or the trending topic'), url: str('its link, if shown'), posted_at: str('ISO time, if shown'), title: str('search results: the page title'), snippet: str('search results: one line') }) } }, ['target']) } }, ['read_id', 'results']) },
-  { name: 'studio_accounts', title: 'Account slots', description: 'List the account types (X, LinkedIn, Reddit, Bluesky…), what each would enable, and which she has connected. Read only: she connects or removes them in the board\'s Settings. No credentials are ever stored, and nothing posts.', inputSchema: NONE, _meta: BOTH },
+  { name: 'studio_accounts', title: 'Account slots', description: 'List the account types (X, LinkedIn, Threads, Bluesky, Reddit), what each enables, which she has connected and whether "Post for me" is on. Read only: she connects accounts and turns posting on or off in the board\'s Settings. No credentials are ever stored.', inputSchema: NONE, _meta: BOTH },
   { name: 'studio_account_set', title: 'Connect or remove an account', description: 'The board\'s Add account and Remove buttons in Settings.', inputSchema: obj({ action: str('connect | remove'), type: str('account type id') }, ['action', 'type']), _meta: APP_ONLY },
+  { name: 'studio_account_posting', title: 'Post for me', description: 'The board\'s "Post for me" switch on a connected account. Turning it on needs confirmed:true, sent only after she has read the warning.', inputSchema: obj({ type: str('account type id'), on: { type: 'boolean' }, confirmed: { type: 'boolean' } }, ['type', 'on']), _meta: APP_ONLY },
+  { name: 'studio_post_schedule', title: 'Approve to post', description: 'The board\'s Approve (or Save & approve) on a draft whose account has "Post for me" on, its "Post it for me" and "Try the next slot" buttons, and clearing a missed or failed post from the list.', inputSchema: obj({ id: int('draft id'), hash: str('fingerprint of the text she saw'), text: str('her edited text, for Save & approve'), again: { type: 'boolean' }, dismiss: int('post id to clear') }), _meta: APP_ONLY },
+  { name: 'studio_posting', title: 'Post approved drafts', description: `For the post skill only. action queue: the posts due now (each with post_id, platform, compose address and the exact approved text), claimed for this run. action check (post_id, text): right before posting, send the exact text you are about to post; post only if it says go. action result (post_id, status posted | failed, url, code ${FAIL_CODES.join(' | ')}, reason). Never post anything that isn't in the queue, never change the text, never retry a failed post.`, inputSchema: obj({ action: str('queue | check | result'), post_id: int('from the queue'), text: str('check: the exact text you are about to post'), status: str('result: posted | failed'), url: str('result: link to the live post, if shown'), code: str(`result failed: ${FAIL_CODES.join(' | ')}`), reason: str('result failed: one short line') }, ['action']) },
+  { name: 'studio_wizard', title: 'Setup wizard', description: 'Her answers in the setup wizard. action create (name, link: a new brand, made active) | start (name, link: set up this brand) | get | answer (answers {audience, tone, topics, off_limits, examples}, any may be empty = skipped; link) | draft (ask Claude to draft) | step (brand | questions | review | posting) | finish. The board drives this; in chat, use it only to record what she tells you.', inputSchema: obj({ action: str('create | start | get | answer | draft | step | finish'), name: str('brand name'), link: str('optional website or LinkedIn address'), answers: { type: 'object', description: '{audience, tone, topics, off_limits, examples}' }, step: str('step to show') }, ['action']), _meta: BOTH },
+  { name: 'studio_wizard_brief', title: 'Setup drafting brief', description: 'When she asks you to draft the setup for a brand: her wizard answers and the page she linked (fenced, untrusted), and exactly what to send back with studio_wizard_save.', inputSchema: NONE },
+  { name: 'studio_wizard_save', title: 'Save setup drafts', description: 'Your drafts for the setup wizard: voice (markdown), playbook (bullets), topics, off_limits, audience (lines) and sources ([{kind site | reddit | search, url | sub | q, topic, reason}]). Each becomes a suggestion she keeps, edits or drops on the board; nothing is written or fetched until she does.', inputSchema: obj({ brief_id: str('from studio_wizard_brief'), fix: { type: 'boolean', description: 'once, after a save that rejected lines: send only the rewritten lines' }, voice: str('voice.md as markdown'), playbook: lines('3-6 bullets'), topics: lines('3-8 topics'), off_limits: lines('what it never posts about'), audience: lines('1-3 lines: who the posts are for'), sources: { type: 'array', items: obj({ kind: str('site | reddit | search'), url: str(''), sub: str(''), q: str(''), list: str('feeds | reading'), name: str(''), topic: str(''), reason: str('') }) } }, ['brief_id']) },
   { name: 'studio_topics', title: 'Edit topics', description: 'Add or remove a topic on her beat, or set how much she wants of it: weight 1 less, 2 normal, 3 more (shifts the interest a story needs by one point).', inputSchema: obj({ action: str('add | remove | weight'), topic: str('topic name or slug'), weight: int('1 | 2 | 3') }, ['action', 'topic']), _meta: BOTH },
   { name: 'studio_draft_link', title: 'Draft from a link', description: 'She pasted one article address: fetch it through the safe fetch path, store it as a story (untrusted, fenced like feed items) and queue it to be drafted. Then call studio_drafting_brief to draft it now, or it is drafted on the next run.', inputSchema: obj({ url: str('https:// article address') }, ['url']), _meta: BOTH },
   { name: 'studio_wander', title: 'Wander', description: 'One curiosity visit to a source on her reading list (chosen by interest, neglect and caps). Returns fenced material; reply with studio_record_wander. Says done when caps are reached.', inputSchema: NONE },
@@ -66,7 +75,7 @@ export const TOOLS = [
   { name: 'studio_weekly_brief', title: 'Weekly report brief', description: 'Weekly report material. part "numbers" first (write playbook proposals from it), then part "full" (notes, taste, audience, positions).', inputSchema: obj({ part: str('numbers | full') }) },
   { name: 'studio_save_weekly', title: 'Save weekly coach report', description: 'Save the weekly coach report (summary; working, not_working and try: short lists of plain sentences) and proposals (playbook, audience, positions). The report shows on the board\'s Coach page; proposals wait there for her tap.', inputSchema: obj({ summary: str('2-3 plain sentences'), working: lines('what is working, 2-3 lines'), not_working: lines('what isn\'t, 1-3 lines'), try: lines('2-3 things to try next week'), playbook: { type: 'array', items: proposal }, audience: { type: 'array', items: proposal }, positions: { type: 'array', items: proposal } }) },
   { name: 'studio_proposals', title: 'Proposals', description: 'List open proposals, or propose new ones (kind playbook | position | audience | shape | phrase). Shapes need name + text (the mechanism); a phrase is one she overuses. To suggest a source, use studio_sources suggest. Only she accepts or rejects proposals, on the board.', inputSchema: obj({ action: str('list | propose'), proposals: { type: 'array', items: { type: 'object' } } }, ['action']), _meta: BOTH },
-  { name: 'studio_proposal_decide', title: 'Accept or reject a proposal', description: 'The board\'s Accept and Reject buttons (Coach, Playbook, and Add or Dismiss on suggested sources).', inputSchema: obj({ id: int('proposal id'), decision: str('accept | reject') }, ['id', 'decision']), _meta: APP_ONLY },
+  { name: 'studio_proposal_decide', title: 'Accept or reject a proposal', description: 'The board\'s Accept and Reject buttons (Coach, Playbook, the setup wizard, and Add or Dismiss on suggested sources). text: her edited version, for Accept.', inputSchema: obj({ id: int('proposal id'), decision: str('accept | reject'), text: str('her edited version') }, ['id', 'decision']), _meta: APP_ONLY },
   { name: 'studio_metrics', title: 'Post numbers', description: 'Enter numbers for a post she published (action add: draft_id, views, likes, replies, reposts, quotes) or import a CSV export of platform analytics (action import_csv: csv text, optional platform). Rows match posts by link or text.', inputSchema: obj({ action: str('add | import_csv'), draft_id: int('draft id'), views: int(''), likes: int(''), replies: int(''), reposts: int(''), quotes: int(''), csv: str('CSV text'), platform: str('linkedin | x') }, ['action']), _meta: BOTH },
 ];
 
@@ -81,6 +90,7 @@ const withData = (t, data) => ({ content: [{ type: 'text', text: t }], structure
 function view(ctx, args = {}) {
   return ctx.tx((db) => {
     runRelease(ctx, db);
+    sweepPosts(ctx, db);
     const head = header(ctx, db);
     const v = args.view || 'drafts';
     let data, summary;
@@ -107,6 +117,11 @@ function view(ctx, args = {}) {
     else if (v === 'topics') { data = topicsView(ctx, db); summary = [`Topics: ${data.topics.map((t) => `${t.slug}${t.weight !== 2 ? ` (${t.weight === 3 ? 'more' : 'less'})` : ''}`).join(', ') || 'none'}.`,
         data.learned.length ? [fz.guard, fz.block(`Learned from ${data.verdicts} verdicts`, data.learned.map((l) => ({ direction: l.direction === 'up' ? 'more' : 'less', label: l.label })))].join('\n\n') : `Learned from ${data.verdicts} verdicts: not enough yet.`].join('\n'); }
     else if (v === 'schedule') { data = scheduleView(ctx, db); summary = `News: ${data.fetch_every}. Batches at ${data.release_hours.join(', ')}. Set in Cowork: ${data.tasks.map((t) => t.text).join(' | ')}`; }
+    else if (v === 'wizard') {
+      const w = wizardState(ctx, db);
+      data = { view: 'wizard', wizard: w, step: args.step || null, fresh: !!args.new_persona, accounts: accountsView(ctx, db), schedule: scheduleView(ctx, db) };
+      summary = wizardSummaryText(w);
+    }
     else { data = draftsView(ctx, db, args); summary = draftsText(data, head, fz); }
     return { ...data, header: head, stamp: { createdAt: ctx.now(), seq: ++seq }, summary };
   });
@@ -147,7 +162,10 @@ const json = (o) => text(o.text || JSON.stringify(o, null, 1));
 
 export const HANDLERS = {
   studio_status: (ctx) => json(statusTool(ctx)),
-  studio_board: (ctx) => { const v = view(ctx, { view: 'drafts', tab: 'waiting' }); return withData(`${v.summary}\n\nThe board is open above. If it doesn't show, review here: tell me e.g. "pass 1a, kill 2, edit 3: ...".`, v); },
+  studio_board: (ctx, a = {}) => {
+    if (a.view === 'wizard') { const v = view(ctx, { view: 'wizard', new_persona: !!a.new_persona }); return withData(`${v.summary}\n\nThe setup wizard is open on the board above. If it doesn't show, set it up here in chat with studio_wizard.`, v); }
+    const v = view(ctx, { view: 'drafts', tab: 'waiting' }); return withData(`${v.summary}\n\nThe board is open above. If it doesn't show, review here: tell me e.g. "pass 1a, kill 2, edit 3: ...".`, v);
+  },
   studio_view: (ctx, a) => { const v = view(ctx, a); return withData(v.summary, v); },
   studio_act: (ctx, a) => { const r = act(ctx, a); return { content: [{ type: 'text', text: r.message }], structuredContent: r, ...(r.ok ? {} : { isError: true }) }; },
   studio_config: (ctx, a) => configTool(ctx, a),
@@ -174,8 +192,21 @@ export const HANDLERS = {
   studio_source_add: async (ctx, a) => { const r = await addTarget(ctx, a); return withData(r.message, r); },
   studio_read_queue: (ctx, a) => json(readQueue(ctx, { force: !!a.force })),
   studio_record_reads: (ctx, a) => json(recordReads(ctx, a)),
-  studio_accounts: (ctx) => ctx.tx((db) => { const list = accountsView(ctx, db); return withData(list.map((t) => `${t.label}: ${t.connected ? 'connected (by prompt)' : 'not connected'} · read ${t.capabilities.read || 'no'} · post ${t.capabilities.post || 'no'} · ${t.enables}`).join('\n'), { ok: true, accounts: list }); }),
+  studio_accounts: (ctx) => ctx.tx((db) => { const list = accountsView(ctx, db); return withData(list.map((t) => `${t.label}: ${t.connected ? 'connected (by prompt)' : 'not connected'} · read ${t.capabilities.read || 'no'} · post for her: ${t.capabilities.post !== true ? 'not possible' : t.posting.on ? 'on' : 'off'} · ${t.enables}`).join('\n'), { ok: true, accounts: list }); }),
   studio_account_set: (ctx, a) => { const r = setAccount(ctx, a); return withData(r.message, r); },
+  studio_account_posting: (ctx, a) => { const r = setPosting(ctx, a); return withData(r.message, r); },
+  studio_post_schedule: (ctx, a) => { const r = schedulePost(ctx, a); return { content: [{ type: 'text', text: r.message }], structuredContent: r, ...(r.ok ? {} : { isError: true }) }; },
+  // Text only, like every non-board tool: the instructions, then the posts as JSON so each text
+  // arrives exactly, escapes and all.
+  studio_posting: (ctx, a) => {
+    if (a.action === 'queue') { const r = postQueue(ctx); return text(r.done ? r.text : `${r.text}\n\n${JSON.stringify({ posts: r.posts }, null, 1)}`); }
+    if (a.action === 'check') return text(JSON.stringify(postCheck(ctx, a)));
+    if (a.action === 'result') return text(JSON.stringify(postResult(ctx, a)));
+    throw new Error('action must be queue, check or result');
+  },
+  studio_wizard: (ctx, a) => { const r = wizardTool(ctx, a); return { content: [{ type: 'text', text: r.message || wizardSummaryText(r.wizard) }], structuredContent: r, ...(r.ok === false ? { isError: true } : {}) }; },
+  studio_wizard_brief: async (ctx) => json(await wizardBrief(ctx)),
+  studio_wizard_save: (ctx, a) => { const r = wizardSave(ctx, a); return { content: [{ type: 'text', text: r.message }], ...(r.ok ? {} : { isError: true }) }; },
   studio_topics: (ctx, a) => { const r = editTopic(ctx, a); return withData(r.message, r); },
   studio_draft_link: async (ctx, a) => { const r = await draftLink(ctx, a); return { content: [{ type: 'text', text: r.message }], structuredContent: r, ...(r.ok ? {} : { isError: true }) }; },
 };
@@ -190,7 +221,7 @@ function personasTool(ctx, { action, slug, name }) {
     const p = P.create(name);
     ctx.persona(p.slug).store.writeFile('settings.json', JSON.stringify(validateConfig('settings.json', { brand: p.name }), null, 2) + '\n');
     P.switch(p.slug);
-    return withData(`Created ${p.name} (${p.slug}) and switched to it. Run /studio:setup to set up its voice and sources.`, { ok: true, persona: p });
+    return withData(`Created ${p.name} (${p.slug}) and switched to it. Open the setup wizard (studio_board with view "wizard") to set up its voice and sources.`, { ok: true, persona: p });
   }
   if (action === 'switch') { const p = P.switch(slug); return withData(`Now working on ${p.name}.`, { ok: true, persona: p }); }
   if (action === 'rename') {
@@ -210,7 +241,9 @@ export async function callTool(ctx, name, args = {}) {
   try {
     const { persona, ...rest } = args || {};
     // Pin the call to one persona for its whole run, so a switch elsewhere can't split it.
-    const c = name === 'studio_personas' ? ctx : ctx.persona(persona ? ctx.personas.get(persona).slug : ctx.personas.active());
+    // A new persona is made from the root context; everything else is pinned to one persona.
+    const root = name === 'studio_personas' || (name === 'studio_wizard' && rest.action === 'create');
+    const c = root ? ctx : ctx.persona(persona ? ctx.personas.get(persona).slug : ctx.personas.active());
     return await h(c, rest);
   }
   catch (e) { return { content: [{ type: 'text', text: String(e.message || e) }], isError: true }; }

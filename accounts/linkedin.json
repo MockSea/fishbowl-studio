@@ -2,7 +2,9 @@
   "id": "linkedin",
   "label": "LinkedIn",
   "icon": "briefcase",
-  "enables": "Later: reading company pages and people you follow while signed in, and handing approved posts to a scheduler.",
-  "connect": "Help me connect my brand's LinkedIn account to Fishbowl Studio. Don't ask for my password, don't type it for me and don't store anything: walk me through signing in to linkedin.com myself, in my own browser, one step at a time, then check with me which account or company page is open. The studio only notes that it's connected.",
-  "capabilities": { "read": false, "post": false }
+  "enables": "Posting approved LinkedIn drafts for you, if you turn it on. Later: reading company pages and people you follow while signed in.",
+  "connect": "Help me connect my brand's LinkedIn account to Fishbowl Studio. Don't ask for my password, don't type it for me and don't store anything: walk me through signing in to linkedin.com myself, in my own browser (the one Claude in Chrome uses), one step at a time, then check with me which account or company page is open. The studio only notes that it's connected.",
+  "capabilities": { "read": false, "post": true },
+  "compose": "https://www.linkedin.com/feed/?shareActive=true",
+  "post_warning": "Posting to LinkedIn by automation breaks LinkedIn's User Agreement, and LinkedIn can restrict the account."
 }

@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Seed a demo studio with two fictional brands (personas): "Northwind Bicycles", with drafts in
 // every state, and "Fernhollow Bakery", a smaller second studio. Sources, topics, verdict history
-// and learned interests are filled in so every board section has something to show.
+// and learned interests are filled in so every board section has something to show. Northwind
+// finished the setup wizard and has "Post for me" on for X (posts scheduled, posted, missed and
+// failed); Fernhollow is partway through re-running setup, with Claude's drafts waiting for her.
 // Usage: node dev/seed.mjs [folder]   (default dev/.demo-home; wipes it first)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,6 +13,7 @@ import { writePlaybook, validateConfig } from '../server/lib/config.js';
 import { localDate } from '../server/lib/text.js';
 import { formOf } from '../server/lib/forms.js';
 import { editDiff } from '../server/lib/learn.js';
+import { textHash, nextSlot } from '../server/lib/posting.js';
 
 const DEV = path.dirname(fileURLToPath(import.meta.url));
 export const DEMO_HOME = path.join(DEV, '.demo-home');
@@ -149,6 +152,13 @@ function seedNorthwind(ctx, now) {
   d({ kind: 'evergreen', origin: 'evergreen', item_id: null, status: 'scrapped', scrap_reason: 'over_daily_cap', scrapped_at: iso(9), age: 14, released_at: null, platform: 'linkedin', shapes: ['one-rule'], text: 'Our one rule for buying a first commuter bike: buy the one you can get fixed locally.\n\nThe cheapest bike is the one that is still running in March.' });
   // Held for the next batch.
   d({ kind: 'evergreen', origin: 'evergreen', item_id: null, status: 'held', age: 1, released_at: null, platform: 'x', shapes: ['plain-take'], text: 'Most squeaks are a clean and a drop of oil. Most.' });
+  // "Post for me" is on for X: approved posts Claude scheduled, posted, missed and couldn't post.
+  // Evergreen posts, so they don't move the story and source records the other pages show.
+  const ev = { kind: 'evergreen', origin: 'evergreen', item_id: null, shapes: ['plain-take'] };
+  const toPost = d({ ...ev, status: 'passed', decided_at: iso(0.5), age: 4, text: 'The last mile used to need a van.\nNow it needs a cargo bike and a mechanic who opens at 7.' });
+  const byClaude = d({ ...ev, status: 'posted', decided_at: iso(30), posted_at: iso(28), age: 33, post_url: 'https://x.com/example_northwind/status/101', posted_by: 'claude', posted_from: 'passed', text: 'A squeak is a question. Usually the answer is a clean and a drop of oil.' });
+  const missed = d({ ...ev, status: 'passed', decided_at: iso(27), age: 29, text: 'The cheapest upgrade on any bike is air. Check your tyres on Sunday night.' });
+  const failed = d({ ...ev, status: 'passed', decided_at: iso(52), age: 54, text: 'Chains and cassettes are back on the shelves. If we said "a few weeks" in summer, we meant it.' });
   const oldItems = [];
   history(d, iso, [
     ['passed', 'x', 'cargo', 'two-line-turn', 'A cargo bike carries two kids and the shopping. A van carries one adult and the guilt.', 3, 'Example Urban Freight'],
@@ -226,9 +236,30 @@ function seedNorthwind(ctx, now) {
         not_working: ['Policy stories: 3 skipped as wrong topic or too salesy.', 'Posts that open with a question: you rewrote the opening in 5 of 7 edits.'],
         try: ['Open on the concrete detail and let the question go.', 'Try one post from the Example Lanes Collective ride counts.', 'Pause Example Transport Policy Notes for two weeks and see if you miss it.'] },
     ];
-    db.accounts = [{ type: 'x', status: 'connected_by_prompt', at: iso(48) }];
+    // X posts for her; Threads was on for a week and she turned it off again.
+    db.accounts = [
+      { type: 'x', status: 'connected_by_prompt', at: iso(48), posting: { on: true, history: [{ on: true, at: iso(46) }] } },
+      { type: 'threads', status: 'connected_by_prompt', at: iso(24 * 9), posting: { on: false, history: [{ on: true, at: iso(24 * 8) }, { on: false, at: iso(24 * 2) }] } },
+    ];
+    // A release hour, some days back.
+    const slotAt = (daysAgo, h) => { const t = new Date(now); t.setDate(t.getDate() - daysAgo); t.setHours(h, 0, 0, 0); return t.toISOString(); };
+    const post = (id, dr, extra) => ({ id, draft_id: dr.id, type: 'x', approved_hash: textHash(dr.final_text || dr.text), approved_at: dr.decided_at, scheduled_at: dr.decided_at, claimed_at: null, checked_at: null, done_at: null, url: null, reason: null, seen_at: null, again: false, ...extra });
+    db.posts = [
+      post(1, byClaude, { slot: slotAt(1, 12), status: 'posted', claimed_at: slotAt(1, 12), checked_at: slotAt(1, 12), done_at: slotAt(1, 12), url: byClaude.post_url }),
+      post(2, toPost, { slot: nextSlot({ release_hours: [8, 12, 16, 20], posts_per_day: 2 }, now, []), status: 'scheduled' }),
+      post(3, missed, { slot: slotAt(1, 16), status: 'missed', done_at: slotAt(1, 18), reason: 'Nothing ran between 16:00 and 17:00: your computer was asleep or Claude was closed. It wasn\'t posted.' }),
+      post(4, failed, { slot: slotAt(2, 12), status: 'failed', code: 'not_signed_in', claimed_at: slotAt(2, 12), done_at: slotAt(2, 12), reason: 'You weren\'t signed in, so Claude couldn\'t post it. (x.com showed the sign-in page)' }),
+    ];
+    // She finished the setup wizard when she started; everything Claude drafted is long since decided.
+    db.wizard = { step: 'done', brand: 'Northwind Bicycles', link: 'https://northwind-bicycles.example.com/', answers: { audience: 'Commuters and parents in town thinking about a cargo bike', tone: 'Warm, practical, a little dry. Never salesy.', topics: 'repair, cargo bikes, safer streets', off_limits: 'Racing gossip, naming customers' }, site: { url: 'https://northwind-bicycles.example.com/', title: 'Northwind Bicycles: repairs and cargo bikes', at: iso(24 * 40) }, brief_id: null, fixed: false, requested_at: iso(24 * 40), drafted_at: iso(24 * 40), proposal_ids: [8, 9, 10], source_ids: [11], started_at: iso(24 * 40), updated_at: iso(24 * 40), finished_at: iso(24 * 40) };
+    db.proposals.push(
+      { id: 8, kind: 'voice', op: 'set', text: 'A neighbourhood bike shop and repair workshop. Warm, practical, a little dry.', reason: 'Drafted from your setup answers', refs: [], status: 'accepted', edited: true, source: 'wizard', created_at: iso(24 * 40), decided_at: iso(24 * 40) },
+      { id: 9, kind: 'topic', op: 'add', text: 'cargo', reason: 'Drafted from your setup answers', refs: [], status: 'accepted', source: 'wizard', created_at: iso(24 * 40), decided_at: iso(24 * 40) },
+      { id: 10, kind: 'topic', op: 'avoid', text: 'pro racing doping', reason: 'Drafted from your setup answers', refs: [], status: 'accepted', source: 'wizard', created_at: iso(24 * 40), decided_at: iso(24 * 40) },
+      { id: 11, kind: 'source', op: 'add', text: 'Daily news: cycling-news.example.com', target: { kind: 'site', url: 'https://cycling-news.example.com/feed.xml', list: 'feeds' }, key: 'site:cycling-news.example.com', reason: 'city cycling news for your topics', refs: [], status: 'accepted', source: 'wizard', created_at: iso(24 * 40), decided_at: iso(24 * 40) },
+    );
   });
-  s.write('meta', { ids: { draft: id, set: setId, item: 60, feedback: 1, job: 2, heart: 3, reversal: 1, proposal: 7, discovery: 1, edit: 7, coach: 2 } });
+  s.write('meta', { ids: { draft: id, set: setId, item: 60, feedback: 1, job: 2, heart: 3, reversal: 1, proposal: 11, discovery: 1, edit: 7, coach: 2, post: 4 } });
   return draftsSpec.length;
 }
 
@@ -237,7 +268,7 @@ function seedFernhollow(ctx, now) {
   const s = ctx.store;
   const iso = (hAgo) => new Date(now - hAgo * H).toISOString();
   const json = (f, o) => s.writeFile(f, JSON.stringify(o, null, 2) + '\n');
-  json('settings.json', { brand: 'Fernhollow Bakery', setup_complete: true, posts_per_day: 1, daily_cap: 6, takes_per_item: 2, evergreen_per_day: 1, release_hours: [9, 15], fetch_every: 'weekdays', platforms: { linkedin: { enabled: true, share: 1 }, x: { enabled: false, share: 0.5 } } });
+  json('settings.json', { brand: 'Fernhollow Bakery', setup_complete: true, posts_per_day: 1, daily_cap: 6, takes_per_item: 2, evergreen_per_day: 1, release_hours: [9, 15], fetch_every: 'weekdays', platforms: { linkedin: { enabled: true, share: 1 }, x: { enabled: false, share: 0.5 }, threads: { enabled: true, share: 0.5 }, bluesky: { enabled: true, share: 0.5 } } });
   s.writeFile('voice.md', `# Fernhollow Bakery\n\n## Who we are\nA small neighbourhood bakery. Sourdough, seasonal pastries, and a wholesale round to four cafes.\n\n## Voice\nCalm, warm and specific. Flour-on-the-apron detail. Proud of the craft, never precious about it.\n\n## Never\nNo "artisanal", no "crafted with love", no exclamation marks.\n`);
   json('voice-samples.json', { samples: [{ text: 'The starter is eleven years old. It has outlived two ovens and one landlord.', platform: 'linkedin' }] });
   json('beat.json', { about: 'Baking, local food, small food businesses and food waste.', topics: ['baking', 'local-food', 'small-business', 'food-waste'], weights: { 'food-waste': 3 }, on_beat: ['bread', 'local food'], off_limits: ['diet fads'], curiosity: { baking: ['heritage grain'] }, allow_names: [] });
@@ -275,6 +306,8 @@ function seedFernhollow(ctx, now) {
   takes.forEach((t) => (t.rank.top = takes[0].id));
   d({ item_id: 1, topic: 'local-food', shapes: ['plain-take'], text: 'From Saturday the mill sells stone-ground flour at the market, two stalls down from us.\n\nWe have baked with it for a year. Come and buy a bag, then come and tell us what you made.', lint: [{ code: 'news-voice', label: 'reads like a news report' }], ...rank(2, 2, 0.6) });
   d({ item_id: 3, status: 'passed', topic: 'small-business', decided_at: iso(20), age: 24, shapes: ['two-line-turn'], text: 'Butter is down for the second month running.\n\nThe croissants noticed before we did.' });
+  d({ item_id: 4, platform: 'threads', topic: 'food-waste', shapes: ['plain-take'], text: 'Twenty community fridges in town now. Ours is the one on Mill Lane, and it gets the day-olds every evening at six.', ...rank(2, 2, 0.57) });
+  d({ item_id: 4, platform: 'bluesky', topic: 'food-waste', shapes: ['two-line-turn'], text: 'Twenty community fridges in town.\nOne of them smells of yesterday’s sourdough.', ...rank(2, 2, 0.52) });
   const oldItems = [];
   history(d, iso, [
     ['passed', 'linkedin', 'food-waste', 'the-receipt', 'Twelve loaves to the community fridge last night. None of them came back.', 2, 'Example Local Food Weekly'],
@@ -305,11 +338,28 @@ function seedFernhollow(ctx, now) {
       { id: 1, kind: 'playbook', op: 'add', text: 'No exclamation marks', reason: 'You took out the exclamation marks in 4 of your last 4 edits.', refs: ['edits:4/4'], key: 'edits:cut_exclamation', status: 'open', source: 'edits', created_at: iso(10) },
       { id: 2, kind: 'source', op: 'add', text: 'Daily news: smallfood.example.net', target: { kind: 'site', url: 'https://smallfood.example.net/', list: 'feeds' }, key: 'site:smallfood.example.net', reason: '3 good results from your search in the last month, over 3 days.', refs: [], status: 'open', source: 'discovery', created_at: iso(6) },
     ];
+    // LinkedIn connected, "Post for me" left off: she copies posts out by hand.
+    db.accounts = [{ type: 'linkedin', status: 'connected_by_prompt', at: iso(24 * 6) }];
+    db.posts = [];
+    // She re-ran setup after a month (Settings › Run setup again): Claude's new drafts are waiting.
+    const wiz = (pid, kind, op, text, extra = {}) => ({ id: pid, kind, op, text, old: null, reason: 'Drafted from your setup answers', refs: [], section: null, name: null, platforms: null, strength: null, key: null, status: 'open', source: 'wizard', created_at: iso(0.4), ...extra });
+    db.proposals.push(
+      wiz(3, 'voice', 'set', '## Who we are\nA small neighbourhood bakery on Mill Lane: sourdough, seasonal pastries and a wholesale round to four cafes.\n\n## Voice\nCalm, warm and specific. Flour-on-the-apron detail. Proud of the craft, never precious about it.\n\n## Never\nNo "artisanal", no exclamation marks, no diet talk.'),
+      wiz(4, 'playbook', 'add', 'Name one thing you can smell, touch or taste in the first line'),
+      wiz(5, 'playbook', 'add', 'Say where the day-olds go, with the number'),
+      wiz(6, 'topic', 'add', 'heritage grain'),
+      wiz(7, 'topic', 'add', 'wholesale'),
+      wiz(8, 'topic', 'avoid', 'diet fads and "clean eating"'),
+      wiz(9, 'audience', 'add', 'Cafe owners within a short drive looking for a wholesale baker', { section: 'who' }),
+      { id: 10, kind: 'source', op: 'add', text: 'Daily news: grain-and-mill.example.org', target: { kind: 'site', url: 'https://grain-and-mill.example.org/feed', list: 'feeds' }, key: 'site:grain-and-mill.example.org', reason: 'Milling and heritage grain news, for your baking topic', refs: [], status: 'open', source: 'wizard', created_at: iso(0.4) },
+      { id: 11, kind: 'source', op: 'add', text: 'Search: wholesale bakery cafes', target: { kind: 'search', q: 'wholesale bakery cafes' }, key: 'search:wholesale bakery cafes', reason: 'For your wholesale topic', refs: [], status: 'open', source: 'wizard', created_at: iso(0.4) },
+    );
+    db.wizard = { step: 'review', brand: 'Fernhollow Bakery', link: 'https://fernhollow-bakery.example.org/', answers: { audience: 'Neighbours who buy bread twice a week, and cafe owners', tone: 'Calm and warm, a bit of flour on the apron', topics: 'bread, local flour, what happens to the day-olds', off_limits: '' }, site: { url: 'https://fernhollow-bakery.example.org/', title: 'Fernhollow Bakery, Mill Lane', at: iso(0.5) }, brief_id: 'demo0brief01', fixed: false, requested_at: iso(0.5), drafted_at: iso(0.4), proposal_ids: [3, 4, 5, 6, 7, 8, 9], source_ids: [10, 11], started_at: iso(0.6), updated_at: iso(0.4), finished_at: iso(24 * 30) };
     db.coach = [{ id: 1, week: localDate(now), at: iso(30), summary: 'One week in: food-waste posts land, generic baking lists don’t.',
       working: ['Food-waste posts: you approved both, and they sound most like you.'], not_working: ['Listicles about bread: skipped as boring.'],
       try: ['A post about where the day-olds go, with the number from last night.', 'One post from the Stone Mill’s new flour.'] }];
   });
-  s.write('meta', { ids: { draft: id, set: 1, item: 21, edit: 4, proposal: 2, coach: 1 } });
+  s.write('meta', { ids: { draft: id, set: 1, item: 21, edit: 4, proposal: 11, coach: 1 } });
   return drafts.length;
 }
 

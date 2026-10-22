@@ -1,8 +1,9 @@
 // Proposals: the model only suggests. Playbook bullets, positions, audience lines, learned
-// shapes, overused phrases and new sources land here as open proposals; she accepts or rejects
-// each one on the board (Coach, Playbook and Sources). A source proposal is the only way an
+// shapes, overused phrases, the brand voice, topics and off-limits lines, and new sources land
+// here as open proposals; she accepts (as is, or after editing the text), or rejects each one on
+// the board (Coach, Playbook, Sources and the setup wizard). A source proposal is the only way an
 // address Claude found (or was told about) becomes something the studio reads.
-import { loadPlaybook, writePlaybook, loadPositions, loadAudience, loadShapes, loadSettings, parseJson, validateConfig } from './config.js';
+import { loadPlaybook, writePlaybook, loadPositions, loadAudience, loadShapes, loadSettings, loadBeat, parseJson, validateConfig, SLUG_RE } from './config.js';
 import { ownWords, INSTRUCTION_RE, cleanField } from './fence.js';
 import { normaliseTarget } from './handles.js';
 import { clip, oneLine } from './text.js';
@@ -14,7 +15,20 @@ const KINDS = {
   shape: ['add'],
   phrase: ['add'],
   source: ['add'],
+  // The whole voice.md, drafted by the setup wizard (set replaces it).
+  voice: ['set'],
+  // add: a topic on her beat; avoid: a line for the off-limits list.
+  topic: ['add', 'avoid'],
 };
+// Kinds whose text she can change before accepting.
+export const EDITABLE = new Set(['playbook', 'position', 'audience', 'phrase', 'voice', 'topic']);
+export const VOICE_CAP = 2400;
+
+// "Cargo bikes" -> "cargo-bikes" (the same rule studio_topics uses).
+export function topicSlug(name) {
+  return String(name ?? '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/^[^a-z]+/, '').slice(0, 40).replace(/-+$/, '');
+}
 export const MAX_SHAPES = 40, NEW_SHAPES_PER_RUN = 3;
 
 export function validateProposal(p) {
@@ -28,6 +42,22 @@ export function validateProposal(p) {
     const name = p.name ? cleanField(oneLine(p.name), 60) : null;
     return { kind: 'source', op: 'add', text: t.label, old: null, key: t.key, target: { ...t.target, ...(p.topic && /^[a-z][a-z0-9_-]{0,39}$/.test(p.topic) ? { topic: p.topic } : {}) },
       name: name && !INSTRUCTION_RE.test(name) ? name : null, reason: clip(oneLine(p.reason || ''), 300), refs: (p.refs || []).map(String).slice(0, 12), section: null, platforms: null, strength: null };
+  }
+  if (p.kind === 'voice') {
+    const text = String(p.text || '').replace(/\r\n?/g, '\n').trim();
+    if (text.length < 40) throw new Error('A voice needs a few lines describing the brand.');
+    if (text.length > VOICE_CAP) throw new Error(`A voice is at most ${VOICE_CAP} characters.`);
+    const ow = ownWords(text);
+    if (!ow.ok) throw new Error(`Voice rejected: ${ow.reason}.`);
+    return { kind: 'voice', op: 'set', text, old: null, key: null, reason: clip(oneLine(p.reason || ''), 300), refs: [], section: null, name: null, platforms: null, strength: null };
+  }
+  if (p.kind === 'topic') {
+    const text = oneLine(p.text).slice(0, p.op === 'add' ? 40 : 80);
+    if (p.op === 'add' && (!SLUG_RE.test(topicSlug(text)) || topicSlug(text) === 'other')) throw new Error('A topic is a word or two, like "cargo bikes".');
+    if (text.length < 3) throw new Error('Too short.');
+    const ow = ownWords(text);
+    if (!ow.ok) throw new Error(`Topic rejected: ${ow.reason}.`);
+    return { kind: 'topic', op: p.op, text, old: null, key: null, reason: clip(oneLine(p.reason || ''), 300), refs: [], section: null, name: null, platforms: null, strength: null };
   }
   if (p.kind === 'phrase') {
     const text = oneLine(p.text).toLowerCase().slice(0, 80);
@@ -113,6 +143,21 @@ function applyShape(store, p) {
   store.writeFile('shapes.json', JSON.stringify(learned, null, 2) + '\n');
 }
 
+function applyVoice(store, p) {
+  store.writeFile('voice.md', validateConfig('voice.md', p.text.endsWith('\n') ? p.text : `${p.text}\n`));
+}
+
+function applyTopic(store, p) {
+  const beat = loadBeat(store);
+  if (p.op === 'add') {
+    const slug = topicSlug(p.text);
+    if (beat.topics.includes(slug)) return;
+    if (beat.topics.length >= 30) throw new Error('You already have 30 topics. Remove one first.');
+    beat.topics = [...beat.topics, slug];
+  } else if (!beat.off_limits.some((x) => same(x, p.text))) beat.off_limits = [...beat.off_limits, p.text];
+  store.writeFile('beat.json', JSON.stringify(validateConfig('beat.json', beat), null, 2) + '\n');
+}
+
 function applyPhrase(store, p) {
   const cur = parseJson(store.readFile('settings.json'), {});
   const list = loadSettings(store).overused_phrases || [];
@@ -121,7 +166,7 @@ function applyPhrase(store, p) {
 }
 
 // Source proposals are applied by sources.js (adding one may test-fetch it first).
-const APPLY = { playbook: applyPlaybook, position: applyPosition, audience: applyAudience, shape: applyShape, phrase: applyPhrase };
+const APPLY = { playbook: applyPlaybook, position: applyPosition, audience: applyAudience, shape: applyShape, phrase: applyPhrase, voice: applyVoice, topic: applyTopic };
 
 // Model-callable: list and propose. Accepting or rejecting is hers alone (decideProposal,
 // reachable only from the board), so the model can never apply its own proposal.
@@ -139,15 +184,25 @@ export function proposalsTool(ctx, args) {
   });
 }
 
-export function decideProposal(ctx, { id, decision }) {
+// Her tap. With `text`, she edited the suggestion first: her version is checked like any proposal
+// (it reaches every brief) and applied instead; the suggestion is kept beside it.
+export function decideProposal(ctx, { id, decision, text }) {
   if (decision !== 'accept' && decision !== 'reject') throw new Error('decision must be accept or reject');
   return ctx.tx((db) => {
     const p = db.proposals.find((x) => x.id === Number(id));
     if (!p) throw new Error(`No proposal ${id}.`);
     if (p.status !== 'open') return { ok: false, message: `Proposal ${p.id} is already ${p.status}.` };
     if (decision === 'accept' && !APPLY[p.kind]) throw new Error('That proposal is accepted from the Sources page.');
+    let edited = false;
+    if (decision === 'accept' && text != null && String(text).trim() !== String(p.text || '').trim()) {
+      if (!EDITABLE.has(p.kind) || !p.text) throw new Error('That one can only be accepted or rejected as it is.');
+      let mine;
+      try { mine = validateProposal({ ...p, text }); } catch (e) { return { ok: false, message: e.message.replace(/^\w+ rejected: /, 'Not saved: ') }; }
+      Object.assign(p, { suggested: p.text, text: mine.text });
+      edited = true;
+    }
     if (decision === 'accept') APPLY[p.kind](ctx.store, p);
-    Object.assign(p, { status: decision === 'accept' ? 'accepted' : 'rejected', decided_at: ctx.iso() });
-    return { ok: true, message: decision === 'accept' ? 'Accepted and applied.' : 'Rejected.' };
+    Object.assign(p, { status: decision === 'accept' ? 'accepted' : 'rejected', decided_at: ctx.iso(), ...(edited ? { edited: true } : {}) });
+    return { ok: true, message: decision === 'accept' ? (edited ? 'Saved your version.' : 'Accepted and applied.') : 'Rejected.' };
   });
 }

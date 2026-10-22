@@ -5,7 +5,7 @@ import { openPersonas } from './personas.js';
 import { loadSettings, allPlatforms } from './config.js';
 import { makeRng } from './rng.js';
 
-const OBJECT_COLLECTIONS = new Set(['days', 'weights', 'meta', 'runs']);
+const OBJECT_COLLECTIONS = new Set(['days', 'weights', 'meta', 'runs', 'wizard']);
 
 export function tx(store, fn) {
   return store.withLock(() => {

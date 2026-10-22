@@ -131,7 +131,7 @@ test('none of these + try again, bring back with a reason, bring back an expired
   assert.ok(drafts(b).some((d) => d.resurrected_at));
 });
 
-test('the persona switcher switches, and a new persona gets the first-run card', async () => {
+test('the persona switcher switches, and Add persona opens the setup wizard', async () => {
   const b = await boot();
   const persona = () => b.document.getElementById('persona');
   await button(persona(), 'NB').click(); await settle();
@@ -141,17 +141,18 @@ test('the persona switcher switches, and a new persona gets the first-run card',
   assert.match(b.view().textContent, /bake to the queue/);
   await button(persona(), 'FB').click(); await settle();
   await button(persona(), 'Add persona').click(); await settle();
-  input(persona(), 'New persona name').value = 'Juniper Lane Books';
-  await button(persona(), 'Create').click(); await settle();
+  assert.match(b.view().textContent, /Add a brand.*What’s the brand called\?/);
+  assert.equal(b.ctx.personas.list().length, 2, 'nothing is created until step 1 is sent');
+  input(b.view(), 'Brand name').value = 'Juniper Lane Books';
+  await button(b.view(), 'Next').click(); await settle();
   assert.equal(b.ctx.slug, 'juniper-lane-books');
+  assert.match(b.view().textContent, /A few questions about Juniper Lane Books/);
+  // Leave halfway: the Drafts page offers it again, at the same step.
+  await b.nav('drafts');
   const v = b.view().textContent;
-  assert.match(v, /Here's how this works/);
-  assert.match(v, /Add your sources/);
-  assert.match(v, /Pick your topics/);
-  assert.match(v, /Set it to run/);
-  await button(b.view(), 'Add sources').click(); await settle();
-  assert.match(b.view().textContent, /Add a source/);
-  assert.match(b.view().textContent, /Nothing here yet/);
+  assert.match(v, /Here's how this works.*Set up the brand/);
+  await button(b.view(), 'Continue (step 2 of 4)').click(); await settle();
+  assert.match(b.view().textContent, /A few questions about Juniper Lane Books/);
 });
 
 test('Sources: add a feed, pause, re-file and remove it, and draft from a link', async () => {
@@ -346,10 +347,10 @@ test('Settings: account slots ask Claude to walk her through signing in and reco
   const b = await boot();
   await b.nav('settings');
   let v = b.view().textContent;
-  assert.match(v, /Accounts.*never stores a password and never posts for you/);
+  assert.match(v, /Accounts.*never stores a password\. It posts for you only on an account where you turn “Post for me” on/);
   assert.match(v, /X.*Connected/);
-  assert.match(v, /Reading signed in: not yet · Posting: not yet/);
-  const li = b.view().findAll((e) => e.className === 'row-item').find((r) => /LinkedIn/.test(r.textContent) && /Add account/.test(r.textContent));
+  assert.match(v, /Reading signed in: not yet · Posting for you: off/);
+  const li = b.view().findAll((e) => e.classList.contains('row-item')).find((r) => /LinkedIn/.test(r.textContent) && /Add account/.test(r.textContent));
   await button(li, 'Add account').click(); await settle();
   const msg = b.sent.filter((m) => m.method === 'ui/message').pop();
   assert.match(JSON.stringify(msg.params), /signing in to linkedin\.com myself/);
@@ -367,4 +368,119 @@ test('Topics and Reads explain what moved stories up or down', async () => {
   await b.nav('reads');
   assert.match(b.view().textContent, /Moved up: You approved 3 of 3 posts about cargo/);
   assert.match(b.view().textContent, /Search result/);
+});
+
+test('Wizard on the board: brand, questions, Claude drafts in the chat, she keeps, edits and drops, posting, schedule', async () => {
+  const feed = '<rss><channel><title>Example Paper Trade News</title><item><title>A</title><link>https://paper.example.com/a</link></item></channel></rss>';
+  const b = await boot({ fetchImpl: async (u) => (u === 'https://paper.example.com/feed' ? { ok: true, status: 200, headers: new Map(), text: async () => feed } : { ok: false, status: 404, headers: new Map() }) });
+  await button(b.document.getElementById('persona'), 'NB').click(); await settle();
+  await button(b.document.getElementById('persona'), 'Add persona').click(); await settle();
+  input(b.view(), 'Brand name').value = 'Juniper Lane Books';
+  input(b.view(), 'Website or LinkedIn page').value = 'https://www.linkedin.com/company/example-juniper-lane/';
+  await button(b.view(), 'Next').click(); await settle();
+  // Step 2: plain questions with an example under each; any can be skipped.
+  let v = b.view().textContent;
+  assert.match(v, /Who are your posts for\?e\.g\./);
+  assert.match(v, /Anything it should never post about\?/);
+  input(b.view(), 'Who are your posts for?').value = 'Readers in the neighbourhood and the book club';
+  await input(b.view(), 'Who are your posts for?').fire('change'); await settle();
+  assert.equal(b.ctx.store.read('wizard', {}).answers.audience, 'Readers in the neighbourhood and the book club', 'saved as she goes');
+  input(b.view(), 'What should it talk about?').value = 'new books, author events, the paper trade';
+  await button(b.view(), 'Draft it for me').click(); await settle();
+  const msg = b.sent.filter((m) => m.method === 'ui/message').pop();
+  assert.match(JSON.stringify(msg.params), /Draft the Fishbowl Studio setup for Juniper Lane Books \(persona juniper-lane-books\)/, 'handed to Claude like Add account');
+  assert.match(b.view().textContent, /Claude is drafting Juniper Lane Books.*Waiting for Claude in the chat/);
+  // Claude, in the chat.
+  const brief = (await callTool(b.ctx, 'studio_wizard_brief', {})).content[0].text;
+  assert.match(brief, /LinkedIn pages need a login/);
+  await callTool(b.ctx, 'studio_wizard_save', { brief_id: brief.match(/brief_id: "([0-9a-f]+)"/)[1],
+    voice: '## Who we are\nAn independent bookshop on Juniper Lane.\n\n## Voice\nBookish and warm, never twee.\n\n## Never\nNo spoilers.',
+    playbook: ['Name the book in the first line', 'One recommendation per post'], topics: ['new books', 'author events'], off_limits: ['spoilers'], audience: ['Neighbours who read'],
+    sources: [{ kind: 'site', url: 'https://paper.example.com/feed', topic: 'new-books', reason: 'trade news' }] });
+  await button(b.view(), 'Check now').click(); await settle();
+  v = b.view().textContent;
+  assert.match(v, /Here’s a first draft of Juniper Lane Books/);
+  assert.match(v, /VoiceHow the brand sounds/);
+  assert.match(v, /Starter sources.*Daily news: paper\.example\.com/);
+  assert.equal(b.ctx.store.readFile('voice.md'), null, 'nothing written yet');
+  // Edit a topic, keep it; drop a bullet; keep the voice; add the source.
+  const topic = input(b.view(), 'Topic: new books');
+  topic.value = 'New fiction';
+  await button(topic.parent, 'Keep').click(); await settle();
+  assert.deepEqual(JSON.parse(b.ctx.store.readFile('beat.json')).topics, ['new-fiction']);
+  await button(input(b.view(), 'Playbook: One recommendation per post').parent, 'Drop').click(); await settle();
+  await button(input(b.view(), 'Voice').parent, 'Keep').click(); await settle();
+  assert.match(b.ctx.store.readFile('voice.md'), /Bookish and warm/);
+  const src = b.view().findAll((e) => e.classList.contains('row-item')).find((r) => /paper\.example\.com/.test(r.textContent));
+  await button(src, 'Add').click(); await settle();
+  assert.match(b.ctx.store.readFile('sources.json'), /Example Paper Trade News/);
+  assert.match(b.view().textContent, /Dropped.*Kept your version/);
+  await button(b.view(), 'Keep everything').click(); await settle();
+  assert.equal(b.ctx.store.read('proposals', []).filter((p) => p.status === 'open').length, 0);
+  // Step 4: Post for me, per account, off.
+  await button(b.view(), 'Next').click(); await settle();
+  v = b.view().textContent;
+  assert.match(v, /Should Claude post for you\?/);
+  assert.match(v, /XNot connectedConnectPost for meConnect the account first\. Off until you turn it on/);
+  await button(b.view(), 'Next').click(); await settle();
+  // Finish: one click asks Claude to make the scheduled task.
+  assert.match(b.view().textContent, /Make it run on its own.*Fishbowl Studio daily run/);
+  await button(b.view(), 'Set it up for me').click(); await settle();
+  assert.match(JSON.stringify(b.sent.filter((m) => m.method === 'ui/message').pop().params), /create_scheduled_task.*cron \\"0 7 \* \* 1-5\\"/);
+  await button(b.view(), 'Finish setup').click(); await settle();
+  assert.equal(b.ctx.settings().setup_complete, true);
+  assert.match(b.view().textContent, /Today's drafts for Juniper Lane Books/);
+});
+
+test('Wizard: answers survive closing it; a re-run with drafts waiting opens at the review step', async () => {
+  const b = await boot();
+  await b.ctx.personas.switch('fernhollow-bakery');
+  await b.nav('drafts');
+  assert.match(b.view().textContent, /Finish setting up Fernhollow Bakery.*step 3 of 4/);
+  await button(b.view(), 'Pick up where you left off').click(); await settle();
+  let v = b.view().textContent;
+  assert.match(v, /Here’s a first draft of Fernhollow Bakery/);
+  assert.match(v, /Off limitsWhat it never posts about/);
+  assert.match(v, /grain-and-mill\.example\.org.*Milling and heritage grain news/);
+  await button(b.view(), 'Back').click(); await settle();
+  assert.equal(input(b.view(), 'Who are your posts for?').value, 'Neighbours who buy bread twice a week, and cafe owners');
+  assert.equal(input(b.view(), 'Anything it should never post about?').value, '', 'skipped stays skipped');
+  // The same drafts wait on Coach too: one flow, not two.
+  await b.nav('coach');
+  assert.match(b.view().textContent, /From setup/);
+});
+
+test('Posting on the board: missed and failed posts are never silent; approve to post; the switch warns first', async () => {
+  const b = await boot();
+  const banner = b.document.getElementById('posting');
+  assert.equal(banner.hidden, false);
+  assert.match(banner.textContent, /2 approved posts didn’t go out \(1 missed, 1 failed\)\. Nothing is retried by itself\./);
+  await button(banner, 'See which').click(); await settle();
+  let v = b.view().textContent;
+  assert.match(v, /Missed the 16:00 slotNothing ran between 16:00 and 17:00: your computer was asleep or Claude was closed/);
+  assert.match(v, /Didn’t postYou weren't signed in/);
+  assert.match(v, /Claude posts this to X at \d\d:00/);
+  assert.match(v, /Posted to X by Claude/);
+  // Her choice for each: another slot, or copy it herself.
+  const missed = b.view().findAll((e) => e.classList.contains('post-problem')).find((x) => /Missed/.test(x.textContent));
+  await button(missed, 'Try the next slot').click(); await settle();
+  const failed = b.view().findAll((e) => e.classList.contains('post-problem')).find((x) => /Didn’t post/.test(x.textContent));
+  await button(failed, 'I’ll copy it myself').click(); await settle();
+  assert.equal(b.document.getElementById('posting').hidden, true);
+  assert.equal(b.ctx.store.read('posts', []).filter((p) => p.status === 'scheduled').length, 2);
+  // To review: an X draft says what Approve will do.
+  await button(b.view(), 'To review').click(); await settle();
+  assert.ok(buttons(b.view(), 'Approve & post').length, 'X drafts post when approved');
+  // Settings: Threads was on and is off; turning it on shows the warning first.
+  await b.nav('settings');
+  const threads = () => b.view().findAll((e) => e.classList.contains('row-item')).find((r) => /^Threads/.test(r.textContent.replace(/^T/, 'T')) && /Posting for you/.test(r.textContent));
+  assert.match(threads().textContent, /Off since/);
+  await button(threads(), 'Post for me on Threads').click(); await settle();
+  assert.match(threads().textContent, /Before you turn this on.*Meta.*Your computer has to be awake.*turn it off any time/);
+  assert.equal(b.ctx.store.read('accounts', []).find((a) => a.type === 'threads').posting.on, false, 'not yet');
+  await button(threads(), 'Turn it on').click(); await settle();
+  assert.equal(b.ctx.store.read('accounts', []).find((a) => a.type === 'threads').posting.on, true);
+  // Schedule now includes the posting task.
+  await b.nav('schedule');
+  assert.match(b.view().textContent, /Fishbowl Studio posting.*Run the Fishbowl Studio posting\./);
 });

@@ -173,12 +173,13 @@ test('editing sources through studio_config still works: pause, re-file and remo
   assert.equal((await callTool(ctx, 'studio_sources', { action: 'suggest', kind: 'watch', url: 'https://bsky.app/profile/x' })).isError, true);
 });
 
-test('account slots: one file per type, capabilities off, connect is a prompt and a note, posting refuses', async () => {
+test('account slots: one file per type, connect is a prompt and a note, posting refuses until she turns it on', async () => {
   const types = accountTypes();
-  assert.deepEqual(Object.keys(types).sort(), ['bluesky', 'linkedin', 'reddit', 'x']);
+  assert.deepEqual(Object.keys(types).sort(), ['bluesky', 'linkedin', 'reddit', 'threads', 'x']);
   for (const t of Object.values(types)) {
     assert.ok(t.label && t.icon && t.enables && t.connect, t.id);
-    assert.equal(t.capabilities.post, false, `${t.id} cannot post`);
+    assert.equal(t.capabilities.post, t.id !== 'reddit', `${t.id} ${t.id === 'reddit' ? 'cannot post' : 'can post, once she turns it on'}`);
+    if (t.capabilities.post) assert.ok(t.compose.startsWith('https://') && t.post_warning, `${t.id} says where it posts and what she risks`);
     assert.ok([false, 'prompt'].includes(t.capabilities.read), `${t.id} reads nothing signed in yet`);
     assert.match(t.connect, /don't store anything/i);
   }
@@ -199,9 +200,9 @@ test('account slots: one file per type, capabilities off, connect is a prompt an
   assert.equal(v.accounts.find((a) => a.id === 'x').connected, true);
   assert.deepEqual(TOOLS.find((t) => t.name === 'studio_account_set')._meta.ui.visibility, ['app'], 'connecting is board-only');
   assert.match((await callTool(ctx, 'studio_accounts', {})).content[0].text, /X: connected \(by prompt\)/);
-  // The posting hook exists and refuses.
+  // The posting hook refuses while "Post for me" is off (the default) and for unconnected accounts.
   ctx.tx((db) => { db.drafts = [{ id: 1, status: 'passed', text: 'A post', platform: 'x' }]; });
-  assert.match(handOff(ctx, { draft_id: 1, type: 'x' }).message, /isn't built/);
+  assert.match(handOff(ctx, { draft_id: 1, type: 'x' }).message, /"Post for me" is off/);
   assert.equal(handOff(ctx, { draft_id: 1, type: 'linkedin' }).ok, false);
   assert.equal(setAccount(ctx, { action: 'remove', type: 'x' }).ok, true);
   assert.equal(ctx.store.read('accounts', []).length, 0);

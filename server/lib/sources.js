@@ -9,7 +9,7 @@ import { cleanField, instructionPhrase } from './fence.js';
 import { oneLine, clip } from './text.js';
 import { mergeItems } from './dedupe.js';
 import { normaliseTarget, parseSubreddit, parseWatch } from './handles.js';
-import { addProposals, decideProposal } from './proposals.js';
+import { addProposals, decideProposal, topicSlug } from './proposals.js';
 
 const LISTS = ['feeds', 'reading'];
 const field = (s, cap) => cleanField(oneLine(s), cap);
@@ -208,10 +208,7 @@ export function editSource(ctx, { action, url, q, list, topic }) {
 
 // ---- topics ----
 
-export function topicSlug(name) {
-  return String(name ?? '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/^[^a-z]+/, '').slice(0, 40).replace(/-+$/, '');
-}
+export { topicSlug };
 
 export function editTopic(ctx, { action, topic, weight }) {
   const beat = loadBeat(ctx.store);
