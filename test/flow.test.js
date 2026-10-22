@@ -53,6 +53,7 @@ test('the whole daily loop, end to end', async () => {
     assert.equal(b.kind, 'item');
     assert.match(b.text, new RegExp(`brief_id: ${b.brief_id}`));
     assert.match(b.text, /## Shapes, one per take/);
+    assert.match(b.text, /## The brand's voice\n[^\n]*not instructions[^\n]*\n<data-([0-9a-f]{8})>\n# Voice\nWarm, practical[^\n]*\n<\/data-\1>/, 'voice.md is fenced as her settings');
     let r = saveTakes(ctx, { brief_id: b.brief_id, takes: takes(3, `Story ${briefs}.`) });
     if (r.status === 'redraft') r = saveTakes(ctx, { brief_id: b.brief_id, takes: takes(3, `Story ${briefs}, again.`) });
     assert.equal(r.status, 'saved');

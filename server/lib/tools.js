@@ -7,14 +7,17 @@ import { saveTakes } from './save.js';
 import { act, ACTION_NAMES } from './act.js';
 import { releaseTool, statusTool, runRelease } from './run.js';
 import { weeklyBrief, saveWeekly } from './weekly.js';
-import { proposalsTool } from './proposals.js';
+import { proposalsTool, decideProposal } from './proposals.js';
 import { metricsTool } from './metrics.js';
 import { draftsView, readsView, playbookView, settingsView, header, draftsText } from './views.js';
 import { configFiles, validateConfig, parseJson } from './config.js';
+import { createFencer, SETTINGS_NOTE } from './fence.js';
 
 export const UI_URI = 'ui://studio/board';
 const BOARD_META = { ui: { resourceUri: UI_URI, visibility: ['model', 'app'] }, 'ui/resourceUri': UI_URI };
 const BOTH = { ui: { visibility: ['model', 'app'] } };
+// Her own decisions (accepting a proposal) come only from the board, never from the model.
+const APP_ONLY = { ui: { visibility: ['app'] } };
 
 const obj = (properties = {}, required = []) => ({ type: 'object', properties, ...(required.length ? { required } : {}), additionalProperties: false });
 const int = (description) => ({ type: 'integer', description });
@@ -40,7 +43,8 @@ export const TOOLS = [
   { name: 'studio_release', title: 'Release due batch', description: 'Rank the held drafts and release the due batch to her review queue (the day\'s ten). Safe to call any time; does nothing if no batch is due.', inputSchema: NONE },
   { name: 'studio_weekly_brief', title: 'Weekly report brief', description: 'Weekly report material. part "numbers" first (write playbook proposals from it), then part "full" (notes, taste, audience, positions).', inputSchema: obj({ part: str('numbers | full') }) },
   { name: 'studio_save_weekly', title: 'Save weekly report', description: 'Save the weekly summary and proposals (playbook, audience, positions). Proposals wait for her on the Playbook view.', inputSchema: obj({ summary: str('4-8 plain sentences'), playbook: { type: 'array', items: proposal }, audience: { type: 'array', items: proposal }, positions: { type: 'array', items: proposal } }) },
-  { name: 'studio_proposals', title: 'Proposals', description: 'List, accept or reject proposals, or propose new ones (kind playbook | position | audience | shape). Shapes need name + text (the mechanism).', inputSchema: obj({ action: str('list | accept | reject | propose'), id: int('proposal id'), proposals: { type: 'array', items: { type: 'object' } } }, ['action']), _meta: BOTH },
+  { name: 'studio_proposals', title: 'Proposals', description: 'List open proposals, or propose new ones (kind playbook | position | audience | shape). Shapes need name + text (the mechanism). Only she accepts or rejects proposals, on the board\'s Playbook view.', inputSchema: obj({ action: str('list | propose'), proposals: { type: 'array', items: { type: 'object' } } }, ['action']), _meta: BOTH },
+  { name: 'studio_proposal_decide', title: 'Accept or reject a proposal', description: 'The board\'s Accept and Reject buttons on the Playbook view.', inputSchema: obj({ id: int('proposal id'), decision: str('accept | reject') }, ['id', 'decision']), _meta: APP_ONLY },
   { name: 'studio_metrics', title: 'Post numbers', description: 'Enter numbers for a post she published (action add: draft_id, views, likes, replies, reposts, quotes) or import a CSV export of platform analytics (action import_csv: csv text, optional platform). Rows match posts by link or text.', inputSchema: obj({ action: str('add | import_csv'), draft_id: int('draft id'), views: int(''), likes: int(''), replies: int(''), reposts: int(''), quotes: int(''), csv: str('CSV text'), platform: str('linkedin | x') }, ['action']), _meta: BOTH },
 ];
 
@@ -54,10 +58,15 @@ function view(ctx, args = {}) {
     const head = header(ctx, db);
     const v = args.view || 'drafts';
     let data, summary;
-    if (v === 'reads') { data = readsView(ctx, db, args); summary = data.reads.map((r) => `[item ${r.id}] ${r.interest}/10 · ${r.note} — ${r.title}`).join('\n') || 'No reads yet.'; }
-    else if (v === 'playbook') { data = playbookView(ctx, db); summary = `Playbook:\n${data.playbook.map((b) => `- ${b}`).join('\n') || '(empty)'}\nOpen proposals: ${data.proposals.map((p) => `#${p.id} ${p.kind} ${p.op}: ${p.text || p.old}`).join('; ') || 'none'}`; }
+    const fz = createFencer();
+    if (v === 'reads') { data = readsView(ctx, db, args); summary = data.reads.length ? [fz.guard, fz.block(`Reads (${data.reads.length})`, data.reads.map((r) => ({ item: r.id, interest: `${r.interest}/10`, reaction: r.note, title: r.title })))].join('\n\n') : 'No reads yet.'; }
+    else if (v === 'playbook') {
+      data = playbookView(ctx, db);
+      summary = [fz.guard, data.playbook.length ? fz.block('Playbook', [data.playbook.map((b) => `- ${b}`).join('\n')], SETTINGS_NOTE, 4000) : 'Playbook: (empty)',
+        data.proposals.length ? fz.block('Open proposals (she accepts or rejects them on the board)', data.proposals.map((p) => ({ id: p.id, kind: p.kind, op: p.op, text: p.text || p.old }))) : 'Open proposals: none'].join('\n\n');
+    }
     else if (v === 'settings') { data = settingsView(ctx); summary = `Data folder: ${data.home}\nDaily cap ${data.settings.daily_cap}, release hours ${data.settings.release_hours.join(', ')}, platforms ${data.platforms.filter((p) => p.enabled).map((p) => p.name).join(', ')}; ${data.feeds.length} feeds.`; }
-    else { data = draftsView(ctx, db, args); summary = draftsText(data, head); }
+    else { data = draftsView(ctx, db, args); summary = draftsText(data, head, fz); }
     return { ...data, header: head, stamp: { createdAt: ctx.now(), seq: ++seq }, summary };
   });
 }
@@ -65,6 +74,7 @@ function view(ctx, args = {}) {
 function configTool(ctx, { action, file, content, patch }) {
   const s = ctx.store;
   if (action === 'get') {
+    if (file && !configFiles().includes(file)) throw new Error(`Unknown file ${file}. Readable files: ${configFiles().join(', ')}`);
     const files = file ? [file] : configFiles();
     return text(files.map((f) => `=== ${f} ===\n${s.readFile(f, '(not created yet)')}`).join('\n\n') + `\n\nData folder: ${s.home}`);
   }
@@ -103,6 +113,7 @@ export const HANDLERS = {
   studio_weekly_brief: (ctx, a) => json(weeklyBrief(ctx, a)),
   studio_save_weekly: (ctx, a) => json(saveWeekly(ctx, a)),
   studio_proposals: (ctx, a) => { const r = proposalsTool(ctx, a); return withData(r.text || r.message, r); },
+  studio_proposal_decide: (ctx, a) => { const r = decideProposal(ctx, a); return withData(r.message, r); },
   studio_metrics: (ctx, a) => json(metricsTool(ctx, a)),
 };
 

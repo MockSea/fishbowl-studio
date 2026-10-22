@@ -2,7 +2,7 @@
 // fenced, plus the server's decisions (platform, shape per take, experiment). The brief id
 // comes back with studio_save_takes, which checks the takes against those decisions.
 import { loadBeat, loadShapes, loadVoice, loadPlaybook, enabledPlatforms, topicsOf, defaults } from './config.js';
-import { createFencer } from './fence.js';
+import { createFencer, SETTINGS_NOTE } from './fence.js';
 import { pickShapes, shapeVotes, resultsMultipliers } from './shapes.js';
 import { overuse, compileTemplates, compileCrutches } from './forms.js';
 import { positionsBlock, audienceBlock } from './triage.js';
@@ -152,12 +152,12 @@ export function draftingBrief(ctx, args = {}) {
 
     const parts = [
       header,
-      voice.text ? `## The brand's voice\n${voice.text.trim()}` : '## The brand\'s voice\n(not set yet; write plainly and warmly)',
-      fz.block('How the brand sounds (samples she pasted; borrow the voice, never the words)', samples),
-      playbook.length ? `## Playbook (what's been working)\n${playbook.map((b) => `- ${b}`).join('\n')}` : '',
-      sig.text,
-      positionsBlock(ctx.store, kind === 'evergreen' ? 10 : 6),
       fz.guard,
+      voice.text.trim() ? fz.block('The brand\'s voice', [voice.text.trim()], `${SETTINGS_NOTE} Write in this voice.`, 20000) : '## The brand\'s voice\n(not set yet; write plainly and warmly)',
+      fz.block('How the brand sounds (samples she pasted; borrow the voice, never the words)', samples),
+      playbook.length ? fz.block('Playbook (what\'s been working)', [playbook.map((b) => `- ${b}`).join('\n')], SETTINGS_NOTE, 4000) : '',
+      sig.text,
+      positionsBlock(ctx.store, fz, kind === 'evergreen' ? 10 : 6),
       audienceBlock(ctx.store, fz),
       `## Platform: ${platform.name}\nHard limit ${platform.max_chars} characters; aim for ${platform.target_chars[0]}-${platform.target_chars[1]}. ${platform.register}`,
       `## How to write\n${WRITE({ platform })}`,

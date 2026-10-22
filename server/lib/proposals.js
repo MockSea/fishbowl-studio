@@ -94,21 +94,28 @@ function applyShape(store, p) {
 
 const APPLY = { playbook: applyPlaybook, position: applyPosition, audience: applyAudience, shape: applyShape };
 
+// Model-callable: list and propose. Accepting or rejecting is hers alone (decideProposal,
+// reachable only from the board), so the model can never apply its own proposal.
 export function proposalsTool(ctx, args) {
+  if (args.action === 'accept' || args.action === 'reject') throw new Error('Only she can accept or reject proposals, with the buttons on the board\'s Playbook view. Tell her it is waiting there.');
   return ctx.tx((db) => {
     if (args.action === 'propose') {
       const res = addProposals(ctx, db, args.proposals, args.source || 'chat');
       return { ...res, text: `Added ${res.added.length} proposal(s) for her to review on the Playbook view${res.rejected.length ? `; rejected ${res.rejected.length}: ${res.rejected.map((r) => r.reason).join(' ')}` : ''}.` };
     }
-    if (args.action === 'accept' || args.action === 'reject') {
-      const p = db.proposals.find((x) => x.id === Number(args.id));
-      if (!p) throw new Error(`No proposal ${args.id}.`);
-      if (p.status !== 'open') return { ok: false, message: `Proposal ${p.id} is already ${p.status}.` };
-      if (args.action === 'accept') APPLY[p.kind](ctx.store, p);
-      Object.assign(p, { status: args.action === 'accept' ? 'accepted' : 'rejected', decided_at: ctx.iso() });
-      return { ok: true, message: args.action === 'accept' ? 'Accepted and applied.' : 'Rejected.' };
-    }
     const open = db.proposals.filter((p) => p.status === 'open');
     return { proposals: open, text: open.length ? open.map((p) => `#${p.id} ${p.kind} ${p.op}: ${p.text || p.old}${p.reason ? ` (${p.reason})` : ''}`).join('\n') : 'No open proposals.' };
+  });
+}
+
+export function decideProposal(ctx, { id, decision }) {
+  if (decision !== 'accept' && decision !== 'reject') throw new Error('decision must be accept or reject');
+  return ctx.tx((db) => {
+    const p = db.proposals.find((x) => x.id === Number(id));
+    if (!p) throw new Error(`No proposal ${id}.`);
+    if (p.status !== 'open') return { ok: false, message: `Proposal ${p.id} is already ${p.status}.` };
+    if (decision === 'accept') APPLY[p.kind](ctx.store, p);
+    Object.assign(p, { status: decision === 'accept' ? 'accepted' : 'rejected', decided_at: ctx.iso() });
+    return { ok: true, message: decision === 'accept' ? 'Accepted and applied.' : 'Rejected.' };
   });
 }

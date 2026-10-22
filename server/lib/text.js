@@ -10,10 +10,20 @@ export const STOPWORDS = new Set((
   'via per get gets got one two three'
 ).split(' '));
 
-const CONTROL_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g;
+// Control, bidi and invisible format characters, including Unicode tag characters (U+E0000-E007F).
+const CONTROL_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF\u{E0000}-\u{E007F}]/gu;
 
 export function stripControl(s) {
   return String(s ?? '').replace(CONTROL_RE, '');
+}
+
+// Single-line text from outside (feed titles, authors): line breaks become spaces and every
+// control, format or private-use character goes, so it can't start a line of its own.
+const BREAK_RE = /[\t\n\v\f\r\u0085\u2028\u2029]/g;
+const INVISIBLE_RE = /[\p{Cc}\p{Cf}\p{Co}\u{E0000}-\u{E007F}]/gu;
+
+export function oneLine(s) {
+  return normSpace(String(s ?? '').replace(BREAK_RE, ' ').replace(INVISIBLE_RE, ''));
 }
 
 export function clip(s, n) {

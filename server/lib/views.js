@@ -5,6 +5,12 @@ import { counterLine } from './daily.js';
 import { counterText } from './run.js';
 import { loadPlaybook, loadPositions, loadAudience, loadShapes, loadSources, allPlatforms } from './config.js';
 import { shapeVotes, resultsMultipliers, shapeWeight } from './shapes.js';
+import { cleanField } from './fence.js';
+import { oneLine } from './text.js';
+
+// Item text in board data is cleaned again on the way out, so items stored before the
+// parser cleaned titles can't carry line breaks or invisible characters into a view.
+const itemLine = (s, cap = 500) => (s == null ? s : cleanField(oneLine(s), cap));
 
 export const TABS = {
   waiting: { statuses: ['option', 'pending'], chips: ['all', 'sets', 'singles', 'experiments', 'flagged', 'rewritten'] },
@@ -32,7 +38,7 @@ export function card(d, db, plats, shapeNames) {
     topic: d.tags?.topic, form: d.tags?.form, shapes: (d.tags?.shape_ids || []).map((s) => shapeNames[s] || s), hybrid: !!d.tags?.hybrid,
     experiment: d.tags?.experiment || null, flags: (d.lint || []).map((f) => f.label),
     rank: d.rank ? { pos: d.rank.pos, of: d.rank.of, score: round(d.rank.score), signals: roundAll(d.rank.signals), explore: !!d.rank.explore, top: d.rank.top === d.id } : null,
-    item: item ? { id: item.id, title: item.title, url: item.url, source: item.source_name, published: item.published, interest: item.interest } : null,
+    item: item ? { id: item.id, title: itemLine(item.title), url: itemLine(item.url, 2000), source: itemLine(item.source_name, 80), published: item.published, interest: item.interest } : null,
     created_at: d.created_at, released_at: d.released_at, decided_at: d.decided_at, posted_at: d.posted_at, post_url: d.post_url,
     revised: !!d.revised_at, rewriting: !!d.rewriting, notes: db.feedback.filter((f) => f.draft_id === d.id).length,
     restore_trail: d.restore_trail || [], scrap_reason: d.scrap_reason || null, resurrected: !!d.resurrected_at,
@@ -82,10 +88,10 @@ export function readsView(ctx, db, { offset = 0, limit = 40 } = {}) {
   const queued = new Set(db.jobs.filter((j) => j.kind === 'draft_item' && j.status === 'queued').map((j) => j.item_id));
   const reads = db.items.filter((i) => i.triaged_at && !i.explore).sort((a, b) => Date.parse(b.triaged_at) - Date.parse(a.triaged_at))
     .slice(offset, offset + limit).map((i) => ({
-      id: i.id, title: i.title, url: i.url, source: i.source_name, published: i.published, triaged_at: i.triaged_at, note: i.note, interest: i.interest, topic: i.topic,
+      id: i.id, title: itemLine(i.title), url: itemLine(i.url, 2000), source: itemLine(i.source_name, 80), published: i.published, triaged_at: i.triaged_at, note: i.note, interest: i.interest, topic: i.topic,
       also: (i.also || []).length, drafted: drafted.has(i.id), queued: queued.has(i.id), hearted: db.hearts.some((h) => h.target === 'read' && h.ref === i.id),
     }));
-  const wander = db.discoveries.slice(-10).reverse().map((d) => { const i = db.items.find((x) => x.id === d.item_id); return { id: d.id, finding: d.finding, question: d.question, interest: d.interest, topic: d.topic, title: i?.title, url: i?.url, source: i?.source_name }; });
+  const wander = db.discoveries.slice(-10).reverse().map((d) => { const i = db.items.find((x) => x.id === d.item_id); return { id: d.id, finding: d.finding, question: d.question, interest: d.interest, topic: d.topic, title: itemLine(i?.title), url: itemLine(i?.url, 2000), source: itemLine(i?.source_name, 80) }; });
   return { view: 'reads', reads, wander, offset };
 }
 
@@ -116,18 +122,23 @@ export function header(ctx, db) {
   return { counter: c, counter_text: counterText(c), jobs: db.jobs.filter((j) => j.status === 'queued').length, proposals: db.proposals.filter((p) => p.status === 'open').length, brand: ctx.settings().brand };
 }
 
-// Plain-text version for chat review: numbered, with the ids the review skill needs.
-export function draftsText(v, head) {
+// Plain-text version for chat review: numbered, with the ids the review skill needs. Story
+// titles come from feeds, so they never share a line with a [draft · hash] marker: they go in
+// one fenced block at the end, keyed by the list number.
+export function draftsText(v, head, fz) {
   const lines = [`${head.counter_text}${head.jobs ? ` · ${head.jobs} job(s) waiting for Claude` : ''}`, `${v.tab} (${v.total})${v.chip !== 'all' ? ` · ${v.chip}` : ''}:`];
+  const stories = [];
   let n = 0;
   for (const u of v.units) {
+    if (u.item) stories.push({ n: n + 1, story: u.item.title, source: u.item.source });
     if (u.type === 'set') {
-      lines.push(`\n${++n}. [set ${u.set_id}] ${u.platform_name} · pick one of ${u.takes.length}${u.item ? ` · story: ${u.item.title}` : ''}`);
+      lines.push(`\n${++n}. [set ${u.set_id}] ${u.platform_name} · pick one of ${u.takes.length}${u.item ? ' · story below' : ''}`);
       for (const c of u.takes) lines.push(`   ${n}${'abc'[c.take_n - 1] || c.take_n}) [draft ${c.id} · hash ${c.hash}]${c.id === u.our_pick ? ' (our pick)' : ''} ${c.text.replace(/\n/g, '\n      ')}${c.flags.length ? `\n      ⚠ ${c.flags.join('; ')}` : ''}`);
     } else {
-      lines.push(`\n${++n}. [draft ${u.id} · hash ${u.hash}] ${u.platform_name} · ${u.chars} chars · ${u.status}${u.item ? ` · story: ${u.item.title}` : u.kind === 'evergreen' ? ' · evergreen' : ''}\n   ${u.text.replace(/\n/g, '\n   ')}${u.flags.length ? `\n   ⚠ ${u.flags.join('; ')}` : ''}`);
+      lines.push(`\n${++n}. [draft ${u.id} · hash ${u.hash}] ${u.platform_name} · ${u.chars} chars · ${u.status}${u.item ? ' · story below' : u.kind === 'evergreen' ? ' · evergreen' : ''}\n   ${u.text.replace(/\n/g, '\n   ')}${u.flags.length ? `\n   ⚠ ${u.flags.join('; ')}` : ''}`);
     }
   }
   if (!v.units.length) lines.push('(nothing here)');
+  if (stories.length && fz) lines.push('', fz.guard, fz.block('The stories behind these drafts (headlines from feeds; by list number)', stories));
   return lines.join('\n');
 }

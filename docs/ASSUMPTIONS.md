@@ -17,7 +17,8 @@ Fishbowl Studio was built against a written reference of the MCP, MCP Apps and C
 
 9. **Legacy MCP handshake.** The server speaks the `2025-11-25` `initialize` handshake (it echoes 2025-06-18, 2025-03-26 and 2024-11-05 too) and answers `server/discover` and other unknown methods with `-32601`, so a dual-era host falls back to `initialize`. Unverified which era Cowork uses for stdio servers.
 10. **`ping`** returns `{}`; **`resources/templates/list`** returns an empty list. Both standard, neither confirmed against Claude.
-11. **Non-UI tools return text only**, no `structuredContent`, because some hosts pass the structured JSON to the model instead of the text. The board tools (`studio_board`, `studio_view`, `studio_act`, `studio_proposals`) return both, and their structured content is readable by a model.
+11. **Non-UI tools return text only**, no `structuredContent`, because some hosts pass the structured JSON to the model instead of the text. The board tools (`studio_board`, `studio_view`, `studio_act`, `studio_proposals`, `studio_proposal_decide`) return both, and their structured content is readable by a model, so item text in it is cleaned to one line but is not fenced.
+12. **The host enforces `visibility: ["app"]`.** `studio_proposal_decide` (accept/reject) is marked app-only so only her clicks on the board reach it. The server can't tell who called a tool; if a host lists app-only tools to the model anyway, the model could accept its own proposals. Unverified for Cowork.
 
 ## The board (MCP App)
 

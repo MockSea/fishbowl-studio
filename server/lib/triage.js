@@ -1,7 +1,7 @@
 // Triage: a cheap first pass. One private line plus a 0-10 interest per item, so only
 // items worth it get drafted. Reactions show on the Reads view and feed the taste log.
 import { loadBeat, loadPositions, loadAudience, topicsOf } from './config.js';
-import { createFencer } from './fence.js';
+import { createFencer, SETTINGS_NOTE } from './fence.js';
 import { clip, clamp } from './text.js';
 import { TRIAGE } from './prompts.js';
 
@@ -12,9 +12,9 @@ export function triageCandidates(items, batch = 40) {
     .slice(0, batch);
 }
 
-export function positionsBlock(store, n = 6) {
+export function positionsBlock(store, fz, n = 6) {
   const ps = loadPositions(store).slice().sort((a, b) => b.strength - a.strength).slice(0, n);
-  return ps.length ? `## The brand's positions (hers; hold them)\n${ps.map((p) => `- ${p.text} (strength ${p.strength}/5)`).join('\n')}` : '';
+  return fz.block('The brand\'s positions (hers; hold them)', ps.map((p) => ({ position: p.text, strength: `${p.strength}/5` })), SETTINGS_NOTE);
 }
 
 export function audienceBlock(store, fz) {
@@ -36,7 +36,7 @@ export function triageQueue(ctx) {
     const text = [
       `# Triage (${items.length} items)`, TRIAGE({ offLimits: beat.off_limits, onBeat: beat.on_beat }), fz.guard,
       `## Topics (use exactly one of these)\n${topicsOf(beat).join(', ')}`,
-      positionsBlock(ctx.store), audienceBlock(ctx.store, fz),
+      positionsBlock(ctx.store, fz), audienceBlock(ctx.store, fz),
       fz.block('Items', rows),
       `Reply with studio_record_triage({queue_id: ${q.id}, reactions: [{item, thought, interest, topic}, ...]}).`,
     ].filter(Boolean).join('\n\n');

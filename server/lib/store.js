@@ -28,6 +28,14 @@ export function openStore(home = resolveHome()) {
   let depth = 0;
 
   const file = (name) => path.join(stateDir, `${name}.json`);
+  // Root-level paths resolve inside the data folder or not at all.
+  const root = path.resolve(home);
+  const inside = (rel) => {
+    const p = path.resolve(root, String(rel));
+    const r = path.relative(root, p);
+    if (!r || r.startsWith('..') || path.isAbsolute(r)) throw new Error(`Refused: ${rel} is outside the studio folder.`);
+    return p;
+  };
 
   const store = {
     home,
@@ -53,14 +61,14 @@ export function openStore(home = resolveHome()) {
     },
     // Root-level files she can open and edit herself.
     readFile(rel, fallback = null) {
-      try { return fs.readFileSync(path.join(home, rel), 'utf8'); }
+      try { return fs.readFileSync(inside(rel), 'utf8'); }
       catch (e) { if (e.code === 'ENOENT') return fallback; throw e; }
     },
     writeFile(rel, text) {
-      writeAtomic(path.join(home, rel), text);
+      writeAtomic(inside(rel), text);
     },
     exists(rel) {
-      return fs.existsSync(path.join(home, rel));
+      return fs.existsSync(inside(rel));
     },
     withLock(fn) {
       if (depth > 0) { depth++; try { return fn(); } finally { depth--; } }

@@ -25,8 +25,8 @@
 
   function playbook(d) {
     if (!d || d.view !== 'playbook') return h('p', { class: 'muted' }, 'Loading…');
-    const decide = (id, action) => async () => {
-      try { const r = await S.callTool('studio_proposals', { action, id }); B.flash(r.content[0].text, r.isError ? 'bad' : 'good'); B.load(); } catch (e) { B.flash(String(e.message || e), 'bad'); }
+    const decide = (id, decision) => async () => {
+      try { const r = await S.callTool('studio_proposal_decide', { id, decision }); B.flash(r.content[0].text, r.isError ? 'bad' : 'good'); B.load(); } catch (e) { B.flash(String(e.message || e), 'bad'); }
     };
     const props = d.proposals.length ? d.proposals.map((p) => h('article', { class: 'card' },
       h('div', { class: 'meta' }, h('span', { class: 'pill' }, p.kind), h('span', { class: 'pill warn' }, p.op), p.section ? h('span', { text: p.section }) : null, h('span', { text: B.ago(p.created_at) })),

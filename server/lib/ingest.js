@@ -4,7 +4,7 @@ import { loadSources, loadBeat, loadPositions, topicsOf } from './config.js';
 import { fetchText, parseFeed } from './feeds.js';
 import { mergeItems } from './dedupe.js';
 import { hostOf } from './urls.js';
-import { createFencer, INSTRUCTION_RE, ownWords } from './fence.js';
+import { createFencer, INSTRUCTION_RE, ownWords, SETTINGS_NOTE } from './fence.js';
 import { clip, clamp, mean } from './text.js';
 import { WANDER } from './prompts.js';
 
@@ -118,7 +118,7 @@ export async function wander(ctx) {
     const positions = loadPositions(ctx.store).slice().sort((a, b) => b.strength - a.strength).slice(0, 6);
     const text = [
       `# Wander: ${pick.name} (topic: ${pick.topic})`, WANDER, fz.guard,
-      positions.length ? `## The brand's positions\n${positions.map((p) => `- ${p.text}`).join('\n')}` : '',
+      fz.block('The brand\'s positions', positions.map((p) => ({ position: p.text })), SETTINGS_NOTE),
       fz.block('Open questions from earlier visits', questions),
       fz.block('What you are reading', entries),
       `Reply with studio_record_wander({visit_id: ${visit.id}, findings: [...]}) — findings may be empty.`,

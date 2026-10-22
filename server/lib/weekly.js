@@ -2,7 +2,7 @@
 // Part "numbers" comes first and is all the playbook proposal may lean on; her notes, taste and
 // restores only arrive in part "full", after the playbook proposal is saved.
 import { loadPlaybook, loadAudience, loadPositions } from './config.js';
-import { createFencer } from './fence.js';
+import { createFencer, SETTINGS_NOTE } from './fence.js';
 import { addProposals } from './proposals.js';
 import { PLAYBOOK, AUDIENCE, POSITIONS } from './prompts.js';
 import { mean, localDate } from './text.js';
@@ -78,22 +78,23 @@ export function weeklyBrief(ctx, { part = 'numbers' } = {}) {
   return ctx.tx((db) => {
     const nums = numbers(db, now);
     const playbook = loadPlaybook(ctx.store);
-    const pb = `## Current playbook\n${playbook.map((b) => `- ${b}`).join('\n') || '(empty)'}`;
+    const fz = createFencer();
+    const pb = playbook.length ? fz.block('Current playbook', [playbook.map((b) => `- ${b}`).join('\n')], SETTINGS_NOTE, 4000) : '## Current playbook\n(empty)';
     if (part === 'numbers') {
-      return { part, text: [`# Weekly report, part 1: numbers`, PLAYBOOK, pb, nums,
+      return { part, text: [`# Weekly report, part 1: numbers`, PLAYBOOK, fz.guard, pb, nums,
         'Save playbook proposals with studio_save_weekly({playbook: [{op, text, old, reason}]}), then call studio_weekly_brief({part: "full"}).'].join('\n\n') };
     }
-    const fz = createFencer();
     const a = loadAudience(ctx.store);
+    const ps = loadPositions(ctx.store);
     const notes = db.feedback.filter((f) => now - Date.parse(f.at) < 7 * DAY).map((f) => ({ post: f.prior_text, her_note: f.text }));
     const restores = db.reversals.filter((r) => now - Date.parse(r.at) < 7 * DAY).map((r) => ({ post: r.line, reason: r.reason }));
     const topicCounts = {};
     for (const d of db.drafts.filter((x) => now - Date.parse(x.created_at) < 7 * DAY)) topicCounts[d.tags?.topic || 'other'] = (topicCounts[d.tags?.topic || 'other'] || 0) + 1;
     return { part, text: [`# Weekly report, part 2: the rest`, fz.guard, nums, taste(db, now),
       fz.block('Her notes this week', notes), fz.block('Kills she undid, with her reasons', restores),
-      `## Audience profile\n${[...a.who.map((w) => `- who (${w.confidence}/5): ${w.text}`), ...a.buttons.map((b) => `- button (${b.confidence}/5): ${b.text}`)].join('\n') || '(empty)'}`,
+      fz.block('Audience profile', [...a.who.map((w) => ({ who: w.text, confidence: `${w.confidence}/5` })), ...a.buttons.map((b) => ({ button: b.text, confidence: `${b.confidence}/5` }))], SETTINGS_NOTE) || '## Audience profile\n(empty)',
       `Evidence refs: ${Object.entries(topicCounts).map(([k, v]) => `topic:${k}=${v}`).join(', ') || 'none'}`, AUDIENCE(2),
-      `## Positions\n${loadPositions(ctx.store).map((p) => `- (${p.strength}/5) ${p.text}`).join('\n') || '(none)'}`, POSITIONS,
+      fz.block('Positions', ps.map((p) => ({ position: p.text, strength: `${p.strength}/5` })), SETTINGS_NOTE) || '## Positions\n(none)', POSITIONS,
       'Finish with studio_save_weekly({summary, audience: [...], positions: [...]}). The summary is 4-8 plain sentences for her: what worked, what didn\'t, what to try.'].filter(Boolean).join('\n\n') };
   });
 }

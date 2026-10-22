@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { testContext, at } from './helpers.js';
-import { proposalsTool, validateProposal } from '../server/lib/proposals.js';
+import { proposalsTool, decideProposal, validateProposal } from '../server/lib/proposals.js';
 import { weeklyBrief, saveWeekly } from '../server/lib/weekly.js';
 import { loadPlaybook, loadPositions, loadAudience, loadShapes, writePlaybook } from '../server/lib/config.js';
 
@@ -25,14 +25,14 @@ test('nothing changes until she accepts', () => {
   ] });
   assert.equal(r.added.length, 4);
   assert.deepEqual(loadPlaybook(ctx.store), ['Short beats clever']);
-  for (const id of r.added) assert.equal(proposalsTool(ctx, { action: 'accept', id }).ok, true);
+  for (const id of r.added) assert.equal(decideProposal(ctx, { id, decision: 'accept' }).ok, true);
   assert.deepEqual(loadPlaybook(ctx.store), ['Short and specific beats clever']);
   assert.equal(loadPositions(ctx.store)[0].strength, 4);
   assert.equal(loadAudience(ctx.store).buttons[0].text, 'hidden costs of cheap bikes');
   assert.ok(loadShapes(ctx.store).some((s) => s.id === 'the-quiet-brag'));
-  assert.equal(proposalsTool(ctx, { action: 'accept', id: r.added[0] }).ok, false, 'already decided');
+  assert.equal(decideProposal(ctx, { id: r.added[0], decision: 'accept' }).ok, false, 'already decided');
   const rej = proposalsTool(ctx, { action: 'propose', proposals: [{ kind: 'playbook', op: 'add', text: 'Try more questions' }] });
-  proposalsTool(ctx, { action: 'reject', id: rej.added[0] });
+  decideProposal(ctx, { id: rej.added[0], decision: 'reject' });
   assert.equal(loadPlaybook(ctx.store).length, 1);
 });
 

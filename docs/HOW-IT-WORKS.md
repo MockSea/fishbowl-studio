@@ -33,7 +33,7 @@ All writes are atomic (temp file + rename) under a folder lock, so a scheduled r
 The scheduled task asks Claude to "Run the Fishbowl Studio daily run". The `daily-run` skill then calls:
 
 1. `studio_status`: setup check, plus any release that is due.
-2. `studio_fetch`: every feed in `sources.json`. The feed parser is hand-written and tolerant (RSS 2.0, RSS 1.0, Atom), refuses DTDs and entities, strips HTML, keeps HTTPS links only, takes 12 items per feed and at most 3 MB per fetch. A dead feed is reported and the rest carry on.
+2. `studio_fetch`: every feed in `sources.json`. The feed parser is hand-written and tolerant (RSS 2.0, RSS 1.0, Atom), refuses DTDs and entities, strips HTML, keeps HTTPS links only, takes 12 items per feed and at most 3 MB per fetch (it parses the first 1 MB and 200 items, in one linear pass). Redirects are followed by hand, at most 5, and every hop must be a public HTTPS host name; hosts that resolve to private, loopback or link-local addresses are refused. Titles, summaries and authors are flattened to one line with control, format and Unicode tag characters removed. A dead feed is reported and the rest carry on.
    - **Dedupe**: exact URL (normalised: tracking parameters, `www.`, fragments and trailing slashes removed) and **story level**: titles are normalised (outlet suffix and punctuation dropped, light stemming) and compared by Jaccard similarity (≥ 0.5) or containment (≥ 0.8 for 4+ words) within 72 hours. The first outlet's item represents the story; the others are recorded as "also covered by" and feed the trending signal.
    - **Ageing**: items older than 30 days with no drafts are pruned. Only items from the last 48 hours are drafted.
 3. `studio_wander` / `studio_record_wander` (up to twice): slow curiosity reading over the reading list. The source is chosen by topic interest (7-day mean triage interest, default 4, plus up to 3 for curiosity keywords seen recently), neglect (every third trip takes the least recently visited source), and caps (12 visits a day, same host at most every 2 h, same source every 24 h). Instruction-shaped entries are dropped. Findings never become drafts directly; they feed evergreen posts.
@@ -96,6 +96,10 @@ Drafts land **held**. At each release hour (8, 12, 16, 20 by default) the held p
 
 Everything read from outside (news, pages, pasted posts) and your own notes when they're fed back to Claude arrive inside `<data-NONCE>` tags, with a fresh random nonce per brief, a guard sentence explaining that it is data and never instructions, control characters stripped, each field capped at 1200 characters, and any fence tags inside the content neutralised. The fencer is one shared, tested function (`server/lib/fence.js`). Model text stored as the brand's own view (proposals, wander findings) must pass an own-words check: no instruction-shaped text, no links or handles, and no ≥ 50% echo of the source.
 
+Your own settings are fenced too. The voice, playbook, positions and audience reach Claude inside the same tags, introduced as a description of the brand rather than instructions, so one bad write can't become a standing order in every brief. Saving `voice.md`, `playbook.md`, `positions.json` or `audience.json` through `studio_config` is refused if it contains instruction-shaped text ("ignore previous…", "from now on", "always write…"); describe the brand instead. `studio_config` reads and writes only the files listed above, and the store refuses any path outside the data folder.
+
+In the chat review list, story headlines never share a line with a `[draft · hash]` marker: they come last, fenced, keyed by list number.
+
 ## Tools
 
 | Tool | Purpose |
@@ -111,14 +115,15 @@ Everything read from outside (news, pages, pasted posts) and your own notes when
 | `studio_drafting_brief`, `studio_save_takes` | the drafting loop |
 | `studio_release` | rank and release the due batch |
 | `studio_weekly_brief`, `studio_save_weekly` | the weekly report |
-| `studio_proposals` | list, accept, reject or propose changes |
+| `studio_proposals` | list or propose changes (Claude) |
+| `studio_proposal_decide` | accept or reject a proposal; board only, hidden from Claude |
 | `studio_metrics` | enter post numbers or import a CSV |
 
 ## What changed from the original agent
 
 - No world simulation, personas, posting, scraping or memes.
 - Takes in a set each get their own shape (the original shared one shape per set).
-- The playbook, positions and audience change only by proposals she accepts.
+- The playbook, positions and audience change only by proposals she accepts on the board (Claude can propose, never accept), or when she edits them with Claude in setup.
 - Autopass became "our pick": the best-ranked take is highlighted, never approved.
 - "Post this" from a triage note was folded into "Draft this", which writes proper takes.
 - Added: story-level dedupe, a real named-person check, per-platform settings, manual metrics and CSV import.

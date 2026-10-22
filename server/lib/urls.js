@@ -10,9 +10,41 @@ export function safeHttpsUrl(raw) {
   if (u.username || u.password) return { ok: false, reason: 'must not contain a username or password' };
   if (u.port) return { ok: false, reason: 'must not specify a port' };
   const host = u.hostname.toLowerCase();
-  if (IP_RE.test(host) || !host.includes('.') || host.endsWith('.local') || host === 'localhost') return { ok: false, reason: 'must be a public host name, not an IP or local address' };
+  const bare = host.replace(/\.+$/, '');
+  if (IP_RE.test(bare) || !bare.includes('.') || LOCAL_TLD.test(bare)) return { ok: false, reason: 'must be a public host name, not an IP or local address' };
   u.hash = '';
   return { ok: true, url: u.toString(), host };
+}
+
+// Names that only ever mean "this machine" or "this network" (trailing dots already removed).
+const LOCAL_TLD = /(^|\.)(localhost|local|internal|intranet|lan|home\.arpa|localdomain)$/;
+
+// Refuse a host whose DNS answer includes a loopback, private, link-local, CGNAT, ULA,
+// multicast or otherwise non-public address. `lookup` is dns.promises.lookup or a test double.
+export async function checkAddress(host, lookup) {
+  let addrs;
+  try { addrs = await lookup(host, { all: true, verbatim: true }); } catch { throw new Error('host not found'); }
+  const list = (Array.isArray(addrs) ? addrs : [addrs]).map((a) => (typeof a === 'string' ? a : a.address));
+  if (!list.length) throw new Error('host not found');
+  const bad = list.find(privateAddress);
+  if (bad) throw new Error(`refused: ${host} points at a private or local address`);
+}
+
+export function privateAddress(ip) {
+  ip = String(ip).toLowerCase().replace(/^\[|\]$/g, '');
+  const mapped = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (mapped) ip = mapped[1];
+  const v4 = ip.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 192 && b === 0 && Number(v4[3]) === 0) ||
+      (a === 198 && (b === 18 || b === 19));
+  }
+  if (!ip.includes(':')) return true;
+  if (ip === '::' || ip === '::1') return true;
+  const head = parseInt(ip.split(':')[0] || '0', 16);
+  return (head & 0xfe00) === 0xfc00 || (head & 0xffc0) === 0xfe80 || (head & 0xff00) === 0xff00 || /^::ffff:/.test(ip);
 }
 
 const TRACKING = /^(utm_\w+|fbclid|gclid|mc_cid|mc_eid|ref|ref_src|cmpid|ncid|ocid)$/i;

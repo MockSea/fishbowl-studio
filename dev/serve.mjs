@@ -8,6 +8,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { seed, DEMO_HOME } from './seed.mjs';
+import { allowedPost } from './guard.mjs';
 
 const DEV = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 7611);
@@ -49,6 +50,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end(fs.readFileSync(path.join(DEV, 'host.html')));
     }
+    if (req.method === 'POST' && !allowedPost(req.headers, PORT)) { res.writeHead(403); return res.end('forbidden'); }
     if (req.method === 'POST' && req.url === '/rpc') {
       let body = '';
       for await (const c of req) body += c;

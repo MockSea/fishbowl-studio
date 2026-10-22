@@ -30,7 +30,7 @@ Say in one or two sentences what's about to happen: "I'll ask about 9 quick ques
 
 ## 2. Save everything
 
-Call `studio_config` with `action: "set"` for each file (JSON files take an object):
+Call `studio_config` with `action: "set"` for each file (JSON files take an object). Write voice, positions, audience and playbook as descriptions of the brand, not orders to Claude; text like "always write…" or "from now on…" is refused, so rephrase ("short, plain sentences") and save again:
 
 - `voice.md`: markdown with sections `## Who we are` (from 1-2), `## Voice` (from 4), `## Never` (things to avoid).
 - `voice-samples.json`: `{ "samples": [{ "text": "...", "platform": "linkedin" | "x" | null }] }` with the posts she pasted (skip if none).

@@ -38,7 +38,7 @@ const LIGHT = { '--color-background-primary': '#FFFFFF', '--color-background-sec
 const DARK = { '--color-background-primary': '#30302E', '--color-background-secondary': '#262624', '--color-text-primary': '#FAF9F5', '--color-text-secondary': '#C2C0B6', '--color-border-primary': 'rgba(222,220,209,.4)' };
 const $ = (id) => document.getElementById(id);
 const log = (t) => { const d = document.createElement('div'); d.className = 'msg'; d.textContent = t; $('log').prepend(d); };
-const rpc = async (method, params) => { const r = await fetch('/rpc', { method: 'POST', body: JSON.stringify({ method, params }) }); return r.json(); };
+const rpc = async (method, params) => { const r = await fetch('/rpc', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ method, params }) }); return r.json(); };
 let html = null;
 const frames = [];
 
@@ -102,7 +102,7 @@ $('theme').onchange = () => {
 };
 $('width').onchange = () => { $('frame').style.width = $('width').value + 'px'; };
 $('remount').onclick = () => mount();
-$('reseed').onclick = async () => { await fetch('/reseed', { method: 'POST' }); location.reload(); };
+$('reseed').onclick = async () => { await fetch('/reseed', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); location.reload(); };
 const qs = new URLSearchParams(location.search);
 if (qs.get('theme')) { $('theme').value = qs.get('theme'); document.body.classList.toggle('dark', qs.get('theme') === 'dark'); }
 if (qs.get('width')) $('width').value = qs.get('width');

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeHttpsUrl } from './urls.js';
+import { instructionPhrase } from './fence.js';
 
 export const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -99,9 +100,17 @@ export function validateConfig(file, value) {
 
 const isStr = (x, max = 2000) => typeof x === 'string' && x.trim().length > 0 && x.length <= max;
 
+// Voice, playbook, positions and audience reach every brief as her settings, so they must read as
+// a description of the brand, not as orders. Same check the proposals go through.
+function describes(file, text) {
+  const hit = instructionPhrase(text);
+  if (hit) throw new Error(`${file} was not saved: "${hit}" reads like an instruction to Claude. Describe the brand instead (e.g. "short, plain sentences" rather than "always write short sentences").`);
+  return text;
+}
+
 const validators = {
-  'voice.md': (t) => { if (!isStr(t, 20000)) throw new Error('voice.md must be non-empty text under 20k characters'); return t; },
-  'playbook.md': (t) => { if (typeof t !== 'string' || t.length > 8000) throw new Error('playbook.md must be text under 8k characters'); return t; },
+  'voice.md': (t) => { if (!isStr(t, 20000)) throw new Error('voice.md must be non-empty text under 20k characters'); return describes('voice.md', t); },
+  'playbook.md': (t) => { if (typeof t !== 'string' || t.length > 8000) throw new Error('playbook.md must be text under 8k characters'); return describes('playbook.md', t); },
   'voice-samples.json': (o) => {
     const samples = (o.samples || []).filter((s) => isStr(s.text, 4000)).slice(0, 20);
     return { samples: samples.map((s) => ({ text: s.text, platform: s.platform || null })) };
@@ -158,13 +167,14 @@ const validators = {
   'positions.json': (o) => {
     const positions = (o.positions || []).map((p) => {
       if (!isStr(p.text, 300)) throw new Error('Each position needs text under 300 characters');
+      describes('positions.json', p.text);
       return { text: p.text.trim(), strength: clampInt(p.strength, 1, 5, 3) };
     });
     if (positions.length > 30) throw new Error('At most 30 positions');
     return { positions };
   },
   'audience.json': (o) => {
-    const row = (r) => { if (!isStr(r.text, 300)) throw new Error('Each audience line needs text'); return { text: r.text.trim(), confidence: clampInt(r.confidence, 1, 5, 1) }; };
+    const row = (r) => { if (!isStr(r.text, 300)) throw new Error('Each audience line needs text'); describes('audience.json', r.text); return { text: r.text.trim(), confidence: clampInt(r.confidence, 1, 5, 1) }; };
     return { who: (o.who || []).map(row).slice(0, 12), buttons: (o.buttons || []).map(row).slice(0, 20) };
   },
 };
