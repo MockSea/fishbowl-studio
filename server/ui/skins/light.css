@@ -72,6 +72,7 @@
   --w-bold: 650;
 
   /* Space */
+  --s-half: 2px;
   --s-1: 4px;
   --s-2: 8px;
   --s-3: 12px;
@@ -99,6 +100,69 @@
   --rail-w: 264px;
   --content-max: 1180px;
   --tap: 44px;
+
+  /* Shared component geometry. Content may grow; these are floors, not fixed boxes. */
+  --control-h: var(--tap);
+  --control-compact-h: var(--s-8);
+  --control-touch-h: var(--tap);
+  --control-radius: var(--r-md);
+  --control-compact-radius: var(--r-sm);
+  --control-pill-radius: var(--r-pill);
+  --control-pad: var(--s-4);
+  --control-compact-pad: var(--s-3);
+  --panel-pad: var(--s-5);
+  --panel-pad-phone: var(--s-4);
+  --panel-radius: var(--r-lg);
+  --panel-gap: var(--s-5);
+  --inset-pad: var(--s-4);
+  --inset-radius: var(--r-md);
+  --row-pad: var(--s-3);
+  --row-min-h: calc(var(--control-h) + var(--row-pad) * 2);
+  --empty-min-h: 240px;
+  --empty-pad: var(--s-8);
+  --badge-h: var(--s-6);
+  --badge-pad: var(--s-2);
+  --badge-radius: var(--r-pill);
+  --textarea-h: 112px;
+  --textarea-short-h: 64px;
+  --textarea-long-h: 200px;
+  --mark-size: 26px;
+  --icon-size: 18px;
+  --icon-small: 14px;
+  --icon-tile: var(--s-10);
+  --icon-empty: 48px;
+  --avatar-size: var(--s-10);
+  --avatar-small: var(--s-8);
+  --step-size: var(--s-6);
+  --switch-w: var(--tap);
+  --switch-h: 26px;
+  --switch-thumb: var(--s-5);
+  --switch-inset: 3px;
+  --switch-travel: 18px;
+  --switch-touch-inset: calc((var(--control-touch-h) - var(--switch-h)) / 2);
+  --switch-thumb-top: calc((var(--control-touch-h) - var(--switch-thumb)) / 2);
+  --focus-width: 2px;
+  --focus-offset: 2px;
+  --ring-size: 22px;
+  --dot-size: 6px;
+  --meter-size: 10px;
+  --meter-radius: 3px;
+  --field-basis: 240px;
+  --row-basis: 200px;
+  --menu-min: 220px;
+  --menu-w: 260px;
+  --duo-min: 300px;
+  --metric-min: 110px;
+  --preset-min: 170px;
+  --rail-min: 260px;
+  --wizard-max: 760px;
+  --side-compact-w: 76px;
+  --drawer-w: 300px;
+  --top-h: 60px;
+  --top-compact-h: 56px;
+  --nav-compact-h: 56px;
+  --badge-offset-x: 14px;
+  --badge-offset-y: -12px;
 
   /* Motion */
   --ease: cubic-bezier(.2, .7, .2, 1);
