@@ -1,4 +1,4 @@
-// Daily rank-weight nudges, learned from her verdicts (and posted results when she enters them).
+// Daily rank-weight nudges, learned from their verdicts (and posted results when they enter them).
 // new_k = old_k + 0.5 * gap_k, clipped to +-0.02/day, +-0.1 vs a week ago, and [0.05, 0.6].
 import { SIGNALS, DEFAULT_WEIGHTS } from './rank.js';
 import { clamp, mean } from './text.js';

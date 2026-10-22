@@ -1,7 +1,7 @@
 // The setup wizard: the brand, a few questions, Claude's drafts to keep, edit or drop, and
-// "Post for me" per account; then one click to make it run on its own. Her answers are saved as
-// she goes (studio_wizard), so she can close the board and pick up where she left off. Claude's
-// drafts arrive as proposals and suggested sources; nothing changes until she keeps one.
+// "Post for me" per account; then one click to make it run on its own. Their answers are saved as
+// they go (studio_wizard), so they can close the board and pick up where they left off. Claude's
+// drafts arrive as proposals and suggested sources; nothing changes until they keep one.
 (function () {
   const S = window.Studio;
   const B = window.Board;
@@ -50,7 +50,7 @@
       h('div', { class: 'chips card-foot' }, next, state.wnew ? h('button', { class: 'btn ghost', onclick: () => { state.wnew = false; state.wstep = null; B.load({ view: 'drafts' }); } }, 'Cancel') : null));
   }
 
-  // Step 2: a few short questions (the last asks for example posts), each with an example, each skippable. Saved as she goes.
+  // Step 2: a few short questions (the last asks for example posts), each with an example, each skippable. Saved as they go.
   function questionsStep(d, w) {
     const boxes = {};
     const save = () => call('studio_wizard', { action: 'answer', answers: Object.fromEntries(Object.entries(boxes).map(([k, t]) => [k, t.value])) }, { reload: false, quiet: true });
@@ -90,7 +90,7 @@
         h('button', { class: 'btn', onclick: () => { polls = 0; B.load(); } }, 'Check now'), B.askClaudeButton('Ask Claude again', prompt, 'btn ghost')));
   }
 
-  // Step 3b: each draft, editable in place; Keep applies her version, Drop discards it.
+  // Step 3b: each draft, editable in place; Keep applies their version, Drop discards it.
   function reviewStep(d, w) {
     const fields = {};
     const decided = (x) => h('span', { class: `tag ${x.status === 'accepted' ? 'ok' : ''}` }, x.status === 'accepted' ? (x.edited ? 'Kept your version' : 'Kept') : x.status === 'rejected' ? 'Dropped' : 'Replaced');
@@ -124,7 +124,7 @@
       h('button', { class: 'btn primary', onclick: () => go('posting', 'posting') }, open.length ? `Next (${open.length} still open)` : 'Next'))];
   }
 
-  // Step 4: "Post for me", per account, off unless she turns it on.
+  // Step 4: "Post for me", per account, off unless they turn it on.
   function postingStep(d, w) {
     const accts = d.accounts.filter((a) => a.capabilities.post === true);
     return card({ icon: 'at', title: 'Should Claude post for you?', sub: 'Off unless you turn it on, one account at a time. When it’s on, a draft you approve on the board is posted at the next release time through your own signed-in browser. When it’s off, you copy and post as usual.' },

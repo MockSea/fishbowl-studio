@@ -31,7 +31,7 @@ const listOf = (list) => {
   return list || 'feeds';
 };
 
-// A display name for a source: hers if given, else the feed's own title, else the host. Feed
+// A display name for a source: theirs if given, else the feed's own title, else the host. Feed
 // titles are outside text, so they are flattened, capped, and dropped if instruction-shaped.
 export function sourceName(given, feedTitle, url) {
   for (const n of [given, feedTitle]) {
@@ -54,7 +54,7 @@ export function feedLinkIn(html, base) {
   return null;
 }
 
-// Fetch a URL she pasted as a source. A feed is used as is; a web page is searched for its feed.
+// Fetch a URL they pasted as a source. A feed is used as is; a web page is searched for its feed.
 async function probeFeed(ctx, url) {
   const body = await fetchText(url, { fetchImpl: ctx.fetchImpl });
   try { return { url, parsed: parseFeed(body, { limit: 3 }) }; }
@@ -140,23 +140,23 @@ function targetKnown(src, t) {
   return [...src.feeds, ...src.reading].some((f) => hostOf(f.url) === hostOf(t.target.url) && normaliseUrl(f.url).replace(/\/+$/, '') === normaliseUrl(t.target.url).replace(/\/+$/, ''));
 }
 
-// Claude's way to add a source: a suggestion she adds with one tap on the board. Nothing is
-// fetched until she does, so an address from a feed item or a search result can't become a
+// Claude's way to add a source: a suggestion they add with one tap on the board. Nothing is
+// fetched until they do, so an address from a feed item or a search result can't become a
 // fetch target by itself.
 export function suggestTarget(ctx, args, origin = 'chat') {
   const kind = args.kind || 'site';
   const t = normaliseTarget({ ...args, kind });
   if (!t.ok) return { ok: false, message: `Can't suggest that: ${t.reason}.` };
-  if (targetKnown(loadSources(ctx.store), t)) return { ok: false, message: 'That one is already on her list.' };
+  if (targetKnown(loadSources(ctx.store), t)) return { ok: false, message: 'That one is already on their list.' };
   return ctx.tx((db) => {
     const res = addProposals(ctx, db, [{ kind: 'source', op: 'add', target: { ...args, kind }, topic: args.topic, name: args.name, reason: args.reason }], origin);
     if (res.rejected.length) return { ok: false, message: res.rejected[0].reason };
-    return { ok: true, suggested: true, proposal_ids: res.added, message: res.added.length ? `Suggested: ${t.label}. She adds it with one tap on the board's Sources page; nothing is read until she does.` : `${t.label} is already waiting for her on the Sources page.` };
+    return { ok: true, suggested: true, proposal_ids: res.added, message: res.added.length ? `Suggested: ${t.label}. They add it with one tap on the board's Sources page; nothing is read until they do.` : `${t.label} is already waiting for them on the Sources page.` };
   });
 }
 
-// Her tap on a source proposal (board only). Adding may test-fetch; if that fails the proposal
-// stays open with the reason, so she can reject it or try again.
+// Their tap on a source proposal (board only). Adding may test-fetch; if that fails the proposal
+// stays open with the reason, so they can reject it or try again.
 export async function decideSource(ctx, { id, decision }) {
   const p = ctx.tx((db) => db.proposals.find((x) => x.id === Number(id)));
   if (!p || p.kind !== 'source') throw new Error(`No source proposal ${id}.`);
@@ -304,7 +304,7 @@ export async function draftLink(ctx, { url }) {
       const host = hostOf(safe.url);
       mergeItems(db.items, [{ source: `link:${host}`, source_name: host, topic_hint: 'other', from_link: true, title: page.title, url: safe.url, body: [page.summary, page.body].filter(Boolean).join(' — ').slice(0, 3000), published: null, author: null }], { now, nextId: () => ctx.id('item') });
       item = db.items.find((i) => normaliseUrl(i.url) === key);
-      // She chose it, so it skips triage; the job below drafts it.
+      // They chose it, so it skips triage; the job below drafts it.
       Object.assign(item, { triaged_at: new Date(now).toISOString(), note: null, interest: null, topic: 'other' });
       delete item.duplicate_of;
     }

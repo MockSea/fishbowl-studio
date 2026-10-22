@@ -1,7 +1,7 @@
 // How often the studio reads the news. The trigger is a Cowork scheduled task. A plugin can't
-// create one itself, but Claude can, with Cowork's create_scheduled_task tool and her approval:
+// create one itself, but Claude can, with Cowork's create_scheduled_task tool and their approval:
 // the board's one click asks it to, with the cron expression worked out here. The preset decides
-// two things: the exact schedule to give her (and Claude), and when studio_fetch actually fetches. A run that comes sooner than the preset's gap (or on a
+// two things: the exact schedule to give them (and Claude), and when studio_fetch actually fetches. A run that comes sooner than the preset's gap (or on a
 // weekend, for weekdays) skips the fetch and still triages, drafts and releases what it has.
 import { localHM } from './text.js';
 
@@ -22,7 +22,7 @@ export const POST_PROMPT = 'Run the Fishbowl Studio posting.';
 
 const hm = (h) => `${String(h).padStart(2, '0')}:00`;
 
-// The task(s) to set in Cowork for a preset, with times worked out from her release hours:
+// The task(s) to set in Cowork for a preset, with times worked out from their release hours:
 // the morning run an hour before the first batch, the second one an hour before the batch
 // nearest 13:00.
 export function scheduleTasks(preset, releaseHours = [8, 12, 16, 20]) {
@@ -49,7 +49,7 @@ export function postingTask(releaseHours = [8, 12, 16, 20]) {
 }
 
 // The words the board's one click sends to Claude: create (or update) the tasks with Cowork's
-// scheduled-task tool, which asks her to approve each one.
+// scheduled-task tool, which asks them to approve each one.
 export function schedulePrompt(tasks, folder) {
   return [
     'Set up the Fishbowl Studio schedule in Cowork. First call list_scheduled_tasks; if a task with the same name exists, update it with update_scheduled_task instead of making another. Then, for each task below, call create_scheduled_task with this name, the cron expression and the prompt, in the folder ' + folder + '. Each one needs my approval; tell me in one line what you made.',

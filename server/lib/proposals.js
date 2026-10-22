@@ -1,6 +1,6 @@
 // Proposals: the model only suggests. Playbook bullets, positions, audience lines, learned
 // shapes, overused phrases, the brand voice, topics and off-limits lines, and new sources land
-// here as open proposals; she accepts (as is, or after editing the text), or rejects each one on
+// here as open proposals; they accept (as is, or after editing the text), or reject each one on
 // the board (Coach, Playbook, Sources and the setup wizard). A source proposal is the only way an
 // address Claude found (or was told about) becomes something the studio reads.
 import { loadPlaybook, writePlaybook, loadPositions, loadAudience, loadShapes, loadSettings, loadBeat, parseJson, validateConfig, SLUG_RE } from './config.js';
@@ -17,10 +17,10 @@ const KINDS = {
   source: ['add'],
   // The whole voice.md, drafted by the setup wizard (set replaces it).
   voice: ['set'],
-  // add: a topic on her beat; avoid: a line for the off-limits list.
+  // add: a topic on their beat; avoid: a line for the off-limits list.
   topic: ['add', 'avoid'],
 };
-// Kinds whose text she can change before accepting.
+// Kinds whose text they can change before accepting.
 export const EDITABLE = new Set(['playbook', 'position', 'audience', 'phrase', 'voice', 'topic']);
 export const VOICE_CAP = 2400;
 
@@ -35,7 +35,7 @@ export function validateProposal(p) {
   if (!KINDS[p.kind]) throw new Error(`Unknown proposal kind "${p.kind}". Kinds: ${Object.keys(KINDS).join(', ')}`);
   if (!KINDS[p.kind].includes(p.op)) throw new Error(`A ${p.kind} proposal's op must be one of ${KINDS[p.kind].join(', ')}`);
   if (INSTRUCTION_RE.test(String(p.reason || ''))) throw new Error('The reason reads like an instruction.');
-  // A source: the target is parsed into canonical form; the text she sees is built here.
+  // A source: the target is parsed into canonical form; the text they see is built here.
   if (p.kind === 'source') {
     const t = normaliseTarget(p.target || {});
     if (!t.ok) throw new Error(`Source rejected: ${t.reason}.`);
@@ -168,23 +168,23 @@ function applyPhrase(store, p) {
 // Source proposals are applied by sources.js (adding one may test-fetch it first).
 const APPLY = { playbook: applyPlaybook, position: applyPosition, audience: applyAudience, shape: applyShape, phrase: applyPhrase, voice: applyVoice, topic: applyTopic };
 
-// Model-callable: list and propose. Accepting or rejecting is hers alone (decideProposal,
+// Model-callable: list and propose. Accepting or rejecting is the user's alone (decideProposal,
 // reachable only from the board), so the model can never apply its own proposal.
 export function proposalsTool(ctx, args) {
-  if (args.action === 'accept' || args.action === 'reject') throw new Error('Only she can accept or reject proposals, with the buttons on the board\'s Playbook view. Tell her it is waiting there.');
+  if (args.action === 'accept' || args.action === 'reject') throw new Error('Only the user can accept or reject proposals, with the buttons on the board\'s Playbook view. Tell them it is waiting there.');
   return ctx.tx((db) => {
     if (args.action === 'propose') {
       // Origin is never taken from the caller: only server paths (edits, weekly, discovery) set
       // another, so the model can't dress its own proposal up as one the board trusts more.
       const res = addProposals(ctx, db, args.proposals, 'chat');
-      return { ...res, text: `Added ${res.added.length} proposal(s) for her to review on the board${res.rejected.length ? `; rejected ${res.rejected.length}: ${res.rejected.map((r) => r.reason).join(' ')}` : ''}.` };
+      return { ...res, text: `Added ${res.added.length} proposal(s) for them to review on the board${res.rejected.length ? `; rejected ${res.rejected.length}: ${res.rejected.map((r) => r.reason).join(' ')}` : ''}.` };
     }
     const open = db.proposals.filter((p) => p.status === 'open');
     return { proposals: open, text: open.length ? open.map((p) => `#${p.id} ${p.kind} ${p.op}: ${p.text || p.old}${p.reason ? ` (${p.reason})` : ''}`).join('\n') : 'No open proposals.' };
   });
 }
 
-// Her tap. With `text`, she edited the suggestion first: her version is checked like any proposal
+// Their tap. With `text`, they edited the suggestion first: their version is checked like any proposal
 // (it reaches every brief) and applied instead; the suggestion is kept beside it.
 export function decideProposal(ctx, { id, decision, text }) {
   if (decision !== 'accept' && decision !== 'reject') throw new Error('decision must be accept or reject');

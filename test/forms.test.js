@@ -34,7 +34,7 @@ test('opener cap: above 5% of 50 means 3 or more', () => {
   assert.deepEqual(overuse(h(3)).openers, [{ opener: 'we tested this', k: 3 }]);
 });
 
-test('crutch families, including her own overused phrases', () => {
+test('crutch families, including their own overused phrases', () => {
   const fams = compileCrutches({ overused_phrases: ['at the end of the day'], variety: { phrase_cap: 0.04 } });
   assert.deepEqual(crutchesIn('This is a game-changer, at the end of the day', fams), ['hype', 'phrases']);
   const h = [...Array(4)].map(() => ({ text: 'a real game-changer' }));

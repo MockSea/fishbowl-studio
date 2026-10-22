@@ -280,7 +280,7 @@ test('Skip asks why with one optional tap; the reason is stored and shown on the
   assert.ok(!b.view().find((e) => e.attrs['aria-label'] === 'Why did you skip it?'));
 });
 
-test('Coach: the weekly report, what is waiting with its why, and her tap applies it', async () => {
+test('Coach: the weekly report, what is waiting with its why, and their tap applies it', async () => {
   const b = await boot();
   await b.nav('coach');
   const v = b.view().textContent;
@@ -298,10 +298,10 @@ test('Coach: the weekly report, what is waiting with its why, and her tap applie
   assert.match(b.ctx.store.readFile('playbook.md'), /- Open with a plain statement, not a question/);
   const pause = b.view().findAll((e) => e.className === 'row-item').find((r) => /Example Transport Policy Notes/.test(r.textContent));
   await button(pause, 'Pause it').click(); await settle();
-  assert.equal(JSON.parse(b.ctx.store.readFile('sources.json')).feeds.find((f) => f.name === 'Example Transport Policy Notes').paused, true, 'paused by her tap');
+  assert.equal(JSON.parse(b.ctx.store.readFile('sources.json')).feeds.find((f) => f.name === 'Example Transport Policy Notes').paused, true, 'paused by their tap');
 });
 
-test('Sources: every kind, records, suggestions she adds or dismisses, and the login and browser states', async () => {
+test('Sources: every kind, records, suggestions they add or dismiss, and the login and browser states', async () => {
   const b = await boot({ fetchImpl: async () => ({ ok: false, status: 404, headers: new Map() }) });
   await b.nav('sources');
   let v = b.view().textContent;
@@ -316,7 +316,7 @@ test('Sources: every kind, records, suggestions she adds or dismisses, and the l
   assert.equal(b.document.getElementById('badge-sources').textContent, '2');
   const sug = b.view().findAll((e) => e.className === 'row-item').find((r) => /example_cargo/.test(r.textContent));
   await button(sug, 'Add').click(); await settle();
-  assert.ok(JSON.parse(b.ctx.store.readFile('sources.json')).watch.some((w) => w.handle === '@example_cargo'), 'added on her tap');
+  assert.ok(JSON.parse(b.ctx.store.readFile('sources.json')).watch.some((w) => w.handle === '@example_cargo'), 'added on their tap');
   const dead = b.view().findAll((e) => e.className === 'row-item').find((r) => /cycling-policy/.test(r.textContent));
   await button(dead, 'Add').click(); await settle();
   assert.match(b.view().textContent, /Last try: Couldn't add it: HTTP 404/);
@@ -343,7 +343,7 @@ test('Sources: every kind, records, suggestions she adds or dismisses, and the l
   assert.match(v, /Example Stone Mill.*Read by web search/);
 });
 
-test('Settings: account slots ask Claude to walk her through signing in and record only that', async () => {
+test('Settings: account slots ask Claude to walk them through signing in and record only that', async () => {
   const b = await boot();
   await b.nav('settings');
   let v = b.view().textContent;
@@ -370,7 +370,7 @@ test('Topics and Reads explain what moved stories up or down', async () => {
   assert.match(b.view().textContent, /Search result/);
 });
 
-test('Wizard on the board: brand, questions, Claude drafts in the chat, she keeps, edits and drops, posting, schedule', async () => {
+test('Wizard on the board: brand, questions, Claude drafts in the chat, they keep, edit and drop, posting, schedule', async () => {
   const feed = '<rss><channel><title>Example Paper Trade News</title><item><title>A</title><link>https://paper.example.com/a</link></item></channel></rss>';
   const b = await boot({ fetchImpl: async (u) => (u === 'https://paper.example.com/feed' ? { ok: true, status: 200, headers: new Map(), text: async () => feed } : { ok: false, status: 404, headers: new Map() }) });
   await button(b.document.getElementById('persona'), 'NB').click(); await settle();
@@ -384,7 +384,7 @@ test('Wizard on the board: brand, questions, Claude drafts in the chat, she keep
   assert.match(v, /Anything it should never post about\?/);
   input(b.view(), 'Who are your posts for?').value = 'Readers in the neighbourhood and the book club';
   await input(b.view(), 'Who are your posts for?').fire('change'); await settle();
-  assert.equal(b.ctx.store.read('wizard', {}).answers.audience, 'Readers in the neighbourhood and the book club', 'saved as she goes');
+  assert.equal(b.ctx.store.read('wizard', {}).answers.audience, 'Readers in the neighbourhood and the book club', 'saved as they go');
   input(b.view(), 'What should it talk about?').value = 'new books, author events, the paper trade';
   await button(b.view(), 'Draft it for me').click(); await settle();
   const msg = b.sent.filter((m) => m.method === 'ui/message').pop();
@@ -461,7 +461,7 @@ test('Posting on the board: missed and failed posts are never silent; approve to
   assert.match(v, /Didn’t postYou weren't signed in/);
   assert.match(v, /Claude posts this to X at \d\d:00/);
   assert.match(v, /Posted to X by Claude/);
-  // Her choice for each: another slot, or copy it herself.
+  // Their choice for each: another slot, or copy it themselves.
   const missed = b.view().findAll((e) => e.classList.contains('post-problem')).find((x) => /Missed/.test(x.textContent));
   await button(missed, 'Try the next slot').click(); await settle();
   const failed = b.view().findAll((e) => e.classList.contains('post-problem')).find((x) => /Didn’t post/.test(x.textContent));

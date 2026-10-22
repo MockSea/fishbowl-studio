@@ -17,7 +17,7 @@ const iso = (hAgo = 0) => new Date(NOW - hAgo * 3600e3).toISOString();
 const callHash = (ctx) => fingerprint(ctx.store.read('drafts', [])[0]);
 const draft = (o) => ({ id: 1, set_id: null, item_id: null, kind: 'item', platform: 'x', status: 'pending', text: 'A post.', created_at: iso(5), released_at: iso(4), lint: [], tags: { topic: 'other', shape_ids: ['plain-take'] }, ...o });
 
-test('edit diffing: what she changed, in pattern keys and removed phrases', () => {
+test('edit diffing: what they changed, in pattern keys and removed phrases', () => {
   const d = editDiff('Ever wondered why the bridge feels safer? Four kilometres of kerb. That is why!', 'Four kilometres of kerb. That is why the bridge feels safer.');
   assert.ok(d.keys.includes('cut_opening_question'));
   assert.ok(d.keys.includes('cut_exclamation'));
@@ -30,10 +30,10 @@ test('edit diffing: what she changed, in pattern keys and removed phrases', () =
   assert.ok(editDiff('First line here. Middle line here. And that is the whole story, really.', 'First line here. Middle line here.').keys.includes('cut_closing_line'));
   const gone = removedPhrases('Honestly a total game-changer for riders', 'Good for riders');
   assert.ok(gone.includes('game-changer') && gone.includes('honestly') && gone.includes('total game-changer'));
-  assert.ok(!gone.includes('riders') && !gone.includes('for riders'), 'what she kept is not removed');
+  assert.ok(!gone.includes('riders') && !gone.includes('for riders'), 'what they kept is not removed');
 });
 
-test('an edit is stored before and after; undoing it removes the record; the brief shows her version', () => {
+test('an edit is stored before and after; undoing it removes the record; the brief shows their version', () => {
   const { ctx } = testContext({ now: NOW });
   const before = 'Ever wondered why lanes matter? Kerbs keep people riding.';
   ctx.tx((db) => { db.drafts = [draft({ text: before, item_id: null })]; });
@@ -51,7 +51,7 @@ test('an edit is stored before and after; undoing it removes the record; the bri
   act(ctx, { action: 'edit', id: 1, hash: callHash(ctx), text: 'Kerbs keep people riding.', and_pass: true });
   ctx.store.writeFile('settings.json', JSON.stringify({ evergreen_per_day: 1, platforms: { x: { enabled: true }, linkedin: { enabled: false } } }));
   const b = draftingBrief(ctx, { evergreen: true, count: 1 });
-  assert.match(b.text, /Drafts she edited before approving[^\n]*\n[^\n]*\n<data-[0-9a-f]+>\ndraft: Ever wondered[^\n]*\nher_version: Kerbs keep people riding\./);
+  assert.match(b.text, /Drafts they edited before approving[^\n]*\n[^\n]*\n<data-[0-9a-f]+>\ndraft: Ever wondered[^\n]*\nuser_version: Kerbs keep people riding\./);
 });
 
 test('the weekly pass turns edit patterns into proposals, once, and never writes the playbook itself', () => {
@@ -70,7 +70,7 @@ test('the weekly pass turns edit patterns into proposals, once, and never writes
   const before = ctx.store.readFile('playbook.md');
   const w = weeklyBrief(ctx, { part: 'numbers' });
   assert.match(w.text, /You cut the opening question in 4 of your last 5 edits/);
-  assert.match(w.text, /Already proposed from her edits/);
+  assert.match(w.text, /Already proposed from their edits/);
   assert.equal(ctx.store.readFile('playbook.md'), before, 'proposals only');
   const props = ctx.store.read('proposals', []);
   const p = props.find((x) => x.key === 'edits:cut_opening_question');
@@ -80,12 +80,12 @@ test('the weekly pass turns edit patterns into proposals, once, and never writes
   assert.equal(ctx.tx((db) => editProposals(ctx, db, NOW)).added.length, 0, 'not proposed twice');
   decideProposal(ctx, { id: p.id, decision: 'reject' });
   assert.equal(ctx.tx((db) => editProposals(ctx, db, NOW)).added.length, 0, 'a no is respected');
-  // Accepting one applies it, on her tap.
+  // Accepting one applies it, on their tap.
   const other = ctx.store.read('proposals', []).find((x) => x.status === 'open');
   if (other) { decideProposal(ctx, { id: other.id, decision: 'accept' }); assert.ok(loadPlaybook(ctx.store).includes(other.text)); }
 });
 
-test('overused phrases are proposed only when she cuts them nearly every time', () => {
+test('overused phrases are proposed only when they cut them nearly every time', () => {
   const rows = [
     ['A real game-changer for the school run.', 'Good for the school run.'],
     ['Cargo bikes are a game-changer downtown.', 'Cargo bikes work downtown.'],
@@ -119,9 +119,9 @@ test('skip reasons: optional, one per skip or set, validated, cleared on restore
   assert.equal(ds[0].kill_note, 'not ours');
   const rows = killReasons(ds, byId(ctx.store.read('items', [])), NOW);
   assert.equal(rows.length, 3, 'a set counts once');
-  assert.equal(reasonsLine(rows), 'Why she skipped posts lately (last 30 days): wrong topic 2 (policy 2); too salesy 1 (policy 1).');
+  assert.equal(reasonsLine(rows), 'Why they skipped posts lately (last 30 days): wrong topic 2 (policy 2); too salesy 1 (policy 1).');
   ctx.tx((db) => { db.items.push({ id: 2, title: 'New one', url: 'https://e.example.com/2', source: 'rss:Notes', source_name: 'Notes', fetched_at: iso(1) }); });
-  assert.match(triageQueue(ctx).text, /Why she skipped posts lately \(last 30 days\): wrong topic 2/);
+  assert.match(triageQueue(ctx).text, /Why they skipped posts lately \(last 30 days\): wrong topic 2/);
   act(ctx, { action: 'restore', id: 1, reason: 'grew on me' });
   assert.equal(ctx.store.read('drafts', [])[0].kill_reason, undefined, 'restoring clears the reason');
   const v = await callTool(ctx, 'studio_view', { view: 'drafts', tab: 'killed' });

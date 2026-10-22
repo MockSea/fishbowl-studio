@@ -1,5 +1,5 @@
-// Her verdicts and actions on the board (or in chat). Pass and edit carry a fingerprint of the
-// text she saw; if a rewrite landed while the board was open, the write is refused.
+// Their verdicts and actions on the board (or in chat). Pass and edit carry a fingerprint of the
+// text they saw; if a rewrite landed while the board was open, the write is refused.
 import { sha12, cleanPost, clip, oneLine } from './text.js';
 import { safeHttpsUrl } from './urls.js';
 import { editDiff, KILL_REASONS, KILL_REASON_KEYS } from './learn.js';
@@ -55,7 +55,7 @@ function setReason(ds, reason, note) {
   }
 }
 
-// Her version against the draft's, kept with what changed, for the weekly pass. One record per
+// Their version against the draft's, kept with what changed, for the weekly pass. One record per
 // draft (the latest edit wins); undoing the edit removes it.
 function recordEdit(db, d, ctx, iso) {
   const i = db.edits.findIndex((e) => e.draft_id === d.id);
@@ -68,7 +68,7 @@ function recordEdit(db, d, ctx, iso) {
 // Approving here (chat or board) never schedules a post: only the board's Approve for an account
 // with "Post for me" on does (studio_post_schedule). Say so when it matters.
 const noPostNote = (db, d) => (postingOn(db.accounts.find((a) => a.type === d.platform))
-  ? ' It won\'t be posted for you: only Approve on the board counts as her OK to post. She can tap "Post it for me" on the board, or copy it.' : '');
+  ? ' It won\'t be posted for you: only Approve on the board counts as their OK to post. They can tap "Post it for me" on the board, or copy it.' : '');
 
 function setDrafts(db, setId) {
   const ds = db.drafts.filter((x) => x.set_id === Number(setId));

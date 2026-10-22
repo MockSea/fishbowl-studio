@@ -1,5 +1,5 @@
 // All state lives in one folder (STUDIO_HOME, default ~/Documents/Fishbowl Studio).
-// Config files sit at its root where she can see them; bookkeeping lives in state/.
+// Config files sit at its root where they can see them; bookkeeping lives in state/.
 // Every write is atomic (temp file + rename). A mkdir lock serialises writers so the
 // scheduled run and an open board can't clobber each other.
 import fs from 'node:fs';
@@ -59,7 +59,7 @@ export function openStore(home = resolveHome()) {
         return out === undefined ? v : out;
       });
     },
-    // Root-level files she can open and edit herself.
+    // Root-level files they can open and edit themselves.
     readFile(rel, fallback = null) {
       try { return fs.readFileSync(inside(rel), 'utf8'); }
       catch (e) { if (e.code === 'ENOENT') return fallback; throw e; }

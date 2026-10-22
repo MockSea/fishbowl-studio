@@ -112,7 +112,7 @@ export function readsView(ctx, db, { offset = 0, limit = 40 } = {}) {
   return { view: 'reads', reads, wander, offset };
 }
 
-// Open proposals she decides on the Coach and Playbook pages (source suggestions live on Sources).
+// Open proposals they decide on the Coach and Playbook pages (source suggestions live on Sources).
 const openProposals = (db) => db.proposals.filter((p) => p.status === 'open' && p.kind !== 'source');
 
 export function playbookView(ctx, db) {
@@ -185,7 +185,7 @@ export function sourcesView(ctx, db) {
     const drafted = db.drafts.some((d) => d.item_id === j.item_id);
     return { job_id: j.id, title: itemLine(i?.title), host: hostOf(i?.url), url: itemLine(i?.url, 2000), status: drafted ? 'drafted' : j.status, at: j.created_at };
   });
-  // Suggestions: sources Claude suggested or discovery found. Nothing here is read until she adds it.
+  // Suggestions: sources Claude suggested or discovery found. Nothing here is read until they add it.
   const suggestions = db.proposals.filter((p) => p.kind === 'source' && p.status === 'open').map((p) => ({ id: p.id, label: p.text, address: targetAddress(p.target), kind: p.target.kind, origin: p.source, why: p.reason || null, error: p.error || null, at: p.created_at }));
   return {
     view: 'sources', feeds: src.feeds.map((f) => row(f, 'feeds')), reading: src.reading.map((f) => row(f, 'reading')),
@@ -197,7 +197,7 @@ export function sourcesView(ctx, db) {
   };
 }
 
-// Ranker features in her words. Internal ones (form, caps) are left out.
+// Ranker features in their words. Internal ones (form, caps) are left out.
 function featureLabel(f, shapeNames) {
   const [k, ...rest] = f.split(':');
   const v = rest.join(':');
@@ -213,7 +213,7 @@ function featureLabel(f, shapeNames) {
 
 const SIGNAL_LABEL = { hot: 'how fresh a story is', trending: 'what lots of outlets are covering', interest: 'how interesting the story is', entertaining: 'what you tend to approve' };
 
-// What it is learning from her verdicts, and why: approvals vs skips per feature over 21 days
+// What it is learning from their verdicts, and why: approvals vs skips per feature over 21 days
 // (the same verdict labels and shrinkage the ranker's "entertaining" signal uses), plus how the
 // rank weights moved in the last week.
 export function learnedInterests(ctx, db) {
@@ -272,13 +272,13 @@ export function boostRows(ctx, db) {
   return rows.sort((a, b2) => Math.abs(b2.points) - Math.abs(a.points)).slice(0, 8).map((r) => ({ ...r, direction: r.points > 0 ? 'up' : 'down' }));
 }
 
-// What her edits and skips say, in her words.
+// What their edits and skips say, in their words.
 export function editSummary(ctx, db) {
   const ed = editPatterns(db.edits, ctx.now());
   return { n: ed.n, patterns: ed.patterns.map((p) => ({ key: p.key, why: p.why, line: p.line })), phrases: ed.phrases.map((p) => ({ phrase: p.phrase, why: p.why })) };
 }
 
-// The Coach page: the latest weekly report, what's waiting for her, and the signals behind it.
+// The Coach page: the latest weekly report, what's waiting for them, and the signals behind it.
 export function coachView(ctx, db) {
   const now = ctx.now();
   const reports = db.coach.slice().sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
@@ -334,7 +334,7 @@ export function personasSummary(ctx) {
 }
 
 // The first-run card, shown until there is a draft: the setup wizard first, then the two things
-// that make drafts arrive (sources she has added, and a first run).
+// that make drafts arrive (sources they have added, and a first run).
 export function firstRun(ctx, db) {
   const setup = !!ctx.settings().setup_complete || db.wizard?.step === 'done';
   const steps = [

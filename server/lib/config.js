@@ -117,7 +117,7 @@ export function validateConfig(file, value) {
 
 const isStr = (x, max = 2000) => typeof x === 'string' && x.trim().length > 0 && x.length <= max;
 
-// Voice, playbook, positions and audience reach every brief as her settings, so they must read as
+// Voice, playbook, positions and audience reach every brief as their settings, so they must read as
 // a description of the brand, not as orders. Same check the proposals go through.
 function describes(file, text) {
   const hit = instructionPhrase(text);

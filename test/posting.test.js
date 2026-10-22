@@ -37,7 +37,7 @@ const draft = (ctx, id) => ctx.store.read('drafts', []).find((d) => d.id === id)
 const posts = (ctx) => ctx.store.read('posts', []);
 const hashOf = (ctx, id) => fingerprint(draft(ctx, id));
 
-test('"Post for me" is off by default, and turning it on needs her second tap after the warning', async () => {
+test('"Post for me" is off by default, and turning it on needs their second tap after the warning', async () => {
   const { ctx } = setup();
   setAccount(ctx, { action: 'connect', type: 'x' });
   const x = () => ctx.tx((db) => accountsView(ctx, db)).find((a) => a.id === 'x');
@@ -81,7 +81,7 @@ test('the model has no tool path that turns posting on or approves a draft for p
   }
   assert.equal(ctx.store.read('accounts', []).find((a) => a.type === 'x').posting, undefined, 'still off');
   assert.equal(posts(ctx).length, 0, 'nothing scheduled');
-  // With posting on (her tap), approving in chat still schedules nothing, and says so.
+  // With posting on (their tap), approving in chat still schedules nothing, and says so.
   await call(ctx, 'studio_account_posting', { type: 'x', on: true, confirmed: true });
   const pass = await call(ctx, 'studio_act', { action: 'pass', id: 2, hash: hashOf(ctx, 2) });
   assert.match(pass.text, /won't be posted for you: only Approve on the board/);
@@ -100,7 +100,7 @@ test('approving on the board schedules the exact text for the next release hour;
   const p = posts(ctx)[0];
   assert.equal(p.approved_hash, textHash('Four kilometres of kerb. That is what a lane looks like.'));
   assert.equal(new Date(p.slot).getHours(), 12);
-  // Save & approve: her edited text is what is hashed. One post per slot, so this one goes at 16:00.
+  // Save & approve: their edited text is what is hashed. One post per slot, so this one goes at 16:00.
   await call(ctx, 'studio_post_schedule', { id: 2, hash: hashOf(ctx, 2), text: 'Most squeaks are a clean and a drop of oil. Most.' });
   assert.equal(posts(ctx)[1].approved_hash, textHash('Most squeaks are a clean and a drop of oil. Most.'));
   assert.equal(new Date(posts(ctx)[1].slot).getHours(), 16);
@@ -110,7 +110,7 @@ test('approving on the board schedules the exact text for the next release hour;
   const q = parse((await call(ctx, 'studio_posting', { action: 'queue' })).text);
   assert.equal(q.posts.length, 1);
   assert.equal(q.posts[0].text, 'Four kilometres of kerb. That is what a lane looks like.');
-  assert.equal(q.posts[0].compose, 'https://x.com/intent/tweet?text=Four%20kilometres%20of%20kerb.%20That%20is%20what%20a%20lane%20looks%20like.', 'opens the composer with her text in it, not her feed');
+  assert.equal(q.posts[0].compose, 'https://x.com/intent/tweet?text=Four%20kilometres%20of%20kerb.%20That%20is%20what%20a%20lane%20looks%20like.', 'opens the composer with their text in it, not their feed');
   assert.equal(q.posts[0].prefilled, true);
   assert.equal(parse((await call(ctx, 'studio_posting', { action: 'queue' })).text).posts.length, 0, 'claimed: a second run cannot post it twice');
   // The skill is about to post something else: blocked.
@@ -126,17 +126,17 @@ test('approving on the board schedules the exact text for the next release hour;
   assert.equal(q2.posts.length, 0);
   assert.equal(posts(ctx)[1].status, 'blocked');
   assert.match(posts(ctx)[1].reason, /text changed after you approved it/);
-  assert.equal(draft(ctx, 2).status, 'edited', 'still approved, hers to copy');
+  assert.equal(draft(ctx, 2).status, 'edited', 'still approved, theirs to copy');
 });
 
-test('"Post it for me" on an approved draft refuses if the text changed since her board showed it', async () => {
+test('"Post it for me" on an approved draft refuses if the text changed since their board showed it', async () => {
   const { ctx } = setup();
   setAccount(ctx, { action: 'connect', type: 'x' });
   await call(ctx, 'studio_act', { action: 'pass', id: 1, hash: hashOf(ctx, 1) });
   await call(ctx, 'studio_account_posting', { type: 'x', on: true, confirmed: true });
   const seen = hashOf(ctx, 1);
-  // A model-side edit lands while her board still shows the old text.
-  ctx.tx((db) => { db.drafts.find((x) => x.id === 1).final_text = 'Something she never saw.'; });
+  // A model-side edit lands while their board still shows the old text.
+  ctx.tx((db) => { db.drafts.find((x) => x.id === 1).final_text = 'Something they never saw.'; });
   const r = await call(ctx, 'studio_post_schedule', { id: 1, hash: seen });
   assert.match(r.text, /changed since you looked at it/);
   assert.equal(posts(ctx).length, 0);
@@ -144,7 +144,7 @@ test('"Post it for me" on an approved draft refuses if the text changed since he
   assert.match(none.text, /changed since you looked at it/);
   assert.equal(posts(ctx).length, 0);
   await call(ctx, 'studio_post_schedule', { id: 1, hash: hashOf(ctx, 1) });
-  assert.equal(posts(ctx)[0].approved_hash, textHash('Something she never saw.'));
+  assert.equal(posts(ctx)[0].approved_hash, textHash('Something they never saw.'));
 });
 
 test('a post that matches goes out and is recorded; the draft is marked posted by Claude', async () => {
@@ -191,11 +191,11 @@ test('missed slots and failed posts surface on the board with their reason, and 
   // A post Claude took but never reported on is marked failed, with a warning to check first.
   await call(ctx, 'studio_post_schedule', { id: 2, hash: hashOf(ctx, 2), again: true });
   clock.t = at(2026, 10, 23, 8, 5);
-  assert.equal(parse((await call(ctx, 'studio_posting', { action: 'queue' })).text).posts.length, 1, 'her tap put it in a new slot');
+  assert.equal(parse((await call(ctx, 'studio_posting', { action: 'queue' })).text).posts.length, 1, 'their tap put it in a new slot');
   clock.t = at(2026, 10, 23, 8, 50);
   v = (await call(ctx, 'studio_view', { view: 'drafts', tab: 'passed' })).sc;
   assert.match(v.units.find((u) => u.id === 2).post.reason, /didn't say whether it worked\. Check X before you try again/);
-  // She clears the missed one ("I'll copy it myself"): it leaves the warning, the draft stays approved.
+  // They clear the missed one ("I'll copy it myself"): it leaves the warning, the draft stays approved.
   await call(ctx, 'studio_post_schedule', { dismiss: posts(ctx).find((p) => p.status === 'missed').id });
   v = (await call(ctx, 'studio_view', { view: 'drafts' })).sc;
   assert.equal(v.header.posting.missed, 0);

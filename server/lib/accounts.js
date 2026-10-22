@@ -1,12 +1,12 @@
 // Account slots. Each type is one small file in accounts/ (label, icon, what it enables, a
 // `connect` prompt, capabilities, and for posting a `compose` address and a `post_warning`).
 // Adding a type is adding a file. No credentials, tokens or cookies are ever stored: "Add account"
-// queues the type's prompt for Claude, which walks her through signing in in her own browser, and
+// queues the type's prompt for Claude, which walks them through signing in in their own browser, and
 // the studio records only that the account was connected that way.
 //
-// Capabilities are `read` and `post`, each false (not built), "prompt" (only when she asks Claude
-// in chat) or true (built). `post: true` means Claude can post approved drafts through her own
-// signed-in browser, and only once she turns "Post for me" on for that account on the board
+// Capabilities are `read` and `post`, each false (not built), "prompt" (only when they ask Claude
+// in chat) or true (built). `post: true` means Claude can post approved drafts through their own
+// signed-in browser, and only once they turn "Post for me" on for that account on the board
 // (posting.js). handOff() is the one gate every post goes through.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,7 +24,7 @@ export function validateAccountType(t, file = 'account type') {
   for (const k of ['label', 'enables', 'connect']) if (typeof t[k] !== 'string' || !t[k].trim()) throw new Error(`${file}: needs ${k}`);
   const caps = t.capabilities || {};
   for (const c of ['read', 'post']) if (!CAP_VALUES.includes(caps[c] ?? false)) throw new Error(`${file}: capabilities.${c} must be false, "prompt" or true`);
-  // A type that can post says where Claude opens the composer, and what she risks.
+  // A type that can post says where Claude opens the composer, and what they risk.
   let compose = null, prefill = null;
   if (caps.post === true) {
     const u = safeHttpsUrl(t.compose);
@@ -32,7 +32,7 @@ export function validateAccountType(t, file = 'account type') {
     if (typeof t.post_warning !== 'string' || !t.post_warning.trim()) throw new Error(`${file}: a type that can post needs a post_warning`);
     compose = u.url;
     // Optional: the platform's documented intent address that opens the composer with the text
-    // already in it, so the posting run lands on a compose page instead of her feed.
+    // already in it, so the posting run lands on a compose page instead of their feed.
     if (t.prefill != null) {
       const p = typeof t.prefill === 'string' && t.prefill.split('{text}').length === 2 ? safeHttpsUrl(t.prefill.replace('{text}', 'x')) : { ok: false, reason: 'must contain {text} once' };
       if (!p.ok) throw new Error(`${file}: prefill must be an https address with {text} in it (${p.reason})`);
@@ -60,10 +60,10 @@ export function accountTypes(dir = ACCOUNTS_DIR) {
 export const canRead = (type) => accountTypes()[type]?.capabilities.read === true;
 export const canPost = (type) => accountTypes()[type]?.capabilities.post === true;
 
-// "Post for me" for one connected account: off unless she turned it on on the board.
+// "Post for me" for one connected account: off unless they turned it on on the board.
 export const postingOn = (row) => row?.posting?.on === true;
 
-// Her connected accounts for this persona, with their type and whether Claude posts for her.
+// Their connected accounts for this persona, with their type and whether Claude posts for them.
 export function accountsView(ctx, db) {
   const types = accountTypes();
   const connected = db.accounts || [];
@@ -75,14 +75,14 @@ export function accountsView(ctx, db) {
   });
 }
 
-// Board only: record that she connected (or removed) an account by following the prompt.
+// Board only: record that they connected (or removed) an account by following the prompt.
 export function setAccount(ctx, { action, type }) {
   const t = accountTypes()[type];
   if (!t) throw new Error(`Unknown account type "${type}". Known: ${Object.keys(accountTypes()).join(', ')}`);
   return ctx.tx((db) => {
     const i = db.accounts.findIndex((a) => a.type === type);
     if (action === 'connect') {
-      // Reconnecting keeps her posting choice and its history; a new connection starts with it off.
+      // Reconnecting keeps their posting choice and its history; a new connection starts with it off.
       const row = { type, status: 'connected_by_prompt', at: ctx.iso(), ...(i >= 0 && db.accounts[i].posting ? { posting: db.accounts[i].posting } : {}) };
       if (i >= 0) db.accounts[i] = row; else db.accounts.push(row);
       return { ok: true, prompt: t.connect, message: `Asked Claude to help you sign in to ${t.label}. Nothing is stored but a note that it's connected.` };

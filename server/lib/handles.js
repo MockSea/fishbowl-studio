@@ -1,4 +1,4 @@
-// Strict parsing for the social and search source kinds. Whatever she pastes (a handle, a page
+// Strict parsing for the social and search source kinds. Whatever they paste (a handle, a page
 // address, a subreddit, a search) becomes one canonical, validated entry, or a plain refusal.
 // The studio only ever builds addresses on x.com, linkedin.com and reddit.com from these, so a
 // watch entry can never point anywhere else.
@@ -85,7 +85,7 @@ export const searchKey = (s) => `search:${s.q}`;
 export const TRENDS_KEY = 'trends:x';
 export const TRENDS_URL = 'https://x.com/explore/tabs/trending';
 
-// A source she or Claude wants to add, in canonical form, without fetching anything.
+// A source they or Claude wants to add, in canonical form, without fetching anything.
 // kind: site | reddit | watch | trends | search.
 export function normaliseTarget(t = {}) {
   const kind = t.kind || 'site';

@@ -19,7 +19,7 @@ function legacyHome() {
   fs.writeFileSync(path.join(home, 'state', 'events.jsonl'), '{"at":"2026-10-20T08:00:00Z","kind":"fetch"}\n');
   fs.mkdirSync(path.join(home, 'reports'));
   fs.writeFileSync(path.join(home, 'reports', 'weekly-2026-10-16.md'), '# Week');
-  fs.writeFileSync(path.join(home, 'notes-she-keeps.txt'), 'not ours');
+  fs.writeFileSync(path.join(home, 'notes-user-keeps.txt'), 'not ours');
   return home;
 }
 
@@ -35,7 +35,7 @@ test('a single-brand folder migrates into personas/<slug> on first start, losing
   assert.match(read(path.join(dir, 'state', 'events.jsonl')), /fetch/);
   assert.equal(read(path.join(dir, 'reports', 'weekly-2026-10-16.md')), '# Week');
   for (const f of ['settings.json', 'voice.md', 'state', 'reports']) assert.ok(!fs.existsSync(path.join(home, f)), `${f} moved`);
-  assert.equal(read(path.join(home, 'notes-she-keeps.txt')), 'not ours', 'files that are not the studio\'s stay put');
+  assert.equal(read(path.join(home, 'notes-user-keeps.txt')), 'not ours', 'files that are not the studio\'s stay put');
   const reg = JSON.parse(read(path.join(home, 'personas.json')));
   assert.equal(reg.active, 'northwind-bicycles');
   assert.equal(reg.personas[0].name, 'Northwind Bicycles');
