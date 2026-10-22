@@ -5,20 +5,22 @@
   color-scheme: light;
 
   /* Surfaces */
-  --paper: #f6f4ef;          /* the app behind the cards */
+  --paper: #f5f7f7;          /* the app behind the cards */
   --surface: #ffffff;        /* cards, sidebar */
-  --surface-2: #faf9f5;      /* inset areas: quoted story, thinking */
-  --hover: #f0ede6;
+  --surface-2: #f5f8f8;      /* inset areas: quoted story, thinking */
+  --hover: #eaf0ef;
   --selected: #e4f0ee;
   --scrim: rgba(29, 28, 26, .32);
 
   /* Ink */
-  --ink: #1d1c1a;
-  --ink-2: #514d46;
-  --ink-3: #6f6a61;
+  --ink: #192727;
+  --ink-2: #465858;
+  --ink-3: #596c6c;
   --ink-on-accent: #ffffff;
-  --line: #e6e1d7;
-  --line-strong: #d3ccbf;
+  --line: #e0e7e6;
+  --line-strong: #c5d1cf;
+  --control-line: #7c8d8b;
+  --focus: #0e6b65;
 
   /* Brand accent: deep fishbowl teal */
   --accent: #0e6b65;
@@ -34,11 +36,11 @@
   --warn-soft: #fcf0d9;
   --bad: #ae2a22;
   --bad-soft: #fbe9e6;
-  --heart: #c93556;
+  --heart: #b92d4d;
   --heart-soft: #fbe8ed;
 
   /* Character-count ring */
-  --ring-track: #e6e1d7;
+  --ring-track: #e0e7e6;
   --ring-fill: #0e6b65;
   --ring-near: #b9790f;
   --ring-over: #ae2a22;
@@ -53,15 +55,15 @@
   --avatar-6: #9b3b63;
 
   /* Type */
-  --font-ui: var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-post: var(--font-ui);
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --t-xs: 12px;
   --t-sm: 13px;
   --t-md: 14px;
-  --t-post: 15px;
+  --t-post: 16px;
   --t-lg: 17px;
-  --t-xl: 22px;
+  --t-xl: 24px;
   --t-2xl: 28px;
   --lh-tight: 1.25;
   --lh: 1.5;
@@ -91,13 +93,12 @@
   /* Depth */
   --shadow-1: 0 1px 2px rgba(29, 28, 26, .05);
   --shadow-2: 0 1px 2px rgba(29, 28, 26, .06), 0 8px 24px rgba(29, 28, 26, .08);
-  --focus-ring: 0 0 0 3px rgba(14, 107, 101, .28);
 
   /* Layout */
-  --side-w: 244px;
-  --rail-w: 296px;
+  --side-w: 232px;
+  --rail-w: 264px;
   --content-max: 1180px;
-  --tap: 40px;
+  --tap: 44px;
 
   /* Motion */
   --ease: cubic-bezier(.2, .7, .2, 1);
