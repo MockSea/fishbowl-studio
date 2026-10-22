@@ -12,6 +12,7 @@ import { allowedPost } from './guard.mjs';
 
 const DEV = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 7611);
+const ORIGINS = (process.env.DEV_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean);
 const home = process.env.STUDIO_HOME ? path.resolve(process.env.STUDIO_HOME) : DEMO_HOME;
 // Seed only an empty folder (or on --reseed): a studio from before personas has settings.json at
 // its root, one from after has personas.json; either is left alone.
@@ -53,7 +54,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end(fs.readFileSync(path.join(DEV, 'host.html')));
     }
-    if (req.method === 'POST' && !allowedPost(req.headers, PORT)) { res.writeHead(403); return res.end('forbidden'); }
+    if (req.method === 'POST' && !allowedPost(req.headers, PORT, ORIGINS)) { res.writeHead(403); return res.end('forbidden'); }
     if (req.method === 'POST' && req.url === '/rpc') {
       let body = '';
       for await (const c of req) body += c;

@@ -143,4 +143,8 @@ test('dev harness takes POSTs only as JSON from its own page or curl', () => {
   assert.equal(allowedPost({ ...json, origin: 'null' }, 7611), false);
   assert.equal(allowedPost({ 'content-type': 'text/plain', origin: 'http://localhost:7611' }, 7611), false, 'a simple cross-site form post');
   assert.equal(allowedPost({}, 7611), false);
+  const preview = 'https://preview.example:7611';
+  assert.equal(allowedPost({ ...json, origin: preview }, 7611), false, 'not without DEV_ORIGINS');
+  assert.equal(allowedPost({ ...json, origin: preview }, 7611, [preview]), true);
+  assert.equal(allowedPost({ ...json, origin: 'https://preview.example:7612' }, 7611, [preview]), false, 'exact match only');
 });
