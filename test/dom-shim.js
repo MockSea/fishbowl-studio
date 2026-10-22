@@ -37,7 +37,7 @@ export function makeDom() {
   const body = new El('body'), head = new El('head'), html = new El('html');
   html.append(head, body);
   const mk = (tag, props = {}, kids = []) => { const e = new El(tag); Object.assign(e, props); if (props.id) e.attrs.id = props.id; if (props.className) e.className = props.className; e.append(...kids); return e; };
-  const ids = ['app', 'mark', 'persona', 'side-foot', 'menu-btn', 'counter', 'brand', 'badge-drafts', 'badge-sources', 'badge-coach', 'stale', 'flash', 'jobs', 'view', 'scrim'];
+  const ids = ['app', 'mark', 'persona', 'side-foot', 'menu-btn', 'counter', 'brand', 'badge-drafts', 'badge-sources', 'badge-coach', 'stale', 'flash', 'jobs', 'posting', 'view', 'scrim'];
   for (const id of ids) body.append(mk('div', { id }));
   body.append(mk('button', { id: 'full-btn' }, [mk('span', { id: 'full-lbl' })]));
   for (const v of ['drafts', 'sources', 'topics', 'schedule', 'settings', 'reads', 'coach', 'playbook']) { const b = mk('button', { className: 'navbtn' }); b.dataset.view = v; b.dataset.icon = v; body.append(b); }
