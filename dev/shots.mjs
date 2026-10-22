@@ -14,7 +14,7 @@ const OUT = path.join(DEV, 'shots');
 const PORT = Number(process.env.PORT || 7631);
 const HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-shots-'));
 const WIDTHS = { desktop: [1280, 1800], phone: [390, 2600] };
-const SECTIONS = ['drafts', 'sources', 'topics', 'schedule', 'settings', 'reads', 'playbook'];
+const SECTIONS = ['drafts', 'sources', 'topics', 'schedule', 'settings', 'reads', 'coach', 'playbook'];
 
 const CHROME = process.env.CHROME || [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
