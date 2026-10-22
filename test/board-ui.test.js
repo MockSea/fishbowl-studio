@@ -255,7 +255,14 @@ test('component CSS takes every colour from the skin; the board ships every skin
   assert.equal(literal, null, `literal colours in board.css: ${literal}`);
   const html = boardHtml();
   assert.match(html, /:root, :root\[data-skin="light"\]/);
-  assert.match(html, /window\.STUDIO_SKINS = \["light"\]/);
+  assert.match(html, /window\.STUDIO_SKINS = \["light","dark"\]/);
+  assert.match(html, /:root\[data-skin="dark"\]/);
+  // Dark mode must not leave a light colour behind: every colour token in light.css is redefined in dark.css.
+  const skin = (f) => fs.readFileSync(path.join(PLUGIN_ROOT, 'server', 'ui', 'skins', f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const colourTokens = (css) => new Set([...css.matchAll(/(--[\w-]+):\s*([^;]+);/g)].filter(([, , v]) => /#|rgba?\(|shadow/.test(v) || /^--shadow/.test(v)).map(([, k]) => k));
+  const dark = colourTokens(skin('dark.css'));
+  const missing = [...colourTokens(skin('light.css'))].filter((k) => !dark.has(k));
+  assert.deepEqual(missing, [], `dark.css is missing colour tokens: ${missing}`);
   assert.doesNotMatch(html, /__(CSS|SKINS|BRIDGE|VIEWS)__/);
 });
 

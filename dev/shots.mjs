@@ -13,7 +13,8 @@ import { fileURLToPath } from 'node:url';
 
 const DEV = path.dirname(fileURLToPath(import.meta.url));
 const README = process.argv.includes('--readme');
-const OUT = README ? path.join(DEV, '..', 'docs', 'screenshots') : path.join(DEV, 'shots');
+const THEME = process.env.THEME === 'dark' ? 'dark' : ''; // THEME=dark shoots the dark skin into dev/shots/dark/
+const OUT = README ? path.join(DEV, '..', 'docs', 'screenshots') : path.join(DEV, 'shots', THEME);
 const PORT = Number(process.env.PORT || 7631);
 const HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-shots-'));
 const WIDTHS = { desktop: [1280, 1800], phone: [390, 2600] };
@@ -77,7 +78,7 @@ if (README) shots.splice(0, shots.length, ...README_SHOTS.map((r) => ({ hide: '#
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-chrome-'));
 try {
   for (const s of shots) {
-    const url = `http://localhost:${PORT}/?bare=1&width=${s.w}&${s.q}${README ? `&viewport=${s.hgt}` : ''}${s.scroll ? `&scroll=${encodeURIComponent(s.scroll)}` : ''}${s.hide ? `&hide=${encodeURIComponent(s.hide)}` : ''}`;
+    const url = `http://localhost:${PORT}/?bare=1&width=${s.w}&${s.q}${README ? `&viewport=${s.hgt}` : ''}${s.scroll ? `&scroll=${encodeURIComponent(s.scroll)}` : ''}${s.hide ? `&hide=${encodeURIComponent(s.hide)}` : ''}${THEME ? `&theme=${THEME}` : ''}`;
     execFileSync(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', ...(README ? ['--force-device-scale-factor=2'] : []), `--user-data-dir=${profile}`, `--window-size=${s.w},${s.hgt}`, '--virtual-time-budget=6000', `--screenshot=${path.join(OUT, s.file)}`, url], { stdio: 'ignore' });
     console.log(path.relative(process.cwd(), path.join(OUT, s.file)));
   }

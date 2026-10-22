@@ -1,0 +1,59 @@
+/* Dark skin: applied when the host (Claude) is in dark mode. Only colours and shadows change;
+   type, spacing and radii come from light.css. Surfaces sit close to Claude's own dark frame. */
+:root[data-skin="dark"] {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --paper: #1f1f1d;
+  --surface: #2a2a27;
+  --surface-2: #232321;
+  --hover: #33332f;
+  --selected: #1f3533;
+  --scrim: rgba(0, 0, 0, .55);
+
+  /* Ink */
+  --ink: #ecebe6;
+  --ink-2: #b9b8b1;
+  --ink-3: #9d9c95;
+  --ink-on-accent: #0f1f1e;
+  --line: #3a3a36;
+  --line-strong: #4a4a45;
+  --control-line: #77766f;
+  --focus: #5cc3b9;
+
+  /* Brand accent: the same teal, lifted for a dark background */
+  --accent: #4fb8ae;
+  --accent-hover: #6cc8bf;
+  --accent-soft: #1f3533;
+  --accent-text: #74d0c6;
+
+  /* Meaning */
+  --ok: #5cc27a;
+  --ok-hover: #78d192;
+  --ok-soft: #1e3324;
+  --warn: #e3a54a;
+  --warn-soft: #3a2e1a;
+  --bad: #f07a6e;
+  --bad-soft: #3d2320;
+  --heart: #f27795;
+  --heart-soft: #3d2029;
+
+  /* Character-count ring */
+  --ring-track: #3a3a36;
+  --ring-fill: #4fb8ae;
+  --ring-near: #e3a54a;
+  --ring-over: #f07a6e;
+
+  /* Persona avatars */
+  --avatar-ink: #ffffff;
+  --avatar-1: #0e6b65;
+  --avatar-2: #a8522c;
+  --avatar-3: #4f5aa3;
+  --avatar-4: #2f6b8f;
+  --avatar-5: #7a6418;
+  --avatar-6: #9b3b63;
+
+  /* Depth: borders do most of the work in the dark, so shadows only darken */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .3);
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .4);
+}
