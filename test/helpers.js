@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { makeContext } from '../server/lib/state.js';
+import { validateConfig } from '../server/lib/config.js';
 
 export function tempHome() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'studio-test-'));
@@ -25,4 +26,10 @@ export function testContext({ now = at(2026, 10, 21, 7, 0), seed = 42, feeds = {
 export function rss(items, title = 'Example Feed') {
   return `<?xml version="1.0"?><rss version="2.0"><channel><title>${title}</title>${items.map((i) =>
     `<item><title>${i.title}</title><link>${i.link}</link><description>${i.desc || ''}</description>${i.date ? `<pubDate>${i.date}</pubDate>` : ''}</item>`).join('')}</channel></rss>`;
+}
+
+// Fixture sources, written as her own file (validated). Claude can't add sources through
+// studio_config; she adds them on the board.
+export function setSources(ctx, content) {
+  ctx.store.writeFile('sources.json', JSON.stringify(validateConfig('sources.json', content), null, 2) + '\n');
 }

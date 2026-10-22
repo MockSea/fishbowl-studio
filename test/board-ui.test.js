@@ -146,11 +146,11 @@ test('the persona switcher switches, and a new persona gets the first-run card',
   assert.equal(b.ctx.slug, 'juniper-lane-books');
   const v = b.view().textContent;
   assert.match(v, /Here's how this works/);
-  assert.match(v, /Add your news sources/);
+  assert.match(v, /Add your sources/);
   assert.match(v, /Pick your topics/);
   assert.match(v, /Set it to run/);
   await button(b.view(), 'Add sources').click(); await settle();
-  assert.match(b.view().textContent, /Add a news source/);
+  assert.match(b.view().textContent, /Add a source/);
   assert.match(b.view().textContent, /Nothing here yet/);
 });
 
@@ -163,8 +163,9 @@ test('Sources: add a feed, pause, re-file and remove it, and draft from a link',
   assert.match(b.view().textContent, /Example City Cycling News/);
   assert.match(b.view().textContent, /Not responding/);
   assert.match(b.view().textContent, /Paused/);
+  const addBtn = (aria) => input(b.view(), aria).parent.find(isBtn);
   input(b.view(), 'Source address').value = 'https://lanes.example.com/feed';
-  await buttons(b.view(), 'Add').find((x) => x.textContent === 'Add').click(); await settle();
+  await addBtn('Source address').click(); await settle();
   const feeds = () => b.ctx.store.readFile('sources.json');
   assert.match(feeds(), /Example Lanes Weekly/);
   await button(b.view(), 'Pause Example Lanes Weekly').click(); await settle();
@@ -180,7 +181,7 @@ test('Sources: add a feed, pause, re-file and remove it, and draft from a link',
   assert.ok(b.ctx.store.read('jobs', []).some((j) => j.from_link && j.status === 'queued' && j.id > 2));
   assert.match(b.view().textContent, /Ten years of cargo counts/);
   input(b.view(), 'Source address').value = 'http://insecure.example.com/feed';
-  await buttons(b.view(), 'Add').find((x) => x.textContent === 'Add').click(); await settle();
+  await addBtn('Source address').click(); await settle();
   assert.match(b.document.getElementById('flash').textContent, /https/);
 });
 
@@ -242,7 +243,7 @@ test('Settings: switches, steppers and segmented choices save on click; Reads an
   await button(b.view(), 'Draft this').click(); await settle();
   assert.ok(b.ctx.store.read('jobs', []).some((j) => j.kind === 'draft_item' && !j.from_link));
   await b.nav('playbook');
-  assert.match(b.view().textContent, /Proposed changes \(3\)/);
+  assert.match(b.view().textContent, /Proposed changes \(4\)/);
   await button(b.view(), 'Accept').click(); await settle();
   assert.match(b.ctx.store.readFile('playbook.md'), /practical consequence/);
 });
@@ -255,4 +256,115 @@ test('component CSS takes every colour from the skin; the board ships every skin
   assert.match(html, /:root, :root\[data-skin="light"\]/);
   assert.match(html, /window\.STUDIO_SKINS = \["light"\]/);
   assert.doesNotMatch(html, /__(CSS|SKINS|BRIDGE|VIEWS)__/);
+});
+
+test('Skip asks why with one optional tap; the reason is stored and shown on the Skipped tab', async () => {
+  const b = await boot();
+  const pending = drafts(b).find((d) => d.status === 'pending' && !d.rewriting);
+  await button(b.view(), 'Skip').click(); await settle();
+  const ask = b.view().find((e) => e.attrs['aria-label'] === 'Why did you skip it?');
+  assert.ok(ask, 'the why strip appears');
+  await button(ask, 'Too salesy').click(); await settle();
+  const killed = drafts(b).find((d) => d.status === 'killed' && d.decided_at && Date.now() - Date.parse(d.decided_at) < 60e3);
+  assert.equal(killed.kill_reason, 'too_salesy');
+  assert.ok(pending);
+  assert.ok(!b.view().find((e) => e.attrs['aria-label'] === 'Why did you skip it?'), 'and goes away');
+  await button(b.view(), 'Skipped').click(); await settle();
+  assert.match(b.view().textContent, /Skipped as: Too salesy/);
+  assert.match(b.view().textContent, /Skipped as: Off-brand/, 'seeded reasons show too');
+  // Ignoring the question is fine: the skip stands without a reason.
+  await button(b.view(), 'To review').click(); await settle();
+  await button(b.view(), 'Skip').click(); await settle();
+  await button(b.view(), 'No reason').click(); await settle();
+  assert.ok(!b.view().find((e) => e.attrs['aria-label'] === 'Why did you skip it?'));
+});
+
+test('Coach: the weekly report, what is waiting with its why, and her tap applies it', async () => {
+  const b = await boot();
+  await b.nav('coach');
+  const v = b.view().textContent;
+  assert.match(v, /Week of \d{4}-\d{2}-\d{2}/);
+  assert.match(v, /What’s working.*Cargo bike posts: you approved 3 of 3/);
+  assert.match(v, /Try next week.*Open on the concrete detail/);
+  assert.match(v, /Waiting for your yes \(4\)/);
+  assert.match(v, /From your edits.*Open with a plain statement, not a question.*Why: You cut the opening question in 5 of your last 7 edits/);
+  assert.match(v, /Why you skipped \(30 days\)/);
+  assert.match(v, /Sources that keep losing.*Example Transport Policy Notes.*0 of 4 drafts from it approved/);
+  assert.match(v, /Earlier weeks/);
+  assert.equal(b.document.getElementById('badge-coach').textContent, '4');
+  const row = b.view().findAll((e) => e.className === 'row-item').find((r) => /plain statement/.test(r.textContent));
+  await button(row, 'Accept').click(); await settle();
+  assert.match(b.ctx.store.readFile('playbook.md'), /- Open with a plain statement, not a question/);
+  const pause = b.view().findAll((e) => e.className === 'row-item').find((r) => /Example Transport Policy Notes/.test(r.textContent));
+  await button(pause, 'Pause it').click(); await settle();
+  assert.equal(JSON.parse(b.ctx.store.readFile('sources.json')).feeds.find((f) => f.name === 'Example Transport Policy Notes').paused, true, 'paused by her tap');
+});
+
+test('Sources: every kind, records, suggestions she adds or dismisses, and the login and browser states', async () => {
+  const b = await boot({ fetchImpl: async () => ({ ok: false, status: 404, headers: new Map() }) });
+  await b.nav('sources');
+  let v = b.view().textContent;
+  assert.match(v, /Suggested sources \(2\)/);
+  assert.match(v, /Daily news: cycling-policy\.example\.org.*Found in your searches: 3 good results/);
+  assert.match(v, /Watch @example_cargo on X.*Claude suggested it/);
+  assert.match(v, /Keeps losing: 0 of 4 drafts from it approved in the last 6 weeks\. Pause it\?/);
+  assert.match(v, /4 of 4 approved/);
+  assert.match(v, /r\/examplebikecommute/);
+  assert.match(v, /Accounts you watch \(3\).*@example_lanes.*Asks to log in.*Trending on X/);
+  assert.match(v, /Saved searches \(2\).*e-bike regulation/);
+  assert.equal(b.document.getElementById('badge-sources').textContent, '2');
+  const sug = b.view().findAll((e) => e.className === 'row-item').find((r) => /example_cargo/.test(r.textContent));
+  await button(sug, 'Add').click(); await settle();
+  assert.ok(JSON.parse(b.ctx.store.readFile('sources.json')).watch.some((w) => w.handle === '@example_cargo'), 'added on her tap');
+  const dead = b.view().findAll((e) => e.className === 'row-item').find((r) => /cycling-policy/.test(r.textContent));
+  await button(dead, 'Add').click(); await settle();
+  assert.match(b.view().textContent, /Last try: Couldn't add it: HTTP 404/);
+  await button(b.view().findAll((e) => e.className === 'row-item').find((r) => /cycling-policy/.test(r.textContent)), 'Dismiss').click(); await settle();
+  assert.doesNotMatch(b.view().textContent, /Suggested sources/);
+  // Add a search and an account from the board.
+  const kinds = b.view().find((e) => e.attrs['aria-label'] === 'What kind of source');
+  await button(kinds, 'Search').click(); await settle();
+  input(b.view(), 'Saved search').value = 'cargo bike school run';
+  await input(b.view(), 'Saved search').parent.find(isBtn).click(); await settle();
+  await button(b.view().find((e) => e.attrs['aria-label'] === 'What kind of source'), 'X or LinkedIn').click(); await settle();
+  input(b.view(), 'Account to watch').value = 'https://evil.example/x.com/a';
+  await input(b.view(), 'Account to watch').parent.find(isBtn).click(); await settle();
+  assert.match(b.document.getElementById('flash').textContent, /only x\.com and linkedin\.com/);
+  const src = JSON.parse(b.ctx.store.readFile('sources.json'));
+  assert.ok(src.searches.some((s) => s.q === 'cargo bike school run'));
+  await button(b.view(), 'Pause e-bike regulation').click(); await settle();
+  assert.equal(JSON.parse(b.ctx.store.readFile('sources.json')).searches.find((s) => s.q === 'e-bike regulation').paused, true);
+  // The other brand ran without a browser.
+  await b.ctx.personas.switch('fernhollow-bakery');
+  await b.nav('sources');
+  v = b.view().textContent;
+  assert.match(v, /couldn’t use its browser.*web search instead/);
+  assert.match(v, /Example Stone Mill.*Read by web search/);
+});
+
+test('Settings: account slots ask Claude to walk her through signing in and record only that', async () => {
+  const b = await boot();
+  await b.nav('settings');
+  let v = b.view().textContent;
+  assert.match(v, /Accounts.*never stores a password and never posts for you/);
+  assert.match(v, /X.*Connected/);
+  assert.match(v, /Reading signed in: not yet · Posting: not yet/);
+  const li = b.view().findAll((e) => e.className === 'row-item').find((r) => /LinkedIn/.test(r.textContent) && /Add account/.test(r.textContent));
+  await button(li, 'Add account').click(); await settle();
+  const msg = b.sent.filter((m) => m.method === 'ui/message').pop();
+  assert.match(JSON.stringify(msg.params), /signing in to linkedin\.com myself/);
+  assert.equal(b.ctx.store.read('accounts', []).find((a) => a.type === 'linkedin').status, 'connected_by_prompt');
+});
+
+test('Topics and Reads explain what moved stories up or down', async () => {
+  const b = await boot();
+  await b.nav('topics');
+  const v = b.view().textContent;
+  assert.match(v, /What it drafts first/);
+  assert.match(v, /Stories about cargo.*Because: You approved 3 of 3 posts about cargo/);
+  assert.match(v, /Stories about policy.*Because: You skipped 2 policy posts as "wrong topic"/);
+  assert.match(v, /From your edits.*You cut the opening question in 5 of your last 7 edits/);
+  await b.nav('reads');
+  assert.match(b.view().textContent, /Moved up: You approved 3 of 3 posts about cargo/);
+  assert.match(b.view().textContent, /Search result/);
 });

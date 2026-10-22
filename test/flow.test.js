@@ -1,7 +1,7 @@
 // End to end through the real store: setup files -> fetch -> triage -> brief -> takes -> release -> verdicts.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { testContext, rss, at } from './helpers.js';
+import { testContext, rss, at, setSources } from './helpers.js';
 import { callTool } from '../server/lib/tools.js';
 import { triageQueue, recordTriage } from '../server/lib/triage.js';
 import { draftingBrief } from '../server/lib/briefs.js';
@@ -25,7 +25,7 @@ async function setup() {
   const t = testContext({ now: NOW, feeds: { [FEED]: rss(stories.map(([title, desc], i) => ({ title, desc, link: `https://news.example.com/${i}`, date: pub }))) } });
   const cfg = (file, content) => callTool(t.ctx, 'studio_config', { action: 'set', file, content });
   await cfg('beat.json', { topics: ['infrastructure', 'repair', 'policy', 'logistics'], on_beat: ['city cycling'], off_limits: ['celebrity gossip'] });
-  await cfg('sources.json', { feeds: [{ name: 'Example Cycling News', url: FEED, topic: 'infrastructure' }] });
+  setSources(t.ctx, { feeds: [{ name: 'Example Cycling News', url: FEED, topic: 'infrastructure' }] });
   await cfg('voice.md', '# Voice\nWarm, practical, a little dry. We fix bikes and say what we see.');
   await callTool(t.ctx, 'studio_config', { action: 'patch', patch: { brand: 'Northwind Bicycles', setup_complete: true, evergreen_per_day: 0 } });
   return t;
@@ -127,7 +127,7 @@ test('studio_config validates sources (https, no IP, no port)', async () => {
 
 test('a dead feed yields an error and the rest carry on', async () => {
   const { ctx } = await setup();
-  await callTool(ctx, 'studio_config', { action: 'set', file: 'sources.json', content: { feeds: [{ name: 'Good', url: FEED }, { name: 'Dead', url: 'https://dead.example.com/feed' }] } });
+  setSources(ctx, { feeds: [{ name: 'Good', url: FEED }, { name: 'Dead', url: 'https://dead.example.com/feed' }] });
   const r = await fetchAll(ctx);
   assert.equal(r.added, 5);
   assert.deepEqual(r.errors.map((e) => e.name), ['Dead']);
