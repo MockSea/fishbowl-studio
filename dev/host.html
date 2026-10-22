@@ -17,13 +17,16 @@
   .msg { padding: 8px 10px; border-radius: 8px; background: #0000000d; margin: 6px 0; white-space: pre-wrap; }
   body.dark .msg { background: #ffffff14; }
   .muted { opacity: .7; }
+  body.bare .bar, body.bare .chat { display: none; }
+  body.bare .wrap { padding: 0; }
+  body.bare .frame { border: 0; border-radius: 0; }
 </style>
 </head>
 <body>
 <div class="bar">
   <strong>Fishbowl Studio dev host</strong>
   <label>Theme <select id="theme"><option>light</option><option>dark</option></select></label>
-  <label>Width <select id="width"><option value="320">320</option><option value="400">400</option><option value="640" selected>640</option><option value="900">900</option></select></label>
+  <label>Width <select id="width"><option value="390">390 (phone)</option><option value="640">640</option><option value="760" selected>760 (chat)</option><option value="1024">1024</option><option value="1280">1280 (desktop)</option><option value="1440">1440</option></select></label>
   <button id="remount">New board (simulate another tool call)</button>
   <button id="reseed">Reseed demo data</button>
   <span class="muted" id="status"></span>
@@ -41,6 +44,7 @@ const log = (t) => { const d = document.createElement('div'); d.className = 'msg
 const rpc = async (method, params) => { const r = await fetch('/rpc', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ method, params }) }); return r.json(); };
 let html = null;
 const frames = [];
+const qs = new URLSearchParams(location.search);
 
 function context() {
   const theme = $('theme').value;
@@ -76,8 +80,14 @@ window.addEventListener('message', async (ev) => {
       f.ready = true;
       $('status').textContent = 'board connected';
       send(f, { method: 'ui/notifications/tool-input', params: { arguments: {} } });
-      const r = await rpc('tools/call', { name: 'studio_board', arguments: {} });
-      return send(f, { method: 'ui/notifications/tool-result', params: r.result });
+      // ?view=sources&persona=<slug> opens a section directly (for screenshots); default is the board tool.
+      const r = qs.get('view') || qs.get('persona')
+        ? await rpc('tools/call', { name: 'studio_view', arguments: { view: qs.get('view') || 'drafts', ...(qs.get('persona') ? { persona: qs.get('persona') } : {}) } })
+        : await rpc('tools/call', { name: 'studio_board', arguments: {} });
+      send(f, { method: 'ui/notifications/tool-result', params: r.result });
+      // ?drawer=1 opens the phone menu once the board has drawn.
+      if (qs.get('drawer')) setTimeout(() => { const b = f.iframe.contentDocument && f.iframe.contentDocument.getElementById('menu-btn'); if (b) b.click(); }, 300);
+      return;
     }
     case 'ui/notifications/size-changed':
       f.iframe.style.height = Math.max(200, m.params.height) + 'px'; return;
@@ -103,7 +113,7 @@ $('theme').onchange = () => {
 $('width').onchange = () => { $('frame').style.width = $('width').value + 'px'; };
 $('remount').onclick = () => mount();
 $('reseed').onclick = async () => { await fetch('/reseed', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); location.reload(); };
-const qs = new URLSearchParams(location.search);
+if (qs.get('bare')) document.body.classList.add('bare');
 if (qs.get('theme')) { $('theme').value = qs.get('theme'); document.body.classList.toggle('dark', qs.get('theme') === 'dark'); }
 if (qs.get('width')) $('width').value = qs.get('width');
 mount();

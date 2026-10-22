@@ -4,3 +4,5 @@ node_modules/
 .worktrees/
 dev/.demo-home/
 dist/
+.ref/
+dev/shots/

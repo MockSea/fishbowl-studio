@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Dev harness: spawns the real MCP server over stdio and serves a local host page that iframes
 // the board and plays the host side of the MCP Apps bridge. `npm run dev`, then open
-// http://localhost:7611. Uses dev/.demo-home (seeded on first run, or with --reseed).
+// http://localhost:7611. Uses dev/.demo-home (two demo personas; seeded on first run, or with --reseed).
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,7 +13,9 @@ import { allowedPost } from './guard.mjs';
 const DEV = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 7611);
 const home = process.env.STUDIO_HOME ? path.resolve(process.env.STUDIO_HOME) : DEMO_HOME;
-if (process.argv.includes('--reseed') || !fs.existsSync(path.join(home, 'settings.json'))) {
+// Seed only an empty folder (or on --reseed): a studio from before personas has settings.json at
+// its root, one from after has personas.json; either is left alone.
+if (process.argv.includes('--reseed') || !['personas.json', 'settings.json'].some((f) => fs.existsSync(path.join(home, f)))) {
   seed(home);
   console.log(`Seeded demo data in ${home}`);
 }
@@ -46,7 +48,8 @@ child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initia
 
 const server = http.createServer(async (req, res) => {
   try {
-    if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
+    const pathname = new URL(req.url, 'http://localhost').pathname;
+    if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       return res.end(fs.readFileSync(path.join(DEV, 'host.html')));
     }

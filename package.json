@@ -10,6 +10,7 @@
     "test": "node --test",
     "dev": "node dev/serve.mjs",
     "seed": "node dev/seed.mjs",
-    "pack": "node scripts/pack.mjs"
+    "pack": "node scripts/pack.mjs",
+    "shots": "node dev/shots.mjs"
   }
 }
