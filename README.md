@@ -6,6 +6,9 @@ Fishbowl Studio is for the person who writes a brand's LinkedIn, X, Threads and 
 
 It runs inside the Claude desktop app as a plugin. Nothing to host, no account to create.
 
+> [!WARNING]
+> **Early alpha (v0.0.1).** This is the first public build and it hasn't been tested much on real Cowork installs yet. Expect rough edges, keep **Post for me** off while you try it, and please [open an issue](https://github.com/MockSea/fishbowl-studio/issues) when something breaks.
+
 <p align="center">
   <img src="docs/screenshots/drafts.png" alt="The Drafts page: a feed of post drafts for a bicycle shop, with today's counts and a list of brands on the right" width="100%">
 </p>
@@ -92,7 +95,7 @@ You can change all of those times on the **Schedule** page, down to reading the 
 ## Install it
 
 1. In the Claude desktop app, open **Customize → Plugins**.
-2. Click **Add marketplace** and enter `OWNER/fishbowl-studio`.
+2. Click **Add marketplace** and enter `MockSea/fishbowl-studio`.
 3. Install **Fishbowl Studio**.
 4. Start a Cowork session and type **/studio:setup**. The setup wizard opens, and at the end one click asks Claude to run it every weekday.
 

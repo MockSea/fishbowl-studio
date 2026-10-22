@@ -15,7 +15,7 @@ export function tooOld(have, min, input, output) {
     let m;
     try { m = JSON.parse(line); } catch (e) { return; }
     if (!m || !('id' in m)) return;
-    if (m.method === 'initialize') return send({ jsonrpc: '2.0', id: m.id, result: { protocolVersion: (m.params && m.params.protocolVersion) || '2025-11-25', capabilities: { tools: {} }, serverInfo: { name: 'fishbowl-studio', version: '0.1.0' }, instructions: msg } });
+    if (m.method === 'initialize') return send({ jsonrpc: '2.0', id: m.id, result: { protocolVersion: (m.params && m.params.protocolVersion) || '2025-11-25', capabilities: { tools: {} }, serverInfo: { name: 'fishbowl-studio', version: '0.0.1' }, instructions: msg } });
     if (m.method === 'tools/list') return send({ jsonrpc: '2.0', id: m.id, result: { tools: [{ name: 'studio_status', title: 'Studio status', description: msg, inputSchema: { type: 'object', additionalProperties: true } }] } });
     if (m.method === 'tools/call') return send({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: msg }], isError: true } });
     if (m.method === 'ping') return send({ jsonrpc: '2.0', id: m.id, result: {} });

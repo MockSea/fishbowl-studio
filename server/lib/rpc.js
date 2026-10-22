@@ -34,7 +34,7 @@ export function makeHandlers(ctx) {
     initialize: (p) => ({
       protocolVersion: VERSIONS.includes(p?.protocolVersion) ? p.protocolVersion : VERSIONS[0],
       capabilities: { tools: { listChanged: false }, resources: {} },
-      serverInfo: { name: 'fishbowl-studio', version: '0.1.0' },
+      serverInfo: { name: 'fishbowl-studio', version: '0.0.1' },
       instructions: INSTRUCTIONS,
     }),
     ping: () => ({}),

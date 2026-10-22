@@ -115,7 +115,7 @@
   async function connect() {
     const res = await request('ui/initialize', {
       protocolVersion: '2026-01-26',
-      appInfo: { name: 'fishbowl-studio-board', version: '0.1.0' },
+      appInfo: { name: 'fishbowl-studio-board', version: '0.0.1' },
       appCapabilities: { availableDisplayModes: ['inline', 'fullscreen'] },
     });
     applyHostContext(res && res.hostContext);
