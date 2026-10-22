@@ -58,6 +58,7 @@
     return card({ icon: 'spark', title: `Suggested sources (${list.length})`, sub: 'Nothing here is read until you add it.', end: list.length > 1 ? h('button', { class: 'btn sm', onclick: addAll }, 'Add all') : null },
       h('div', { class: 'rows' }, list.map((x) => h('div', { class: 'row-item' },
         h('span', { class: 'who' }, h('span', { class: 'nm', text: x.label }),
+          x.address ? h('span', { class: 'sub mono', text: x.address }) : null,
           h('span', { class: 'sub', text: x.origin === 'discovery' ? `Found in your searches: ${x.why || ''}` : x.why ? `Claude suggested it: ${x.why}` : 'Claude suggested it.' }),
           x.error ? h('span', { class: 'sub warn-text', text: `Last try: ${x.error}` }) : null),
         h('span', { class: 'ctl' }, h('button', { class: 'btn sm approve', onclick: () => decide(x.id, 'accept') }, icon('plus'), 'Add'), h('button', { class: 'btn sm ghost', onclick: () => decide(x.id, 'reject') }, 'Dismiss'))))));

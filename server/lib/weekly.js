@@ -124,7 +124,7 @@ export function weeklyBrief(ctx, { part = 'numbers' } = {}) {
       const ep = editProposals(ctx, db, now);
       const fromEdits = db.proposals.filter((p) => p.status === 'open' && p.source === 'edits');
       return { part, edit_proposals: ep.added.length, text: [`# Weekly report, part 1: numbers`, PLAYBOOK, fz.guard, pb, nums, sources,
-        fromEdits.length ? `## Already proposed from her edits (don't repeat these)\n${fromEdits.map((p) => `- ${p.kind} ${p.op}: ${p.text}`).join('\n')}` : '',
+        fromEdits.length ? fz.block('Already proposed from her edits (don\'t repeat these)', fromEdits.map((p) => ({ kind: p.kind, op: p.op, text: p.text }))) : '',
         'Save playbook proposals with studio_save_weekly({playbook: [{op, text, old, reason}]}), then call studio_weekly_brief({part: "full"}).'].filter(Boolean).join('\n\n') };
     }
     const a = loadAudience(ctx.store);

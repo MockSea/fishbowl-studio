@@ -248,6 +248,7 @@ details.why summary:hover { color: var(--ink); }
 .row-item .who { flex: 1 1 200px; min-width: 0; }
 .row-item .nm { display: block; font-weight: var(--w-medium); overflow-wrap: anywhere; }
 .row-item .sub { display: block; color: var(--ink-3); font-size: var(--t-sm); overflow-wrap: anywhere; }
+.row-item .sub.mono { font-family: var(--font-mono); font-size: var(--t-xs); }
 .row-item .ctl { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
 .row-item.paused .nm, .row-item.paused .sub { color: var(--ink-3); }
 .letter { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--r-md); background: var(--hover); color: var(--ink-2); font-weight: var(--w-bold); text-transform: uppercase; }

@@ -206,3 +206,16 @@ test('account slots: one file per type, capabilities off, connect is a prompt an
   assert.equal(setAccount(ctx, { action: 'remove', type: 'x' }).ok, true);
   assert.equal(ctx.store.read('accounts', []).length, 0);
 });
+
+test('Claude cannot pick where its own proposal came from, and suggestions show the full address', async () => {
+  const { ctx } = testContext({ now: NOW });
+  proposalsTool(ctx, { action: 'propose', source: 'discovery', proposals: [{ kind: 'source', op: 'add', target: { kind: 'site', url: 'https://medium.com/feed/@someone' }, reason: '3 good results from 2 of your searches' }] });
+  proposalsTool(ctx, { action: 'propose', source: 'edits', proposals: [{ kind: 'playbook', op: 'add', text: 'Lead with the number', reason: 'you cut the opener' }] });
+  assert.deepEqual(ctx.store.read('proposals', []).map((p) => p.source), ['chat', 'chat']);
+  const view = await callTool(ctx, 'studio_view', { view: 'sources' });
+  const s = view.structuredContent.suggestions[0];
+  assert.equal(s.origin, 'chat');
+  assert.equal(s.address, 'medium.com/feed/@someone');
+  const brief = await callTool(ctx, 'studio_weekly_brief', { part: 'numbers' });
+  assert.doesNotMatch(brief.content[0].text, /Already proposed from her edits/, 'a chat proposal is not listed as one of hers');
+});

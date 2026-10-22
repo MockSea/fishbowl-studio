@@ -138,6 +138,19 @@ export function settingsView(ctx, db) {
 const DAY = 24 * 3600e3;
 const label = (slug) => String(slug || 'other').replace(/-/g, ' ');
 
+// The whole address a feed is read from, not just its host: on a shared host (medium.com,
+// github.com, news.google.com) the path decides who controls what gets read.
+function addressOf(url) {
+  try { const u = new URL(url); return `${u.hostname.replace(/^www\./, '')}${u.pathname.replace(/\/+$/, '')}${u.search}`; } catch { return hostOf(url); }
+}
+
+function targetAddress(t = {}) {
+  if (t.kind === 'site') return addressOf(t.url);
+  if (t.kind === 'reddit') return `reddit.com/r/${t.sub}`;
+  if (t.kind === 'watch') return addressOf(t.url);
+  return null;
+}
+
 export function sourcesView(ctx, db) {
   const src = loadSources(ctx.store);
   const beat = loadBeat(ctx.store);
@@ -155,7 +168,7 @@ export function sourcesView(ctx, db) {
   const row = (f, list) => {
     const key = list === 'feeds' ? feedKey(f) : `explore:${f.name}`;
     const status = f.paused ? 'paused' : list === 'feeds' && failing.has(f.name) ? 'failing' : 'active';
-    return { kind: f.kind === 'reddit' ? 'reddit' : 'site', name: f.name, url: f.url, host: f.kind === 'reddit' ? `reddit.com/r/${f.sub}` : hostOf(f.url), topic: f.topic, list, paused: !!f.paused, status, error: status === 'failing' ? failing.get(f.name) : null, ...stats(key) };
+    return { kind: f.kind === 'reddit' ? 'reddit' : 'site', name: f.name, url: f.url, host: f.kind === 'reddit' ? `reddit.com/r/${f.sub}` : addressOf(f.url), topic: f.topic, list, paused: !!f.paused, status, error: status === 'failing' ? failing.get(f.name) : null, ...stats(key) };
   };
   const webRow = (kind, x, key, extra) => {
     const w = web[key];
@@ -168,7 +181,7 @@ export function sourcesView(ctx, db) {
     return { job_id: j.id, title: itemLine(i?.title), host: hostOf(i?.url), url: itemLine(i?.url, 2000), status: drafted ? 'drafted' : j.status, at: j.created_at };
   });
   // Suggestions: sources Claude suggested or discovery found. Nothing here is read until she adds it.
-  const suggestions = db.proposals.filter((p) => p.kind === 'source' && p.status === 'open').map((p) => ({ id: p.id, label: p.text, kind: p.target.kind, origin: p.source, why: p.reason || null, error: p.error || null, at: p.created_at }));
+  const suggestions = db.proposals.filter((p) => p.kind === 'source' && p.status === 'open').map((p) => ({ id: p.id, label: p.text, address: targetAddress(p.target), kind: p.target.kind, origin: p.source, why: p.reason || null, error: p.error || null, at: p.created_at }));
   return {
     view: 'sources', feeds: src.feeds.map((f) => row(f, 'feeds')), reading: src.reading.map((f) => row(f, 'reading')),
     watch: src.watch.map((w) => webRow('watch', w, watchKey(w), { list: 'watch', name: w.name, handle: w.handle, platform: w.platform, url: w.url })),

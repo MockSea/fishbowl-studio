@@ -104,7 +104,8 @@ function view(ctx, args = {}) {
       summary = [fz.guard, r ? fz.block(`Coach report, week of ${r.week}`, [{ summary: r.summary, working: r.working.join(' | '), not_working: r.not_working.join(' | '), try: r.try.join(' | ') }]) : 'No coach report yet.',
         data.proposals.length ? fz.block('Waiting for her tap', data.proposals.map((p) => ({ id: p.id, kind: p.kind, change: `${p.op}: ${p.text || p.old}`, why: p.reason }))) : 'Nothing waiting.'].join('\n\n');
     }
-    else if (v === 'topics') { data = topicsView(ctx, db); summary = `Topics: ${data.topics.map((t) => `${t.slug}${t.weight !== 2 ? ` (${t.weight === 3 ? 'more' : 'less'})` : ''}`).join(', ') || 'none'}.\nLearned from ${data.verdicts} verdicts: ${data.learned.map((l) => `${l.direction === 'up' ? '+' : '-'} ${l.label}`).join('; ') || 'not enough yet'}.`; }
+    else if (v === 'topics') { data = topicsView(ctx, db); summary = [`Topics: ${data.topics.map((t) => `${t.slug}${t.weight !== 2 ? ` (${t.weight === 3 ? 'more' : 'less'})` : ''}`).join(', ') || 'none'}.`,
+        data.learned.length ? [fz.guard, fz.block(`Learned from ${data.verdicts} verdicts`, data.learned.map((l) => ({ direction: l.direction === 'up' ? 'more' : 'less', label: l.label })))].join('\n\n') : `Learned from ${data.verdicts} verdicts: not enough yet.`].join('\n'); }
     else if (v === 'schedule') { data = scheduleView(ctx, db); summary = `News: ${data.fetch_every}. Batches at ${data.release_hours.join(', ')}. Set in Cowork: ${data.tasks.map((t) => t.text).join(' | ')}`; }
     else { data = draftsView(ctx, db, args); summary = draftsText(data, head, fz); }
     return { ...data, header: head, stamp: { createdAt: ctx.now(), seq: ++seq }, summary };

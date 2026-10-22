@@ -129,7 +129,9 @@ export function proposalsTool(ctx, args) {
   if (args.action === 'accept' || args.action === 'reject') throw new Error('Only she can accept or reject proposals, with the buttons on the board\'s Playbook view. Tell her it is waiting there.');
   return ctx.tx((db) => {
     if (args.action === 'propose') {
-      const res = addProposals(ctx, db, args.proposals, args.source || 'chat');
+      // Origin is never taken from the caller: only server paths (edits, weekly, discovery) set
+      // another, so the model can't dress its own proposal up as one the board trusts more.
+      const res = addProposals(ctx, db, args.proposals, 'chat');
       return { ...res, text: `Added ${res.added.length} proposal(s) for her to review on the board${res.rejected.length ? `; rejected ${res.rejected.length}: ${res.rejected.map((r) => r.reason).join(' ')}` : ''}.` };
     }
     const open = db.proposals.filter((p) => p.status === 'open');
