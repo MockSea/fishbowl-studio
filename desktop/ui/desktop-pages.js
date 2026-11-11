@@ -5,7 +5,7 @@
 (function () {
   const S = window.Studio;
   const B = window.Board;
-  const { h, icon, page, card, empty, plural, ago } = B;
+  const { h, icon, page, card, empty, plural, ago, since } = B;
   let prefs = { autorun: false };
   let keyState = { has: true };
 
@@ -26,7 +26,6 @@
   kitBtn.addEventListener('click', () => { Object.assign(B.state, { open: {}, why: null, menu: false, wnew: false, wstep: null, arming: null }); B.setDrawer(false); B.load({ view: 'brandkit' }); });
   topics.after(kitBtn);
 
-  const since = (iso) => { const a = ago(iso); return a === 'just now' ? a : `${a} ago`; };
   const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
   // ---------- Brand kit ----------

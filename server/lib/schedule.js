@@ -10,7 +10,7 @@ const H = 3600e3;
 // gap_h: the least time between two fetches (a little under the interval, so a run that
 // starts a few minutes early still fetches). tasks: what to set in Cowork.
 export const FETCH_PRESETS = {
-  hourly: { label: 'Every hour', blurb: 'Freshest news. Claude opens briefly every hour.', gap_h: 0.75, weekdays_only: false, tasks: [{ repeat: 'Hourly', cron: () => '0 * * * *' }] },
+  hourly: { label: 'Every hour', blurb: 'Freshest news. Reads every hour.', gap_h: 0.75, weekdays_only: false, tasks: [{ repeat: 'Hourly', cron: () => '0 * * * *' }] },
   every_3h: { label: 'Every 3 hours', blurb: 'A good balance for busy beats.', gap_h: 2.75, weekdays_only: false, tasks: [{ repeat: 'Hourly', cron: () => '0 */3 * * *' }], note: 'Set by hand, Cowork repeats hourly; the studio only reads the news every third hour and the runs in between finish in a moment.' },
   twice_daily: { label: 'Twice a day', blurb: 'Morning and early afternoon.', gap_h: 5, weekdays_only: false, tasks: [{ repeat: 'Daily', at: 'first', cron: (h) => `0 ${h} * * *` }, { repeat: 'Daily', at: 'midday', cron: (h) => `0 ${h} * * *` }] },
   daily: { label: 'Once a day', blurb: 'One read before your first batch.', gap_h: 20, weekdays_only: false, tasks: [{ repeat: 'Daily', at: 'first', cron: (h) => `0 ${h} * * *` }] },

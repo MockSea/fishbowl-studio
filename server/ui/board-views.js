@@ -31,6 +31,7 @@
     if (s < 86400) return `${Math.floor(s / 3600)}h`;
     return `${Math.floor(s / 86400)}d`;
   }
+  const since = (iso) => { const a = ago(iso); return a === 'just now' || !a ? a : `${a} ago`; };
   const hm = (iso) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -285,7 +286,7 @@
           h('button', { class: `btn sm ${s.done ? 'ghost' : 'primary'}`, onclick: go }, s.done ? 'Done · change' : cta)); })));
   }
 
-  window.Board = { state, hook, h, icon, load, call, act, setting, flash, render, ago, hm, plural, meter, page, card, empty, seg, switchCtl, stepper, confirmButton, copyButton, askClaudeButton, avatar, todayCard, profilesCard, firstRunCard, switchTo, proposalRow, postingControl, openWizard, setDrawer, KIND_LABEL, OP_LABEL };
+  window.Board = { state, hook, h, icon, load, call, act, setting, flash, render, ago, since, hm, plural, meter, page, card, empty, seg, switchCtl, stepper, confirmButton, copyButton, askClaudeButton, avatar, todayCard, profilesCard, firstRunCard, switchTo, proposalRow, postingControl, openWizard, setDrawer, KIND_LABEL, OP_LABEL };
   window.BoardPages = window.BoardPages || {};
 
   // ---------- boot ----------
