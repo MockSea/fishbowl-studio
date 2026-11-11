@@ -3,7 +3,7 @@
 // app runs the loop and only the writing goes to the model. Reading watched social accounts and
 // wandering need a browser, so the desktop run leaves them out.
 import { fetchAll } from '../server/lib/ingest.js';
-import { triageQueue, recordTriage } from '../server/lib/triage.js';
+import { triageQueue, recordTriage, skipTriage } from '../server/lib/triage.js';
 import { draftingBrief } from '../server/lib/briefs.js';
 import { saveTakes, abandonBrief } from '../server/lib/save.js';
 import { releaseTool } from '../server/lib/run.js';
@@ -17,8 +17,9 @@ const MAX_TRIAGE_ROUNDS = 10;
 // what it has.
 export const MAX_CALLS_PER_RUN = 40;
 export const CALLS_PER_BRIEF = 3;
-// Answers the model got wrong for this brief only: the brief is closed as dropped and the run
-// moves on. Anything else (auth, network, rate limits) ends the run with the brief left open.
+// Answers the model got wrong for this brief or triage batch only: the brief is closed as dropped,
+// the batch is closed at interest 0, and the run moves on. Anything else (auth, network, rate
+// limits) ends the run with the brief or batch left open.
 const BRIEF_ERRORS = new Set(['refusal', 'max_tokens', 'parse']);
 
 // A model call counter. Every call through budget.ask spends one; run out and asks throw.
@@ -59,7 +60,15 @@ export function makeRunner({ ctx, model, kit, progress = () => {} }) {
     for (let i = 0; i < MAX_TRIAGE_ROUNDS && budget.can(); i++) {
       const q = triageQueue(c);
       if (q.done) break;
-      const out = await budget.ask({ task: q.text, schema: SCHEMAS.triage, kit: k, effort: 'low', maxTokens: 8000 });
+      let out;
+      try {
+        out = await budget.ask({ task: q.text, schema: SCHEMAS.triage, kit: k, effort: 'low', maxTokens: 8000 });
+      } catch (e) {
+        // A batch the model got wrong is closed at interest 0 and the run goes on to drafting.
+        if (!(e instanceof ModelError && BRIEF_ERRORS.has(e.kind))) throw e;
+        skipTriage(c, { queue_id: q.queue_id });
+        continue;
+      }
       const r = recordTriage(c, { queue_id: q.queue_id, reactions: out.reactions });
       saved += r.saved;
     }

@@ -125,3 +125,60 @@ test('one run and one tick are capped, however much work is waiting', async () =
   for (const [k, n] of Object.entries(perStory)) assert.ok(n <= 2, `${k}: ${n} calls`);
   assert.equal(api.requests.length, t1.calls + t2.calls);
 });
+
+test('a triage batch the model refuses is closed at interest 0 and the run still drafts', async () => {
+  for (const kind of ['refusal', 'max_tokens', 'parse']) {
+    const bad = { refusal: { stop_reason: 'refusal', content: [] }, max_tokens: { stop_reason: 'max_tokens', content: [] }, parse: { stop_reason: 'end_turn', content: [{ type: 'text', text: 'not json' }] } }[kind];
+    let api;
+    const made = await app({
+      createModel: () => makeModel({ create: async (p) => (p.output_config.format.schema === SCHEMAS.triage ? (api.requests.push(p), bad) : api.create(p)) }),
+    });
+    api = made.api;
+    const { host, clock } = made;
+    await host.keySet(KEY);
+    await setUpBrand(host);
+    await settings(host, { evergreen_per_day: 1 });
+
+    const r = await host.ask('Run the Fishbowl Studio daily run now.').done;
+    assert.equal(r.ok, true, `${kind}: ${r.message}`);
+    assert.equal(r.drafts, 1, `${kind}: the evergreen post is still drafted`);
+    const triageCalls = () => api.requests.filter((p) => p.output_config.format.schema === SCHEMAS.triage).length;
+    assert.equal(triageCalls(), 1, `${kind}: one batch, one call`);
+    const items = host.ctx.tx((db) => db.items.filter((i) => !i.explore && !i.duplicate_of));
+    assert.ok(items.length > 0);
+    for (const i of items) { assert.ok(i.triaged_at, `${kind}: ${i.title} closed`); assert.equal(i.interest, 0); }
+    assert.equal(takesCalls(api).filter((p) => story(p) !== 'evergreen').length, 0, `${kind}: no story drafted at interest 0`);
+
+    // A queued job makes the timer do a real run; the batch is not offered again.
+    host.ctx.tx((db) => { db.jobs.push({ id: host.ctx.id('job'), kind: 'draft_item', item_id: items[0].id, status: 'queued', created_at: host.ctx.iso() }); });
+    host.prefsSet({ autorun: true });
+    const before = takesCalls(api).length;
+    await ticks(host, clock, 24);
+    assert.ok(takesCalls(api).length > before, `${kind}: the tick ran and drafted the job`);
+    assert.equal(triageCalls(), 1, `${kind}: ticks do not retry the batch`);
+  }
+});
+
+test('a tick still running makes the next one a no-op', async () => {
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  let api;
+  const made = await app({ createModel: () => makeModel({ create: async (p) => { await gate; return api.create(p); } }) });
+  api = made.api;
+  const { host } = made;
+  await host.keySet(KEY);
+  await setUpBrand(host);
+  host.prefsSet({ autorun: true });
+
+  const first = host.tick();
+  await new Promise((r) => setTimeout(r, 20));
+  const second = await host.tick();
+  assert.deepEqual(second, { calls: 0, skipped: true });
+  release();
+  const t1 = await first;
+  assert.ok(t1.calls > 0);
+  assert.ok(!t1.skipped);
+  assert.equal(api.requests.length, t1.calls);
+  // Once it is done, ticks run again.
+  assert.equal((await host.tick()).skipped, undefined);
+});

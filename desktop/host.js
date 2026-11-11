@@ -24,6 +24,7 @@ export function makeHost({ home, appDir, safeStorage, createModel = (apiKey) => 
   const keys = makeKeystore({ dir: appDir, safeStorage });
   const prefsFile = path.join(appDir, 'prefs.json');
   let model = null;
+  let ticking = false;
 
   const prefs = () => { try { return { ...DEFAULT_PREFS, ...JSON.parse(fs.readFileSync(prefsFile, 'utf8')) }; } catch { return { ...DEFAULT_PREFS }; } };
   const getModel = async () => {
@@ -55,6 +56,21 @@ export function makeHost({ home, appDir, safeStorage, createModel = (apiKey) => 
     if (t === 'Run the Fishbowl Studio daily run now.') return { kind: 'daily', slug: active(), go: () => runner.daily(active(), { force: true }) };
     if (/^Run my Fishbowl Studio rewrites and redos now\.$|^Draft the link I just sent to Fishbowl Studio/.test(t)) return { kind: 'jobs', slug: active(), go: () => runner.jobs(active()) };
     return null;
+  }
+
+  // One pass of the timer; tick() below keeps two from overlapping.
+  async function tickOnce() {
+    const budget = runner.budget(MAX_CALLS_PER_TICK);
+    for (const p of ctx.personas.list()) {
+      const c = ctx.persona(p.slug);
+      try { releaseTool(c); } catch { /* a broken persona shouldn't stop the others */ }
+      if (!prefs().autorun || !keys.has() || !c.settings().setup_complete || runner.busy(p.slug)) continue;
+      if (ctx.now() - (failedAt.get(p.slug) ?? -Infinity) < RETRY_AFTER_MS) continue;
+      if (!budget.can(CALLS_PER_BRIEF)) break;
+      const r = await runner.daily(p.slug, { budget });
+      if (r.ok) failedAt.delete(p.slug); else failedAt.set(p.slug, ctx.now());
+    }
+    return { calls: budget.used };
   }
 
   return {
@@ -95,17 +111,11 @@ export function makeHost({ home, appDir, safeStorage, createModel = (apiKey) => 
     // it's time to read, or a rewrite is queued. The whole tick shares one call budget, and a
     // brand whose last automatic run failed sits out for an hour.
     async tick() {
-      const budget = runner.budget(MAX_CALLS_PER_TICK);
-      for (const p of ctx.personas.list()) {
-        const c = ctx.persona(p.slug);
-        try { releaseTool(c); } catch { /* a broken persona shouldn't stop the others */ }
-        if (!prefs().autorun || !keys.has() || !c.settings().setup_complete || runner.busy(p.slug)) continue;
-        if (ctx.now() - (failedAt.get(p.slug) ?? -Infinity) < RETRY_AFTER_MS) continue;
-        if (!budget.can(CALLS_PER_BRIEF)) break;
-        const r = await runner.daily(p.slug, { budget });
-        if (r.ok) failedAt.delete(p.slug); else failedAt.set(p.slug, ctx.now());
-      }
-      return { calls: budget.used };
+      // A tick still running (a slow feed or API call) makes the next one a no-op, so two ticks
+      // never run side by side with a budget each.
+      if (ticking) return { calls: 0, skipped: true };
+      ticking = true;
+      try { return await tickOnce(); } finally { ticking = false; }
     },
   };
 }

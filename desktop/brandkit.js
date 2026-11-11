@@ -98,6 +98,12 @@ const rssOf = (pid) => new Promise((resolve) => execFile('ps', ['-o', 'rss=', '-
 export function isolatedExtract(buf, kind, { timeoutMs = LIMITS.extract_ms, heapMb = LIMITS.extract_heap_mb, rssMb = LIMITS.extract_rss_mb } = {}) {
   if (kind === 'text') return extractText(buf, kind);
   return new Promise((resolve, reject) => {
+    // The child is this same Electron binary run as plain Node (ELECTRON_RUN_AS_NODE), so the
+    // RunAsNode fuse must stay on. The build sets no Electron fuses (electron-builder's
+    // `electronFuses` in package.json "build"); turning RunAsNode off there breaks brand kit
+    // PDF and DOCX reading. Fuses worth turning off: EnableNodeOptionsEnvironmentVariable,
+    // EnableNodeCliInspectArguments, OnlyLoadAppFromAsar, EnableEmbeddedAsarIntegrityValidation
+    // (candidates only; none has been tried with this build).
     const child = fork(CHILD, [], {
       execArgv: [`--max-old-space-size=${heapMb}`],
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },

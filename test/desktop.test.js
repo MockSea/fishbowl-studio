@@ -8,6 +8,7 @@ import { tempHome, at } from './helpers.js';
 import { writeKitFiles, png } from './kit-files.js';
 import { KEY, fakeSafeStorage, NOW, fetchImpl, app, setUpBrand } from './desktop-helpers.js';
 import { makeHost } from '../desktop/host.js';
+import Anthropic from '@anthropic-ai/sdk';
 import { makeModel, MODEL } from '../desktop/llm.js';
 import { editDiff } from '../server/lib/learn.js';
 
@@ -102,17 +103,17 @@ test('ask routes only the board\'s own prompts', async () => {
   assert.match((await d.done).message, /Finish setting up/);
 });
 
-test('model errors come back as a sentence, and the run ends', async () => {
+test('API errors come back as a sentence, and the run ends', async () => {
   const home = tempHome(), appDir = tempHome();
   const events = [];
   const host = makeHost({ home, appDir, safeStorage: fakeSafeStorage(), now: () => NOW, fetchImpl, emit: (e) => events.push(e),
-    createModel: () => makeModel({ create: async () => ({ stop_reason: 'refusal', content: [] }) }) });
+    createModel: () => makeModel({ create: async () => { throw new Anthropic.APIConnectionError({ message: 'offline' }); } }) });
   await host.keySet(KEY);
   await setUpBrand(host);
   const r = await host.ask('Run the Fishbowl Studio daily run now.').done;
   assert.equal(r.ok, false);
   assert.equal(events.at(-1).state, 'error');
-  assert.match(events.at(-1).message, /declined/);
+  assert.match(events.at(-1).message, /Couldn't reach Anthropic/);
   assert.equal(host.runner.busy(host.ctx.slug), false);
 });
 
