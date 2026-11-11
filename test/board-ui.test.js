@@ -10,47 +10,45 @@ import { seed } from '../dev/seed.mjs';
 import { makeContext } from '../server/lib/state.js';
 import { callTool } from '../server/lib/tools.js';
 import { PLUGIN_ROOT } from '../server/lib/config.js';
-import { BOARD_SCRIPTS, boardHtml } from '../server/lib/rpc.js';
+import { BOARD_SCRIPTS, boardHtml } from '../server/lib/page.js';
 
 const tick = () => new Promise((r) => setTimeout(r, 5));
 async function settle(n = 20) { for (let i = 0; i < n; i++) await tick(); }
 
-async function boot({ fetchImpl, displayModes, refuseDisplay, hooks } = {}) {
+// A stand-in for web-bridge.js: window.Studio calls the real tools in-process, and anything the
+// board hands to Claude is recorded in `sent` as { method: 'ask', text }.
+async function boot({ fetchImpl, hooks } = {}) {
   const home = tempHome();
   seed(home);
   const ctx = makeContext({ home, fetchImpl });
   const { document } = makeDom();
   const sent = [];
-  const listeners = [];
-  const parent = {
-    postMessage: async (m) => {
-      sent.push(m);
-      const reply = (result) => listeners.forEach((f) => f({ source: parent, data: { jsonrpc: '2.0', id: m.id, result } }));
-      if (m.method === 'ui/initialize') reply({ protocolVersion: '2026-01-26', hostContext: { theme: 'dark', ...(displayModes && { availableDisplayModes: displayModes }), styles: { variables: { '--color-text-primary': '#fff' } } } });
-      else if (m.method === 'tools/call') reply(await callTool(ctx, m.params.name, m.params.arguments));
-      else if (m.method === 'ui/message' || m.method === 'ui/open-link' || m.method === 'ui/request-display-mode') reply(m.method === 'ui/request-display-mode' && !refuseDisplay ? { mode: m.params.mode } : {});
-      else if (m.method === 'ui/notifications/initialized') {
-        const r = await callTool(ctx, 'studio_board', {});
-        listeners.forEach((f) => f({ source: parent, data: { jsonrpc: '2.0', method: 'ui/notifications/tool-result', params: r } }));
-      }
-    },
-  };
   const win = {
-    document, parent, innerWidth: 640, navigator: { clipboard: { writeText: async (t) => { win.copied = t; } } },
-    addEventListener: (t, f) => { if (t === 'message') listeners.push(f); },
+    document, innerWidth: 640, navigator: { clipboard: { writeText: async (t) => { win.copied = t; } } },
+    addEventListener: () => {},
     requestAnimationFrame: (f) => setTimeout(f, 0), clearTimeout,
     setTimeout: (f, ms) => { const t = setTimeout(f, ms); if (ms > 100) t.unref(); return t; }, ResizeObserver: class { observe() {} },
     Promise, Map, Set, Object, Array, Date, Math, Number, String, JSON, Error, console, STUDIO_SKINS: ['light'],
   };
   win.window = win;
+  win.Studio = {
+    connect: async () => ({}),
+    callTool: async (name, args) => { sent.push({ method: 'call', name }); return callTool(ctx, name, args || {}); },
+    askClaude: async (text) => { sent.push({ method: 'ask', text }); return true; },
+    copy: async (t) => { win.copied = t; return true; },
+    openLink: async (url) => { sent.push({ method: 'link', url }); return true; },
+    reportSize: () => {}, setStamp: () => {}, onResult: () => {}, onContext: () => {},
+    isSuperseded: () => false, fullscreen: async () => null, displayMode: async () => null,
+  };
   if (hooks) win.BoardHooks = hooks;
   vm.createContext(win);
   const ui = (f) => fs.readFileSync(path.join(PLUGIN_ROOT, 'server', 'ui', f), 'utf8');
-  for (const f of ['board-bridge.js', ...BOARD_SCRIPTS]) vm.runInContext(ui(f), win, { filename: f });
+  for (const f of BOARD_SCRIPTS) vm.runInContext(ui(f), win, { filename: f });
   await settle();
   const nav = async (v) => { await document.querySelectorAll('.navbtn').find((x) => x.dataset.view === v).click(); await settle(); };
   return { ctx, document, sent, win, nav, view: () => document.getElementById('view') };
 }
+const asked = (b) => b.sent.filter((m) => m.method === 'ask');
 
 const isBtn = (e) => e.tagName === 'BUTTON';
 const buttons = (root, text) => root.findAll((e) => isBtn(e) && (e.textContent.trim() === text || e.textContent.trim().startsWith(text) || e.attrs['aria-label'] === text));
@@ -59,13 +57,8 @@ const button = (root, text) => root.find((e) => isBtn(e) && (e.textContent.trim(
 const input = (root, aria) => root.find((e) => ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.tagName) && e.attrs['aria-label'] === aria);
 const drafts = (b) => b.ctx.store.read('drafts', []);
 
-test('the board handshakes, keeps its own light skin and renders the drafts feed', async () => {
+test('the board renders the drafts feed', async () => {
   const b = await boot();
-  assert.equal(b.sent[0].method, 'ui/initialize');
-  assert.equal(b.sent[0].params.protocolVersion, '2026-01-26');
-  assert.ok(b.sent.some((m) => m.method === 'ui/notifications/initialized'));
-  assert.equal(b.document.documentElement.dataset.theme, 'dark');
-  assert.equal(b.document.documentElement.dataset.skin, 'light', 'no dark skin file, so it stays light');
   const v = b.view().textContent;
   assert.match(v, /Four kilometres of kerb/);
   assert.match(v, /Pick the one you'd post/);
@@ -77,7 +70,6 @@ test('the board handshakes, keeps its own light skin and renders the drafts feed
   assert.match(b.document.getElementById('persona').textContent, /Northwind Bicycles/);
   assert.match(v, /Your brands/);
   assert.match(v, /Fernhollow Bakery/);
-  assert.ok(b.sent.some((m) => m.method === 'ui/notifications/size-changed'));
 });
 
 test('pick, approve, skip and copy go through studio_act and re-render', async () => {
@@ -91,7 +83,7 @@ test('pick, approve, skip and copy go through studio_act and re-render', async (
   assert.ok(drafts(b).some((d) => d.status === 'passed' && d.decided_at && Date.now() - Date.parse(d.decided_at) < 60e3));
   await button(b.view(), 'Skip').click();
   await settle();
-  assert.ok(b.sent.filter((m) => m.method === 'tools/call' && m.params.name === 'studio_act').length >= 3);
+  assert.ok(b.sent.filter((m) => m.method === 'call' && m.name === 'studio_act').length >= 3);
   await button(b.view(), 'Approved').click();
   await settle();
   const copy = button(b.view(), 'Copy ·');
@@ -238,7 +230,7 @@ test('Settings: switches, steppers and segmented choices save on click; Reads an
   await button(b.view(), 'Remove game-changer').click(); await settle();
   assert.doesNotMatch(b.ctx.store.readFile('settings.json'), /game-changer/);
   await button(b.view(), 'Change the brand voice').click(); await settle();
-  assert.ok(b.sent.some((m) => m.method === 'ui/message'));
+  assert.ok(asked(b).length);
   await b.nav('reads');
   assert.match(b.view().textContent, /interest 9\/10/);
   assert.match(b.view().textContent, /From wandering/);
@@ -360,8 +352,7 @@ test('Settings: account slots ask Claude to walk them through signing in and rec
   assert.match(v, /Reading signed in: not yet · Posting for you: off/);
   const li = b.view().findAll((e) => e.classList.contains('row-item')).find((r) => /LinkedIn/.test(r.textContent) && /Add account/.test(r.textContent));
   await button(li, 'Add account').click(); await settle();
-  const msg = b.sent.filter((m) => m.method === 'ui/message').pop();
-  assert.match(JSON.stringify(msg.params), /signing in to linkedin\.com myself/);
+  assert.match(asked(b).pop().text, /signing in to linkedin\.com myself/);
   assert.equal(b.ctx.store.read('accounts', []).find((a) => a.type === 'linkedin').status, 'connected_by_prompt');
 });
 
@@ -395,8 +386,7 @@ test('Wizard on the board: brand, questions, Claude drafts in the chat, they kee
   assert.equal(b.ctx.store.read('wizard', {}).answers.audience, 'Readers in the neighbourhood and the book club', 'saved as they go');
   input(b.view(), 'What should it talk about?').value = 'new books, author events, the paper trade';
   await button(b.view(), 'Draft it for me').click(); await settle();
-  const msg = b.sent.filter((m) => m.method === 'ui/message').pop();
-  assert.match(JSON.stringify(msg.params), /Draft the Fishbowl Studio setup for Juniper Lane Books \(persona juniper-lane-books\)/, 'handed to Claude like Add account');
+  assert.match(asked(b).pop().text, /Draft the Fishbowl Studio setup for Juniper Lane Books \(persona juniper-lane-books\)/, 'handed to Claude like Add account');
   assert.match(b.view().textContent, /Claude is drafting Juniper Lane Books.*Waiting for Claude in the chat/);
   // Claude, in the chat.
   const brief = (await callTool(b.ctx, 'studio_wizard_brief', {})).content[0].text;
@@ -434,7 +424,7 @@ test('Wizard on the board: brand, questions, Claude drafts in the chat, they kee
   // Finish: one click asks Claude to make the scheduled task.
   assert.match(b.view().textContent, /Make it run on its own.*Fishbowl Studio daily run/);
   await button(b.view(), 'Set it up for me').click(); await settle();
-  assert.match(JSON.stringify(b.sent.filter((m) => m.method === 'ui/message').pop().params), /create_scheduled_task.*cron \\"0 7 \* \* 1-5\\"/);
+  assert.match(asked(b).pop().text, /create_scheduled_task[\s\S]*cron "0 7 \* \* 1-5"/);
   await button(b.view(), 'Finish setup').click(); await settle();
   assert.equal(b.ctx.settings().setup_complete, true);
   assert.match(b.view().textContent, /Today's drafts for Juniper Lane Books/);
@@ -491,19 +481,6 @@ test('Posting on the board: missed and failed posts are never silent; approve to
   // Schedule now includes the posting task.
   await b.nav('schedule');
   assert.match(b.view().textContent, /Fishbowl Studio posting.*Run the Fishbowl Studio posting\./);
-});
-
-test('Full screen: shown only when the host offers it, hidden for good when a request fails', async () => {
-  const none = await boot();
-  assert.equal(none.document.getElementById('full-btn').hidden, true);
-  const offered = await boot({ displayModes: ['inline', 'fullscreen'] });
-  assert.equal(offered.document.getElementById('full-btn').hidden, false);
-  const inlineOnly = await boot({ displayModes: ['inline'] });
-  assert.equal(inlineOnly.document.getElementById('full-btn').hidden, true);
-  const refused = await boot({ displayModes: ['inline', 'fullscreen'], refuseDisplay: true });
-  await refused.document.getElementById('full-btn').click();
-  await new Promise((r) => setTimeout(r, 20));
-  assert.equal(refused.document.getElementById('full-btn').hidden, true);
 });
 
 test('a host that reads only sites and subreddits offers only those, and says nothing of a coach', async () => {

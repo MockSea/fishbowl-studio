@@ -1,8 +1,6 @@
 // Loading and validating the files in the data folder, plus the plugin's own data
 // (platforms/, shapes/, defaults/). Platforms and shapes are data: a new one is one file.
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { ROOT, readOwn, listOwn } from './files.js';
 import { safeHttpsUrl, normaliseUrl } from './urls.js';
 import { instructionPhrase } from './fence.js';
 import { oneLine } from './text.js';
@@ -10,18 +8,17 @@ import { FETCH_KEYS } from './schedule.js';
 import { parseSubreddit, parseWatch, parseSearch, feedKey, watchKey, searchKey, TRENDS_KEY } from './handles.js';
 import { canRead } from './accounts.js';
 
-export const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+export const PLUGIN_ROOT = ROOT;
 
-const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
-const dirJson = (dir) => fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort()
-  .map((f) => readJson(path.join(dir, f)));
+const readJson = (rel) => JSON.parse(readOwn(rel));
+const dirJson = (dir) => listOwn(dir).filter((f) => f.endsWith('.json')).map((f) => readJson(`${dir}/${f}`));
 
 const cache = {};
 function once(key, fn) { return cache[key] ??= fn(); }
 
-export const defaults = (name) => once(`d:${name}`, () => readJson(path.join(PLUGIN_ROOT, 'defaults', `${name}.json`)));
-export const allPlatforms = () => once('platforms', () => Object.fromEntries(dirJson(path.join(PLUGIN_ROOT, 'platforms')).map((p) => [p.id, p])));
-export const seedShapes = () => once('shapes', () => dirJson(path.join(PLUGIN_ROOT, 'shapes')));
+export const defaults = (name) => once(`d:${name}`, () => readJson(`defaults/${name}.json`));
+export const allPlatforms = () => once('platforms', () => Object.fromEntries(dirJson('platforms').map((p) => [p.id, p])));
+export const seedShapes = () => once('shapes', () => dirJson('shapes'));
 
 export const SLUG_RE = /^[a-z][a-z0-9_-]{0,39}$/;
 
@@ -101,7 +98,7 @@ export function writePlaybook(store, bullets) {
 
 export function parseJson(text, fallback) {
   if (text == null || text === '') return fallback;
-  try { return JSON.parse(text); } catch { throw new Error('A settings file in the studio folder is not valid JSON. Ask Claude to repair it.'); }
+  try { return JSON.parse(text); } catch { throw new Error('A settings file in the studio folder is not valid JSON. Fix it in a text editor, or move it out of the folder to start that file over.'); }
 }
 
 // ---- validation for files written through studio_config ----

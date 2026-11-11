@@ -1,59 +1,142 @@
+// The API key: OS stores take it on stdin only; the plaintext file is the 0600 fallback and the
+// only place plaintext is ever written; nothing that reaches the page or the logs carries it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { tempHome } from './helpers.js';
-import { KEY, fakeSafeStorage, everything, app, setUpBrand } from './desktop-helpers.js';
-import { makeKeystore, checkKey, KEY_FILE } from '../desktop/keystore.js';
-import { makeModel } from '../desktop/llm.js';
+import { KEY, everything, app, setUpBrand } from './host-helpers.js';
+import { makeKeystore, osStore, checkKey, KEY_FILE, MARK_FILE, DPAPI_FILE } from '../server/lib/keystore.js';
+import { makeModel } from '../server/lib/engines/api.js';
 
 test('checkKey trims and rejects junk', () => {
   assert.equal(checkKey(`  ${KEY}\n`).key, KEY);
-  for (const bad of ['', 'short', 'has a space in it but is long enough', 'x'.repeat(401), 'sk-ant-<script>-aaaaaaaaaaaaaaa']) assert.equal(checkKey(bad).ok, false, bad);
+  for (const bad of ['', 'short', 'has a space in it but is long enough', 'x'.repeat(401), 'sk-ant-<script>-aaaaaaaaaaaaaaa', 'sk-ant-aaaaaaaaaaaaaaaaaaaa\n-w evil']) assert.equal(checkKey(bad).ok, false, bad);
 });
 
-test('the key is stored encrypted, owner-only, and reads back', async () => {
+// A fake of the tools the OS stores call. Records every call; the secret lives only in memory.
+function fakeTools({ fail = false } = {}) {
+  const calls = [];
+  let secret = null;
+  const run = async (cmd, args, input = '') => {
+    calls.push({ cmd, args, input });
+    if (fail) return { code: 1, stdout: '' };
+    if (cmd === '/usr/bin/security') {
+      if (args[0] === '-i') { secret = input.match(/-w (\S+)/)[1]; return { code: 0, stdout: '' }; }
+      if (args[0] === 'find-generic-password') return secret ? { code: 0, stdout: `${secret}\n` } : { code: 44, stdout: '' };
+      if (args[0] === 'delete-generic-password') { secret = null; return { code: 0, stdout: '' }; }
+    }
+    if (cmd === 'secret-tool') {
+      if (args[0] === 'store') { secret = input; return { code: 0, stdout: '' }; }
+      if (args[0] === 'lookup') return secret ? { code: 0, stdout: secret } : { code: 1, stdout: '' };
+      if (args[0] === 'clear') { secret = null; return { code: 0, stdout: '' }; }
+    }
+    if (cmd === 'powershell.exe') {
+      const body = args.at(-1);
+      if (body.includes('::Protect(')) return { code: 0, stdout: Buffer.from(`dpapi:${[...input].reverse().join('')}`).toString('base64') };
+      if (body.includes('::Unprotect(')) return { code: 0, stdout: [...Buffer.from(input, 'base64').toString().slice(6)].reverse().join('') };
+    }
+    return { code: 127, stdout: '' };
+  };
+  return { run, calls, secret: () => secret };
+}
+
+const noKeyInArgv = (calls) => { for (const c of calls) assert.ok(!c.args.join(' ').includes(KEY), `${c.cmd} got the key in its arguments`); };
+
+test('macOS: the key goes to the Keychain on stdin, and no file holds it', async () => {
   const dir = tempHome();
-  const ks = makeKeystore({ dir, safeStorage: fakeSafeStorage() });
-  assert.equal(ks.has(), false);
-  assert.deepEqual(await ks.set(KEY), { ok: true });
+  const tools = fakeTools();
+  const ks = makeKeystore({ dir, os: osStore({ platform: 'darwin', run: tools.run, dir }), env: {} });
+  assert.equal(ks.target(), 'keychain');
+  assert.deepEqual(await ks.set(KEY), { ok: true, store: 'keychain', fellBack: false });
+  assert.equal(tools.secret(), KEY);
   assert.equal(await ks.get(), KEY);
+  assert.equal(ks.where(), 'keychain');
   assert.equal(await ks.hint(), '…WXYZ');
-  assert.equal(fs.statSync(path.join(dir, KEY_FILE)).mode & 0o777, 0o600);
-  assert.ok(!everything(dir).includes(KEY), 'no plaintext key on disk');
-  assert.ok(!everything(dir).includes(KEY.slice(10, 30)), 'not even part of it');
-  ks.clear();
+  noKeyInArgv(tools.calls);
+  assert.ok(!everything(dir).includes(KEY.slice(0, -4)), 'no plaintext key on disk');
+  assert.deepEqual(fs.readdirSync(dir), [MARK_FILE]);
+  await ks.clear();
+  assert.equal(tools.secret(), null);
   assert.equal(ks.has(), false);
   assert.deepEqual(fs.readdirSync(dir), []);
 });
 
-test('with no encryption available the key is refused, never written in the clear', async () => {
+test('Linux with secret-tool: the key goes to the Secret Service on stdin', async () => {
+  const dir = tempHome(), bin = tempHome();
+  fs.writeFileSync(path.join(bin, 'secret-tool'), '');
+  const tools = fakeTools();
+  const ks = makeKeystore({ dir, os: osStore({ platform: 'linux', run: tools.run, dir, env: { PATH: bin } }), env: {} });
+  assert.equal((await ks.set(KEY)).store, 'secret-service');
+  assert.equal(await ks.get(), KEY);
+  noKeyInArgv(tools.calls);
+  assert.ok(!everything(dir).includes(KEY.slice(0, -4)));
+});
+
+test('Linux without secret-tool: the 0600 file, and only that file, holds the key', async () => {
   const dir = tempHome();
-  const ks = makeKeystore({ dir, safeStorage: fakeSafeStorage({ available: false }) });
-  const r = await ks.set(KEY);
-  assert.equal(r.ok, false);
-  assert.match(r.reason, /can't encrypt/);
+  assert.equal(osStore({ platform: 'linux', dir, env: { PATH: tempHome() } }), null);
+  const ks = makeKeystore({ dir, os: null, env: {} });
+  assert.equal((await ks.set(KEY)).store, 'file');
+  assert.equal(await ks.get(), KEY);
+  if (process.platform !== 'win32') {
+    assert.equal(fs.statSync(path.join(dir, KEY_FILE)).mode & 0o777, 0o600);
+    assert.equal(fs.statSync(path.join(dir, MARK_FILE)).mode & 0o777, 0o600);
+  }
+  const holding = fs.readdirSync(dir).filter((f) => fs.readFileSync(path.join(dir, f), 'utf8').includes(KEY.slice(0, -4)));
+  assert.deepEqual(holding, [KEY_FILE]);
+  await ks.clear();
   assert.deepEqual(fs.readdirSync(dir), []);
 });
 
-test('through the app: the key stays out of the studio folder, the app folder, the window and the logs', async () => {
+test('Windows: DPAPI ciphertext on disk, the key passed on stdin', async () => {
+  const dir = tempHome();
+  const tools = fakeTools();
+  const ks = makeKeystore({ dir, os: osStore({ platform: 'win32', run: tools.run, dir }), env: {} });
+  assert.equal((await ks.set(KEY)).store, 'dpapi');
+  assert.ok(fs.existsSync(path.join(dir, DPAPI_FILE)));
+  assert.equal(await ks.get(), KEY);
+  noKeyInArgv(tools.calls);
+  assert.ok(!everything(dir).includes(KEY.slice(0, -4)), 'no plaintext key on disk');
+});
+
+test('when the OS store fails, the key falls back to the 0600 file and says so', async () => {
+  const dir = tempHome();
+  const tools = fakeTools({ fail: true });
+  const ks = makeKeystore({ dir, os: osStore({ platform: 'darwin', run: tools.run, dir }), env: {} });
+  assert.deepEqual(await ks.set(KEY), { ok: true, store: 'file', fellBack: true });
+  assert.equal(await ks.get(), KEY);
+  assert.equal(ks.where(), 'file');
+});
+
+test('ANTHROPIC_API_KEY is used read-only when nothing is stored', async () => {
+  const dir = tempHome();
+  const ks = makeKeystore({ dir, os: null, env: { ANTHROPIC_API_KEY: KEY } });
+  assert.equal(ks.has(), true);
+  assert.equal(ks.where(), 'env');
+  assert.equal(await ks.get(), KEY);
+  assert.deepEqual(fs.readdirSync(dir), []);
+});
+
+test('through the app: the key stays out of the studio folder, the page and the logs', async () => {
   const logs = [];
   const orig = { log: console.log, error: console.error, warn: console.warn, info: console.info, debug: console.debug };
   for (const k of Object.keys(orig)) console[k] = (...a) => logs.push(a.map(String).join(' '));
   try {
     const keysSeen = [];
-    const t = await app({ createModel: (apiKey) => { keysSeen.push(apiKey); return makeModel({ create: t.api.create }); } });
+    const tools = fakeTools();
+    const t = await app({ os: osStore({ platform: 'darwin', run: tools.run, dir: tempHome() }), createModel: (apiKey) => { keysSeen.push(apiKey); return makeModel({ create: t.api.create }); } });
     const { host, home, appDir, events } = t;
     const set = await host.keySet(KEY);
     assert.equal(set.ok, true);
     assert.equal(set.hint, '…WXYZ');
+    assert.equal(set.where, 'keychain');
     await setUpBrand(host);
     const r = await host.ask('Run the Fishbowl Studio daily run now.').done;
     assert.equal(r.ok, true, r.message);
     assert.deepEqual(keysSeen, [KEY], 'the model was built once, with the stored key');
-    const toWindow = [set, await host.keyStatus(), await host.call('studio_view', { view: 'apikey' }), await host.call('studio_view', { view: 'settings' }), host.prefsGet(), events, host.kitList()];
-    const shown = JSON.stringify(toWindow);
-    assert.ok(!shown.includes(KEY.slice(0, -4)), 'nothing sent to the window carries the key');
+    const toPage = [set, await host.keyStatus(), await host.call('studio_view', { view: 'apikey' }), await host.call('studio_view', { view: 'settings' }), host.prefsGet(), events, host.kitList()];
+    assert.ok(!JSON.stringify(toPage).includes(KEY.slice(0, -4)), 'nothing sent to the page carries the key');
     assert.ok(!JSON.stringify(t.api.requests).includes(KEY.slice(0, -4)), 'the key is not in a prompt');
     assert.ok(!everything(home).includes(KEY.slice(0, -4)), 'not in the studio folder');
     assert.ok(!everything(appDir).includes(KEY.slice(0, -4)), 'not in plaintext in the app folder');

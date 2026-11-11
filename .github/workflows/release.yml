@@ -1,0 +1,98 @@
+# Builds the standalone executables, starts each one to check it answers, and on a version tag
+# (v1.2.3) publishes them as a GitHub release with SHA256SUMS. Runs on pushes to main, on pull
+# requests and by hand too, without releasing.
+#
+# Each runner builds for its own system (node --build-sea can't cross-build). The Node used for
+# the build is the official one from setup-node: it becomes the runtime inside the executable.
+name: standalone
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26
+      - run: npm ci
+      - run: npm test
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-15, asset: fishbowl-studio-macos-arm64 }
+          - { runner: macos-15-intel, asset: fishbowl-studio-macos-x64 }
+          - { runner: windows-latest, asset: fishbowl-studio-windows-x64.exe }
+          - { runner: ubuntu-latest, asset: fishbowl-studio-linux-x64 }
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26
+      - run: npm ci
+      - name: Build
+        run: node scripts/build-standalone.mjs --out "dist/${{ matrix.asset }}"
+      - name: Smoke start
+        env:
+          ASSET: dist/${{ matrix.asset }}
+        run: |
+          "./$ASSET" --version
+          home="$RUNNER_TEMP/studio-home"
+          log="$RUNNER_TEMP/studio.log"
+          "./$ASSET" --no-open --home "$home" > "$log" 2>&1 &
+          pid=$!
+          url=""
+          for _ in $(seq 1 60); do
+            url=$(grep -o 'http://127\.0\.0\.1:[0-9]*/?t=[0-9a-f]*' "$log" || true)
+            [ -n "$url" ] && break
+            sleep 1
+          done
+          cat "$log"
+          [ -n "$url" ] || { echo "The studio didn't print its link."; exit 1; }
+          code=$(curl -s -o /dev/null -w '%{http_code}' -c "$RUNNER_TEMP/cookies" "$url")
+          page=$(curl -s -o /dev/null -w '%{http_code}' -b "$RUNNER_TEMP/cookies" "${url%%/?t=*}/")
+          echo "launch link: $code, page: $page"
+          if [ "$RUNNER_OS" = Windows ]; then taskkill //F //IM "${{ matrix.asset }}" || true; else kill "$pid" || true; fi
+          [ "$code" = 303 ] && [ "$page" = 200 ]
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Checksums
+        working-directory: assets
+        run: sha256sum fishbowl-studio-* > SHA256SUMS && cat SHA256SUMS
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" assets/* --repo "$GITHUB_REPOSITORY" --title "$TAG" --notes "Standalone builds of Fishbowl Studio $TAG. Check a download against SHA256SUMS, or use scripts/install.sh or scripts/install.ps1, which check it for you."

@@ -5,10 +5,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { rss, at, setSources } from './helpers.js';
-import { KEY, app, setUpBrand, fetchImpl } from './desktop-helpers.js';
-import { makeModel, SCHEMAS } from '../desktop/llm.js';
-import { MAX_CALLS_PER_RUN } from '../desktop/runner.js';
-import { MAX_CALLS_PER_TICK } from '../desktop/host.js';
+import { KEY, app, setUpBrand, fetchImpl } from './host-helpers.js';
+import { makeModel, SCHEMAS } from '../server/lib/engines/api.js';
+import { MAX_CALLS_PER_RUN } from '../server/lib/runner.js';
+import { MAX_CALLS_PER_TICK } from '../server/lib/host.js';
 import { callTool } from '../server/lib/tools.js';
 
 const FIVE_MIN = 5 * 60e3;

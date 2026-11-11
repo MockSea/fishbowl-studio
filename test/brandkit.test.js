@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { tempHome } from './helpers.js';
 import { writeKitFiles, png, docx, pdf } from './kit-files.js';
-import { openKit, LIMITS, sniff, zipTooBig, isolatedExtract } from '../desktop/brandkit.js';
+import { openKit, LIMITS, sniff, zipTooBig, isolatedExtract } from '../server/lib/brandkit.js';
 
 const setup = () => {
   const home = tempHome();
@@ -125,4 +125,19 @@ test('a file that unpacks past the memory limit only stops the reader process, n
 
 test('reading a document is time-limited', async () => {
   await assert.rejects(isolatedExtract(pdf('Slow.'), 'pdf', { timeoutMs: 1 }), /too long/);
+});
+
+test('an upload keeps the name the person gave it for display only', async () => {
+  const { kit, files } = setup();
+  const r = await kit.add(files['notes.md'], { name: '../../etc/evil\u0007.md' });
+  assert.equal(r.ok, true);
+  const f = kit.list().files[0];
+  assert.equal(f.name, 'evil.md');
+  assert.deepEqual(fs.readdirSync(kit.dir).filter((n) => !n.startsWith('manifest')).every((n) => /^[0-9a-f]{12}\.(md|txt)$/.test(n)), true);
+});
+
+test('Windows tasklist output parses to MB', async () => {
+  const { parseTasklist } = await import('../server/lib/brandkit.js');
+  assert.equal(parseTasklist('"node.exe","4242","Console","1","51,200 K"\r\n'), 50);
+  assert.equal(parseTasklist('INFO: No tasks are running'), null);
 });

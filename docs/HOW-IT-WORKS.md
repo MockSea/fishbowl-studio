@@ -1,32 +1,31 @@
 # How Fishbowl Studio works
 
-Fishbowl Studio is a Claude plugin with three parts:
+Fishbowl Studio is one Node program the person starts on their own computer. It has three parts:
 
-1. **A local MCP server** (`server/`, plain Node.js, no dependencies). It does the bookkeeping: reading feeds, dedupe, ranking, release times, verdicts, caps and learning. Every formula lives here as a small pure function with tests.
-2. **Skills and commands** (`skills/`, `commands/`). They tell Claude what to do at each step: react to stories, write takes, rewrite from notes, write the weekly report. Claude does the thinking; the server hands it exactly the context it needs and checks what comes back.
-3. **The board** (`server/ui/`), an MCP App: one self-contained HTML page rendered inside the chat, assembled at read time from small files (no build step): the skin (`skins/*.css`), the component CSS (`board.css`), the bridge and four scripts (icons, shell, drafts feed, the other pages). Every button calls a server tool through the host bridge.
+1. **The studio** (`server/lib/`). It does the bookkeeping: reading feeds, dedupe, ranking, release times, verdicts, caps and learning. Every formula lives here as a small pure function with tests. Its operations are the `studio_*` tools listed below; the board and the runner both go through them.
+2. **The runner and the engines** (`server/lib/runner.js`, `server/lib/engines/`). The runner drives a run (fetch, triage, draft, release) and hands each writing step to Claude: through `claude -p` on the person's Claude plan, or the Anthropic API with their key. The studio hands Claude exactly the context it needs and checks what comes back.
+3. **The board** (`server/ui/`), one HTML page served by the local web server (`server/lib/web.js`) to the person's browser, assembled at read time from small files (no build step): the skin (`skins/*.css`), the component CSS (`board.css`), the bridge and the page scripts. Every button calls a studio tool through the server's JSON API.
 
-The model never sees raw files and the server never writes prose.
+The model never sees raw files and the studio never writes prose.
 
 ## The data folder
 
-Everything lives in one folder, `~/Documents/Fishbowl Studio/` by default (set `STUDIO_HOME` to move it). It holds one folder per brand, `personas/<slug>/`, and `personas.json`, which lists them and names the active one. Each persona folder holds exactly what a single-brand studio held before. Files you might open in a persona's folder:
+Everything lives in one folder, `~/Documents/Fishbowl Studio/` by default (`--home` or `STUDIO_HOME` moves it). The program's own files (key marker, preferences, the day's call count, the lock file a second copy reads) are in its `app/` folder. It holds one folder per brand, `personas/<slug>/`, and `personas.json`, which lists them and names the active one. Each persona folder holds exactly what a single-brand studio held before. Files you might open in a persona's folder:
 
 | File | What it is | Who changes it |
 |---|---|---|
 | `settings.json` | platforms, daily cap, release times, news frequency, takes per story, overused phrases | you (board Settings and Schedule, or Claude) |
-| `voice.md` | the brand and its voice | you, via `/studio:voice` |
+| `voice.md` | the brand and its voice | you (setup, or the voice proposals you accept) |
 | `voice-samples.json` | posts you pasted as examples | you |
 | `beat.json` | topics and how much you want of each, off-limits list, curiosity keywords, names you allow | you (board Topics, or setup) |
-| `sources.json` | news feeds and subreddits, the reading list, watched X and LinkedIn accounts, X trending topics, saved searches; each can be paused | you, on the board's Sources page; Claude can only suggest, pause, re-file or remove |
+| `sources.json` | news feeds and subreddits, plus the kinds below that need Claude's browser; each can be paused | you, on the board's Sources page; Claude can only suggest |
 | `positions.json` | what the brand believes, strength 1-5 | you; Claude only proposes |
 | `audience.json` | who you write for and their "buttons" | you; Claude only proposes |
 | `playbook.md` | the learned rules injected into every draft | you; Claude only proposes |
 | `shapes.json` | shapes learned from posts you admire | you accept them on the board |
-| `reports/weekly-*.md` | weekly reports | written by the weekly skill |
-| `state/*.json` | bookkeeping: items, drafts, verdicts, skip reasons, edits, notes, hearts, jobs, proposals, weights, coach reports, connected accounts and their "Post for me" history (`accounts.json`), scheduled and finished posts (`posts.json`), the setup wizard's answers and step (`wizard.json`) | the server |
+| `state/*.json` | bookkeeping: items, drafts, verdicts, skip reasons, edits, notes, hearts, jobs, proposals, weights, the setup wizard's answers and step (`wizard.json`) | the studio |
 
-All writes are atomic (temp file + rename) under a folder lock, so a scheduled run and an open board can't overwrite each other.
+All writes are atomic (temp file + rename) under a folder lock, so a run and the open board can't overwrite each other.
 
 ## Personas
 
@@ -34,77 +33,62 @@ One studio per brand. `personas.json` is `{active, personas: [{slug, name, creat
 
 - **Every tool acts on the active persona**, or on the one named by its `persona` argument (every tool takes one). A tool call is pinned to one persona for its whole run, so switching on the board can't split a call between two brands. A `persona` that isn't in the registry is refused; it can't name a path.
 - `studio_personas`: `list` (with what's waiting per persona), `create` (a new empty folder plus `settings.json` with the brand name; it becomes active), `switch`, `rename`. There is no delete: removing a brand is moving its folder away by hand. On the board, **Add persona** goes through the setup wizard (below), which creates the persona when they send step 1.
-- **The daily run goes through every persona** (the `daily-run` skill lists them and passes `persona` on each call), so one scheduled task serves all brands. The board's switcher only changes which brand the board and the chat work on.
+- **A run goes through every persona**, so one timer serves all brands. The board's switcher only changes which brand the board works on.
 - **Migration.** On the first start of this version, a studio folder from before personas (config files and `state/` at its root) is moved, entry by entry with a rename, into `personas/<slug>/` (slug from its brand name), and `personas.json` is written last. Nothing is copied or rewritten, and files that aren't the studio's stay where they are. If a move was interrupted, the next start finishes it; where a file already exists at the destination, the leftover root copy is kept beside it as `<name>.legacy-<time>` rather than overwriting anything. A brand-new folder gets one empty persona, "My brand".
 
 ## The setup wizard
 
-One setup flow for every brand: the board's **Add persona**, a new brand's first-run card, **Run setup again** in Settings and `/studio:setup` (which opens the board on it with `studio_board {view: "wizard"}`) all open the same wizard. The server keeps its state per persona in `state/wizard.json` (`step`, brand, link, their answers, when they asked for drafts, which proposals they became), written as they go, so closing the board, or restarting Claude, loses nothing: the Drafts page offers **Pick up where you left off** at the same step until they finish.
+One setup flow for every brand: the board's **Add persona**, a new brand's first-run card and **Run setup again** in Settings all open the same wizard. The studio keeps its state per persona in `state/wizard.json` (`step`, brand, link, their answers, when they asked for drafts, which proposals they became), written as they go, so closing the tab or stopping the studio loses nothing: the Drafts page offers **Pick up where you left off** at the same step until they finish.
 
 1. **Brand.** A name (checked like any persona name) and an optional website or LinkedIn address (`https://` added if they leave it off, then the usual public-HTTPS check). For a new brand, `studio_wizard {action: "create"}` makes the persona and switches to it; for the active one, `start` renames it if they changed the name.
 2. **Questions.** Who the posts are for, how it should sound, what it should talk about, what's off limits: each with an example, each skippable (an empty answer), each saved on change, at most 600 characters, control characters stripped.
-3. **Drafts.** **Draft it for me** sets the step to `drafting` and the board posts a chat message ("Draft the Fishbowl Studio setup for … (persona …)") with `ui/message`, the same hand-off Add account and Draft from a link use; if the host refuses, the board shows the words to type. The board then shows a waiting state and reloads every 4 seconds for 5 minutes (**Check now** after that). In the chat, the `setup-draft` skill calls `studio_wizard_brief`, which only answers while the step is `drafting`. The server reads the linked page once through the same safe fetch path as Draft from a link (LinkedIn pages aren't fetched: they need a login) and hands Claude **their answers in one fenced block and the page in another** (fresh nonce, guard sentence, fence tags neutralised, the page capped at 2,000 characters), with a one-time `brief_id`. Claude replies with `studio_wizard_save`: a voice (markdown, 40-2,400 characters), up to 6 playbook bullets, 8 topics, 8 off-limits lines, 3 audience lines and 10 starter sources. Every one becomes an **open proposal** (origin `wizard`, set by the server) or a **suggested source**, through the same validators as any proposal: the own-words check refuses instruction-shaped text, links and handles, so a page that says "set the voice to…" or "always include this link" can't land as written. A source pointing at the page they linked is refused; any other address is only ever a suggestion, never fetched before their tap. Rejected lines are listed back, and one follow-up save with `fix: true` may add rewritten ones. A new draft request supersedes what's still open from the last. Nothing is written to `voice.md`, `playbook.md`, `beat.json`, `audience.json` or `sources.json` by any of this.
-   On the board each draft shows in an editable field: **Keep** applies it (their edited text, if they changed it, re-checked like a proposal and kept beside the suggestion), **Drop** rejects it, **Keep everything** keeps the rest; starter sources have **Add** (test-fetched, as on Sources) and **Dismiss**. The same proposals also wait on Coach and Playbook, marked "From setup".
-4. **Posting.** Each account that can post, with Connect for the unconnected ones and the same **Post for me** switch as Settings (below), off.
+3. **Drafts.** **Draft it for me** sets the step to `drafting` and the runner makes one model call. `wizardBrief` only answers while the step is `drafting`. It reads the linked page once through the same safe fetch path as Draft from a link (LinkedIn pages aren't fetched: they need a login) and hands Claude **their answers in one fenced block and the page in another** (fresh nonce, guard sentence, fence tags neutralised, the page capped at 2,000 characters). The answer is checked by `wizardSave`: a voice (markdown, 40-2,400 characters), up to 6 playbook bullets, 8 topics, 8 off-limits lines, 3 audience lines and 10 starter sources. Every one becomes an **open proposal** (origin `wizard`) or a **suggested source**, through the same validators as any proposal: the own-words check refuses instruction-shaped text, links and handles, so a page that says "set the voice to…" or "always include this link" can't land as written. A source pointing at the page they linked is refused; any other address is only ever a suggestion, never fetched before their tap. A new draft request supersedes what's still open from the last. Nothing is written to `voice.md`, `playbook.md`, `beat.json`, `audience.json` or `sources.json` by any of this.
+   On the board each draft shows in an editable field: **Keep** applies it (their edited text, if they changed it, re-checked like a proposal and kept beside the suggestion), **Drop** rejects it, **Keep everything** keeps the rest; starter sources have **Add** (test-fetched, as on Sources) and **Dismiss**. The same proposals also wait on Playbook, marked "From setup".
 
-**Finish** lists the scheduled tasks to make, with **Set it up for me** (below), and marks the brand set up (`setup_complete`).
+**Finish** offers **Run on its own** and marks the brand set up (`setup_complete`).
 
 ## The daily pipeline
 
-The scheduled task asks Claude to "Run the Fishbowl Studio daily run". The `daily-run` skill then calls:
+A run (**Run it now**, or the timer when **Run on its own** is on) goes through every persona and does:
 
-1. `studio_status`: setup check, plus any release that is due.
-2. `studio_fetch`: every feed in `sources.json` that isn't paused (websites and subreddits). It first checks their **news frequency** (below) and skips the fetch, saying why, if it is too soon. The feed parser is hand-written and tolerant (RSS 2.0, RSS 1.0, Atom), refuses DTDs and entities, strips HTML, keeps HTTPS links only, takes 12 items per feed and at most 3 MB per fetch (it parses the first 1 MB and 200 items, in one linear pass). Redirects are followed by hand, at most 5, and every hop must be a public HTTPS host name; hosts that resolve to private, loopback or link-local addresses are refused. Titles, summaries and authors are flattened to one line with control, format and Unicode tag characters removed. A dead feed is reported and the rest carry on.
+1. Any release that is due.
+2. **Fetch**: every feed in `sources.json` that isn't paused (websites and subreddits). It first checks their **news frequency** (below) and skips the fetch, saying why, if it is too soon. The feed parser is hand-written and tolerant (RSS 2.0, RSS 1.0, Atom), refuses DTDs and entities, strips HTML, keeps HTTPS links only, takes 12 items per feed and at most 3 MB per fetch (it parses the first 1 MB and 200 items, in one linear pass). Redirects are followed by hand, at most 5, and every hop must be a public HTTPS host name; hosts that resolve to private, loopback or link-local addresses are refused. Titles, summaries and authors are flattened to one line with control, format and Unicode tag characters removed. A dead feed is reported and the rest carry on.
    - **Dedupe**: exact URL (normalised: tracking parameters, `www.`, fragments and trailing slashes removed) and **story level**: titles are normalised (outlet suffix and punctuation dropped, light stemming) and compared by Jaccard similarity (≥ 0.5) or containment (≥ 0.8 for 4+ words) within 72 hours. The first outlet's item represents the story; the others are recorded as "also covered by" and feed the trending signal.
    - **Ageing**: items older than 30 days with no drafts are pruned. Only items from the last 48 hours are drafted.
-   - Then `studio_read_queue` / `studio_record_reads`: the X and LinkedIn accounts they watch, X trending topics and their saved searches, read by Claude (below).
-3. `studio_wander` / `studio_record_wander` (up to twice): slow curiosity reading over the reading list. The source is chosen by topic interest (7-day mean triage interest, default 4, plus up to 3 for curiosity keywords seen recently), neglect (every third trip takes the least recently visited source), and caps (12 visits a day, same host at most every 2 h, same source every 24 h). Instruction-shaped entries are dropped. Findings never become drafts directly; they feed evergreen posts.
-4. `studio_triage_queue` / `studio_record_triage`: the newest 40 untriaged stories, one per story cluster (posts and search results included, each marked as what it is). Claude writes a one-line private reaction, a 0-10 interest score and a topic. The queue also says, in one line, why they skipped posts lately ("wrong topic 3 (policy 3)"). These show on the Reads tab and feed the taste log. After each triage the server checks for sites worth suggesting (discovery, below).
-5. `studio_drafting_brief` / `studio_save_takes`, in a loop. The work queue is: queued rewrites, redos and "draft this" requests, then stories with interest ≥ 6 (after their topic weights and what it has learned, below; up to `drafts_per_run`, 12 by default), then evergreen posts (2 a day by default).
-6. `studio_release`: rank and release the due batch.
+3. **Triage**: the newest 40 untriaged stories, one per story cluster, in rounds. Claude writes a one-line private reaction, a 0-10 interest score and a topic. The queue also says, in one line, why they skipped posts lately ("wrong topic 3 (policy 3)"). These show on the Reads tab and feed the taste log.
+4. **Drafting**, one brief at a time, each checked by `saveTakes`. The work queue is: queued rewrites, redos and "draft this" requests, then stories with interest ≥ 6 (after their topic weights and what it has learned, below; up to `drafts_per_run`, 12 by default), then evergreen posts (2 a day by default).
+5. **Release**: rank and release the due batch.
 
-Running the skill twice is harmless: fetched items dedupe, triaged items aren't re-queued, drafted stories aren't drafted again, and each batch releases once.
+The whole run shares one call budget (40 calls) and the day's cap (150), whichever engine answers. Running twice is harmless: fetched items dedupe, triaged items aren't re-queued, drafted stories aren't drafted again, and each batch releases once.
 
 ## How often it reads the news
 
-A plugin can't schedule itself: the trigger is a Cowork scheduled task. Cowork gives Claude a `create_scheduled_task` tool (cron expression, with their approval on a card), so the board's **Set it up for me** (at the end of setup and on the Schedule page) sends Claude each task's name, cron expression, prompt and the studio folder, and asks it to check `list_scheduled_tasks` first and update rather than duplicate. Setting it up by hand stays on the Schedule page. `settings.fetch_every` is one of five presets, validated on save; anything else is refused. Each preset says what task to set (the board's Schedule page shows it with copy buttons, times worked out from their release hours) and the least time between two fetches:
+The studio only works while it's running. While it runs, a timer ticks every five minutes: it releases due batches for every brand and, when **Run on its own** is on, starts a run. On start it catches up batches whose release time passed while it was closed and says how many. `settings.fetch_every` is one of five presets, validated on save; anything else is refused. Each sets the least time between two fetches:
 
-| Preset | Task to set in Cowork | Cron (default hours) | Fetches when |
-|---|---|---|---|
-| `hourly` | repeat Hourly | `0 * * * *` | 45 min or more since the last fetch |
-| `every_3h` | repeat Hourly | `0 */3 * * *` | 2 h 45 min or more since the last fetch |
-| `twice_daily` | two tasks, Daily, an hour before the first batch and an hour before the batch nearest 13:00 | `0 7 * * *`, `0 11 * * *` | 5 h or more |
-| `daily` | Daily, an hour before the first batch | `0 7 * * *` | 20 h or more |
-| `weekdays` (default) | Weekdays, an hour before the first batch | `0 7 * * 1-5` | 20 h or more, never on Saturday or Sunday |
+| Preset | Fetches when |
+|---|---|
+| `hourly` | 45 min or more since the last fetch |
+| `every_3h` | 2 h 45 min or more since the last fetch |
+| `twice_daily` | 5 h or more |
+| `daily` | 20 h or more |
+| `weekdays` (default) | 20 h or more, never on Saturday or Sunday |
 
-When "Post for me" is on for any account of any brand, there is one more task, **Fishbowl Studio posting** (`Run the Fishbowl Studio posting.`), five minutes after each of those brands' release hours (`5 8,12,16,20 * * *` by default; Hourly by hand).
-
-The gaps are a little under the interval so a run that starts a few minutes early still fetches. A run that comes too soon (an hourly task with "every 3 hours", a second run on the same day, a weekend run on "weekdays") skips only the fetch: triage, drafting and the release still happen. Cowork's scheduler screen has no "every 3 hours", so set by hand that preset uses an hourly task and the in-between runs end almost at once; the cost is a short Claude session each hour, which the Schedule page says. A cron expression can say every 3 hours, so a task Claude creates does. When they ask for a run in chat (`/studio:run`), the skill passes `force: true` and the news is read regardless.
+The gaps are a little under the interval so a tick a few minutes early still fetches. A run that comes too soon skips only the fetch: triage, drafting and the release still happen, and a tick with nothing to do makes no calls. **Run it now** reads the news regardless.
 
 ## Sources, topics and links from the board
 
 - **Sources.** They add them on the board (`studio_source_add`, board only). Claude can only **suggest** one (`studio_sources` `suggest`, or `add`, which is treated as a suggestion): it waits under Suggested sources until they tap Add, and nothing is fetched before that. `studio_config` can edit, pause, re-file or remove sources in `sources.json` but refuses a write that adds a new one. A website is test-fetched through the same safe path as the feeds (below). A feed is used as is; a web page is searched for its `<link rel="alternate" type="application/rss+xml|atom+xml">` and that feed is fetched instead, if it too is a public HTTPS address. The name is theirs if given, else the feed's title (flattened to one line, capped at 80, and replaced by the host name if it reads like an instruction), else the host. `pause`, `resume`, `remove` and `topic` (re-file under one of their topics) find the source by its list (`feeds`, `reading`, `watch`, `trends`, `searches`) and normalised address, or a search by its words. Every write goes through the `sources.json` validator.
-- **Topics** (`studio_topics`): `add` turns "Cargo bikes" into the slug `cargo-bikes`, `remove` drops it (and re-files its sources under "other"), `weight` sets 1 (less), 2 (normal) or 3 (more). Weights move the drafting bar by one point: a story's interest counts one higher on a "more" topic and one lower on a "less" one, for both the threshold (6) and the order. They also tilt wandering the same way, and the triage queue tells Claude plainly which topics they want more or less of. Every write goes through the `beat.json` validator.
+- **Topics** (`studio_topics`): `add` turns "Cargo bikes" into the slug `cargo-bikes`, `remove` drops it (and re-files its sources under "other"), `weight` sets 1 (less), 2 (normal) or 3 (more). Weights move the drafting bar by one point: a story's interest counts one higher on a "more" topic and one lower on a "less" one, for both the threshold (6) and the order. The triage queue tells Claude plainly which topics they want more or less of. Every write goes through the `beat.json` validator.
 - **Draft from a link** (`studio_draft_link`): one article address, checked like a source address and fetched through the same path (HTTPS, public hosts only, redirects followed by hand and checked at every hop, private addresses refused, 3 MB cap). The page is parsed in linear passes: title (Open Graph title or `<title>`), description, and the paragraphs of its `<article>` or `<main>`, with scripts, styles and tags removed, entities decoded, flattened to one line, control and invisible characters stripped, fence tags neutralised, capped at 3,000 characters. A feed pasted here is refused with "add it under Sources". It is stored as a story marked `from_link`, skips triage (they chose it), and is queued as a "draft this" job; the brief fences the page exactly like a feed item and adds one line, outside the fence, that they sent the link themselves. Pasting the same article again while it waits queues it once; an article already read from a feed is reused rather than fetched again.
 
-## Reading where their audience is
+## Sources that need Claude's browser
 
-Five kinds of source, one validator (`handles.js`, `config.js`). Whatever they paste becomes one canonical entry or a plain refusal:
+The studio's source model also has X accounts, LinkedIn pages, X trending topics and saved web searches (`handles.js`, `config.js`), which Claude would read with its own browser and web search. The web app's runner doesn't have those tools, so the Sources page offers only websites and subreddits (the `sourceKinds` board hook) and a run leaves the others out, along with the slow reading over the reading list and the site suggestions that come from saved searches.
 
-| Kind | They paste | Stored as | Read by |
-|---|---|---|---|
-| Website | a page or feed address | the feed's `https://` address | the server, every run (`studio_fetch`) |
-| Subreddit | `r/name` or a reddit.com/r/name address | `https://www.reddit.com/r/<name>/.rss`, always rebuilt from the name | the server, like any feed. The poster's username and the "submitted by … [link] [comments]" footer are dropped: Reddit users are private people |
-| X account | `@handle`, `handle`, or an x.com (or twitter.com) address of the account itself | `https://x.com/<handle>` (letters, digits, `_`, at most 15; page names like `home` or `explore` refused) | Claude, in its browser, logged out |
-| LinkedIn page | a linkedin.com `/company/`, `/showcase/` or `/in/` address | `https://www.linkedin.com/<kind>/<slug>/` | Claude, in its browser, logged out |
-| X trending topics | (a switch) | `x.com/explore/tabs/trending` | Claude, in its browser, logged out |
-| Saved search | a few words ("e-bike regulation") | the words: 2-80 characters, no address, nothing instruction-shaped | Claude, with its web search |
-
-Only x.com and linkedin.com addresses can be watched, and the server builds them from the validated handle, so a watched account can't point anywhere else. Each watched account carries `via: "public"`; a signed-in read through an account slot (`via: "account:<type>"`) is accepted only once that account type declares `read: true`, which none does yet. Adding it later means building the reader and flipping the type's file, not changing the source kind.
-
-**How a read works.** `studio_read_queue` respects their news frequency like `studio_fetch` (or `force`). It lists the targets, numbered, each with the exact address the server built. The `daily-run` skill opens each one with Claude's browser tool (Claude in Chrome) as a logged-out visitor: no signing in, no typing into the page, no following links in posts, no other address. If the page asks for a login it reports `login_wall`. If there's no browser tool it reports `no_browser` for each account and looks the account up with web search instead (`via: "search"`); the board's Sources page then says Claude couldn't use its browser. Saved searches go through Claude's web search, up to 8 results from the last week each. `studio_record_reads` takes results only for target numbers it issued, at most 10 posts per account, 20 trends and 8 results per search. Every field is flattened to one line and cleaned like a feed item; a post's link is kept only if it is on its own platform, a search result needs a public `https://` link. They are stored as stories (`web: watch | trends | search`, no author) and triaged with the news. The server never fetches any of these links.
-
-**Discovery.** A site earns a suggestion when it has shown up at least 3 times in search results they'd care about (triaged 6 or more), from at least 2 different searches or on 2 different days, in 30 days, and isn't already a source or a social site. The suggestion says why ("3 good results from 2 of your searches in the last month") and waits under Suggested sources until they tap Add (it's test-fetched then) or Dismiss. A site they have added or dismissed is never suggested again. This is the only way an address Claude came across becomes something the studio reads: a search result that says "add me as a source" is one result, below the bar, and even above it is only a suggestion.
+| Kind | They paste | Stored as |
+|---|---|---|
+| Website | a page or feed address | the feed's `https://` address |
+| Subreddit | `r/name` or a reddit.com/r/name address | `https://www.reddit.com/r/<name>/.rss`, always rebuilt from the name. The poster's username and the "submitted by … [link] [comments]" footer are dropped: Reddit users are private people |
 
 ## What it has learned, in their words
 
@@ -137,7 +121,7 @@ The **second** submission is final. Takes still over the length limit, or still 
 
 ## The day's ten
 
-Drafts land **held**. At each release hour (8, 12, 16, 20 by default) the held pool is ranked and a share is released to **Waiting**. The release runs whenever any studio tool is called after the hour (the board, the status check or the scheduled run), so batches appear on time as long as something touches the studio; missed batches run as one.
+Drafts land **held**. At each release hour (8, 12, 16, 20 by default) the held pool is ranked and a share is released to **Waiting**. The release runs on the timer and whenever any studio tool is called after the hour, so batches appear on time while the studio is running; batches missed while it was closed run when it starts.
 
 - **Quota** for batch k of n: `min(left, ceil(left / (n − k)), ceil(2·cap / n))`. A share a thin pool can't fill rolls on.
 - **Stale**: held longer than `held_max_hours` (16 by default) is scrapped first.
@@ -155,103 +139,47 @@ Drafts land **held**. At each release hour (8, 12, 16, 20 by default) the held p
 - **Edits.** When they change a draft before approving it, the draft and their version are kept (`state/edits.json`, one record per draft, the latest edit wins, undoing the edit removes it) with what changed: they cut the opening question, cut the last line, cut it by a fifth or more, added to it, took out exclamation marks, hashtags, emojis or "we/our", added "we/our" or a number, and which words and two- or three-word phrases they removed. Their last four edits reach every brief, fenced, as "drafts they edited before approving (their version is the voice)", and their versions count as examples the drafter mustn't copy word for word.
 - **Edit patterns become proposals.** In the weekly pass, a pattern that shows up in at least 3 of their edits and at least half of them (with 4 or more edits in 60 days) becomes one playbook proposal, written as a description of the brand ("Open with a plain statement, not a question") with its reason ("You cut the opening question in 7 of your last 9 edits."). A word or phrase they cut at least 3 times, from at least 3 of every 4 drafts that had it, becomes a proposal to add it to "phrases we overuse". Each is proposed once; one they accepted or rejected isn't proposed again for 60 days. Nothing changes until they tap Accept.
 - **Skip reasons.** After a skip (or "none of these") the board asks once, optionally: off-brand, wrong topic, too salesy, boring, factually off, other. Ignoring it is fine. The reason is stored on the draft, cleared if they bring it back, shown on the Skipped tab, given to the drafter beside the killed post ("why: too salesy"), summed up in the triage queue, and counted in the weekly report.
-- **Source records.** Each source's drafts approved of drafts decided over 6 weeks (a set counts once), shown on the Sources page ("4 of 5 approved"). A source with 5 or more decided and at most 1 in 5 approved, or 4 or more and none approved, is marked "Keeps losing … Pause it?" on Sources and Coach. It is never paused automatically.
+- **Source records.** Each source's drafts approved of drafts decided over 6 weeks (a set counts once), shown on the Sources page ("4 of 5 approved"). A source with 5 or more decided and at most 1 in 5 approved, or 4 or more and none approved, is marked "Keeps losing … Pause it?" on Sources. It is never paused automatically.
 - **What it drafts first.** Their topic weights move the drafting bar by one point. What it has learned moves it too, by up to 1.5 points either way, with the reasons shown on the Topics page ("What it drafts first") and on each read: per topic, the shrunk approve-vs-skip lift over 21 days (counted exactly like "learned from your verdicts") × 4, capped at ±0.75, plus 0.25 per read they hearted about it (at most 0.5), minus 0.25 per "wrong topic" skip (at most 0.5); per source, (its approval rate − their overall rate) × 2 once it has 3 decided, capped at ±0.75, plus 0.25 per hearted read from it (at most 0.5). Each kind is capped at ±1 and a story's total at ±1.5. It changes which stories are drafted and in what order, not how they're written.
 - **Rank weights** move once a day at the first batch: from the last 14 days of released sets, passes vs kills (each side ≥ 4) give a gap per signal; posted results (above vs below median, each side ≥ 4) give another. `new = old + 0.5 · gap`, clipped to ±0.02 a day, ±0.1 against a week ago, and [0.05, 0.6]. If posts stall (≥ 6 measured posts in 3 days averaging under 0.5 interactions, or all identical), 0.02 moves from the heaviest weight to the lightest and the novelty budget rises.
 - **Notes** queue a rewrite (at most 3 waiting at a time). The rewrite lands as a new version of the same draft; the old text is kept with the note. Posted drafts are never rewritten.
 - **Redo** writes a new set for a story you passed on (at most 2 per story). The new set inherits the old set's daily slot and goes straight to Waiting.
 - **Fingerprints**: pass and edit carry a hash of the text you saw. If a rewrite landed while the board was open, the action is refused and you see the new text.
-- **Weekly coach**: the report is written in two parts. Playbook changes are proposed from the numbers alone (including skip reasons, edit patterns and how each source does), before Claude sees your notes, so a single grumpy note can't rewrite the rules. Then the coach report: what's working (2-3 lines), what isn't (1-3), two or three things to try, and a short summary, each line naming its evidence. It is stored per persona (`state/coach.json`, one per week) and shown on the board's Coach page with everything waiting for their yes; lines with a link, a handle or anything instruction-shaped are dropped, and coach text is never fed back into a brief. Audience and position suggestions come after. Every change is a proposal you accept or reject.
-- **Taste log**: every triaged story is logged (seen, drafted, topic, source); the weekly report shows drafted-of-seen by topic and source over four weeks.
+- **Proposals from the numbers.** Playbook changes are proposed from the numbers alone (skip reasons, edit patterns, how each source does), never from free text, so a single grumpy note can't rewrite the rules. Every change is a proposal you accept or reject on the Playbook page.
+- **Taste log**: every triaged story is logged (seen, drafted, topic, source).
 
 ## Untrusted text
 
-Everything read from outside (news, pages, subreddit posts, X and LinkedIn posts, trending topics, search results, pasted posts) and your own notes when they're fed back to Claude arrive inside `<data-NONCE>` tags, with a fresh random nonce per brief, a guard sentence explaining that it is data and never instructions, control characters stripped, each field capped at 1200 characters, and any fence tags inside the content neutralised. The fencer is one shared, tested function (`server/lib/fence.js`). Model text stored as the brand's own view (proposals, wander findings) must pass an own-words check: no instruction-shaped text, no links or handles, and no ≥ 50% echo of the source.
+Everything read from outside (news, pages, subreddit posts, brand kit text) and your own notes when they're fed back to Claude arrive inside `<data-NONCE>` tags, with a fresh random nonce per brief, a guard sentence explaining that it is data and never instructions, control characters stripped, each field capped at 1200 characters, and any fence tags inside the content neutralised. The fencer is one shared, tested function (`server/lib/fence.js`). Model text stored as the brand's own view (proposals) must pass an own-words check: no instruction-shaped text, no links or handles, and no ≥ 50% echo of the source.
 
 Your own settings are fenced too. The voice, playbook, positions and audience reach Claude inside the same tags, introduced as a description of the brand rather than instructions, so one bad write can't become a standing order in every brief. Saving `voice.md`, `playbook.md`, `positions.json` or `audience.json` through `studio_config` is refused if it contains instruction-shaped text ("ignore previous…", "from now on", "always write…"); describe the brand instead. `studio_config` reads and writes only the files listed above, and the store refuses any path outside the data folder.
 
-In the chat review list, story headlines never share a line with a `[draft · hash]` marker: they come last, fenced, keyed by list number.
-
-Pages they paste with "Draft from a link", and everything Claude reads on a social site or in a search, are outside text like any feed: cleaned the same way on the way in, fenced the same way in the brief. A post's text never becomes an instruction, a setting or something to fetch: links in posts are stored for them to open and never fetched, and a new source only ever arrives as a suggestion they tap (see Discovery). Feed titles that become source names are flattened and dropped if instruction-shaped. Persona names are flattened, capped at 60 and refused if instruction-shaped.
+Pages they paste with "Draft from a link" are outside text like any feed: cleaned the same way on the way in, fenced the same way in the brief. Story text never becomes an instruction, a setting or something to fetch: links in it are stored for them to open and never fetched, and a new source only ever arrives as a suggestion they tap. Feed titles that become source names are flattened and dropped if instruction-shaped. Persona names are flattened, capped at 60 and refused if instruction-shaped.
 
 ## Tools
+
+The studio's operations are named tools (`server/lib/tools.js`). The board calls them through the server's API (`/api/call`), and the runner calls the ones a run needs. The main ones:
 
 | Tool | Purpose |
 |---|---|
 | `studio_personas` | list, create, switch or rename personas |
 | `studio_status` | setup state, counter, waiting, jobs; runs due releases |
-| `studio_board` | opens the board (MCP App) and returns a text fallback |
-| `studio_view` | board data and text: drafts tabs, reads, coach, playbook, settings, sources, topics, schedule |
+| `studio_view` | board data: drafts tabs, reads, playbook, settings, sources, topics, schedule |
 | `studio_act` | pass, edit, kill (optional reason), kill_reason, pick, none, redo, restore, resurrect, heart, note, draft_this, mark_posted, unpost |
 | `studio_config` | get/set/patch the files in the persona's folder, with validation |
-| `studio_sources` | suggest a source (it waits for their tap), or pause, resume, re-file or remove one |
-| `studio_source_add` | add a source (website or subreddit test-fetched; account, trends, search); board only, hidden from Claude |
-| `studio_read_queue`, `studio_record_reads` | the accounts, trends and searches Claude reads, and what it read |
-| `studio_accounts` | list account slots and which are connected |
-| `studio_account_set` | connect (by prompt) or remove an account; board only, hidden from Claude |
+| `studio_source_add` | add a website or subreddit (test-fetched) |
 | `studio_topics` | add, remove or weight a topic |
 | `studio_draft_link` | fetch one article and queue it to be drafted |
 | `studio_wizard` | the setup wizard's answers and steps (create, start, get, answer, draft, step, finish) |
-| `studio_wizard_brief`, `studio_wizard_save` | Claude's setup drafts: the fenced brief, and the drafts as proposals |
-| `studio_account_posting` | turn "Post for me" on (confirmed) or off; board only, hidden from Claude |
-| `studio_post_schedule` | approve a draft to be posted, try a missed one again, or clear it; board only, hidden from Claude |
-| `studio_posting` | the post skill: queue, check, result |
-| `studio_fetch` | fetch, dedupe and store news (respects the news frequency unless `force`) |
-| `studio_wander`, `studio_record_wander` | curiosity reading |
-| `studio_triage_queue`, `studio_record_triage` | triage |
-| `studio_drafting_brief`, `studio_save_takes` | the drafting loop |
 | `studio_release` | rank and release the due batch |
-| `studio_weekly_brief`, `studio_save_weekly` | the weekly coach report (and edit-pattern proposals) |
-| `studio_proposals` | list or propose changes (Claude): playbook, position, audience, shape, phrase |
-| `studio_proposal_decide` | accept (as is, or their edited text) or reject a proposal, including a suggested source; board only, hidden from Claude |
+| `studio_proposal_decide` | accept (as is, or their edited text) or reject a proposal, including a suggested source |
 | `studio_metrics` | enter post numbers or import a CSV |
 
-**Which new tools change what's read or what the voice says, and how they're held back.** Adding a source of any kind: board only (`studio_source_add`), because a source is a standing fetch or read target. Claude suggesting one: proposal (`studio_sources` suggest), because Claude may have been told about it by something it read. Edit patterns and overused phrases: proposals, because they change every future brief. Discovery: proposal, for the same reason as suggestions. Connecting an account: board only. Recording what Claude read (`studio_record_reads`): neither, because it only adds fenced stories, never targets. Skip reasons and learned boosts: neither; like verdicts, they move ranking, not the voice or the sources.
-
-The setup wizard and posting:
-
-| Tool | Held back how | Why |
-|---|---|---|
-| `studio_wizard` | neither (model and board) | It only records their answers and which step they're on. It writes nothing the drafts read, so Claude can run the wizard in chat when the board can't show. Its one side effect, `create`, is what `studio_personas` already lets Claude do. |
-| `studio_wizard_brief` | neither (model) | Read only: it hands Claude their answers and the linked page, fenced. |
-| `studio_wizard_save` | proposal-based (model) | Everything Claude drafts in setup (voice, playbook, topics, off-limits, audience, starter sources) changes every future brief or what is read, and may have been steered by the page they linked, so all of it waits for their Keep or Add. |
-| `studio_proposal_decide` (now with `text`) | board only | Keeping a suggestion, including their edited version of it, is their decision. |
-| `studio_account_posting` | board only, plus a second confirming tap | Turning "Post for me" on lets Claude publish under their name and risks the account. |
-| `studio_post_schedule` | board only | Their Approve here is their consent to post that exact text. Approving in chat (`studio_act`) never schedules a post. |
-| `studio_posting` (queue, check, result) | neither (model) | It can only take posts they already approved for posting, ask whether the text matches, and report back. It can't add, approve or re-queue anything. |
-
-## Account slots
-
-`accounts/` holds one small file per account type (`x.json`, `linkedin.json`, `threads.json`, `bluesky.json`, `reddit.json`): its label, icon, what it enables, a `connect` prompt, and `capabilities` `{read, post}`, each `false` (not built), `"prompt"` (only when they ask Claude in chat) or `true`. A type with `post: true` also names its `compose` address, optionally a `prefill` address (https, with `{text}` once) that opens the composer with the text in it, and a plain `post_warning`; X, LinkedIn, Threads and Bluesky can post, Reddit can't, and none reads signed in yet. Adding a type is adding a file.
-
-Settings › Accounts lists them. **Add account** records the account as `connected_by_prompt` (type and time, nothing else: no password, token or cookie is ever stored) and sends the type's prompt to Claude, which walks them through signing in themselves, in their own browser (the one Claude in Chrome uses). A watched account's `via` can name an account slot once that type can read (above).
-
-## Posting for them (opt-in)
-
-Off for every account until they turn it on. Copying a post out by hand works exactly as before, whatever the switch says.
-
-- **The switch.** Each connected account that can post has **Post for me** in Settings › Accounts and in the wizard's last step. Turning it on shows the type's warning first (for X: "Posting to X by automation breaks X's rules, and X can restrict or suspend the account"), that only drafts approved on the board are posted, that the computer must be awake, and that they can turn it off any time; only **Turn it on** sends `studio_account_posting {on: true, confirmed: true}`. The account row keeps `posting: {on, history: [{on, at}]}`: timestamps only. Reconnecting keeps it; turning it off cancels anything scheduled.
-- **Approve = consent.** On an account with posting on, the board's Approve reads **Approve & post**. It calls `studio_post_schedule`, which records the verdict through the usual path (fingerprint checked) and, if `handOff()` agrees (approved, connected, can post, switch on), schedules a post: the SHA-256 of the exact approved text, and a slot at the next release hour with room (one post per account per slot, at most `posts_per_day` a day, two weeks ahead). An already-approved draft gets **Post it for me** on the Approved tab. Passing in chat says it won't be posted and why.
-- **At release time** the `post` skill (the posting task) calls `studio_posting {action: "queue"}` per persona. The server first sweeps: a scheduled post whose draft was skipped, rewritten or marked posted by hand, or whose switch went off, is cancelled with that reason; a slot more than 60 minutes old is **missed** ("Nothing ran between 16:00 and 17:00: your computer was asleep or Claude was closed. It wasn't posted."). Due posts are re-checked with `handOff()` and against the hash (a changed text is **blocked**), claimed (so a second run can't post them twice) and handed over with their compose address and exact text. Where the account type has a `prefill` address (X, Bluesky, Threads) the compose address already carries the text and the post is marked `prefilled`, so Claude checks the composer and presses Post without typing; on LinkedIn Claude types it.
-- **Right before posting**, the skill sends the exact text it is about to type to `studio_posting {action: "check"}`. It says go only if that text, the draft's current text and the approval hash all match; otherwise the post is blocked with the reason and nothing goes out. Then `result`: `posted` (with the link if shown; the draft becomes Posted, `posted_by: "claude"`) or `failed` with a code (`not_signed_in`, `no_browser`, `wrong_account`, `site_refused`, `composer_changed`, `other`) and one line. A post claimed but never reported is marked failed after 30 minutes, telling them to check the platform before trying again.
-- **Never silent, never a loop.** Missed, failed and blocked posts show on the Approved tab with the reason, and a banner across the board says how many didn't go out until they deal with them: **Try the next slot** (keeps the original approval's hash; refused if the text changed) or **I'll copy it myself**. Nothing is ever put back in the queue except by their tap.
-
-The sweep runs whenever the board loads and on every queue call, like releases.
-
-Every tool except `studio_personas` also takes `persona`.
+Every tool except `studio_personas` also takes `persona`. The source also holds tools for posting through Claude's browser and a weekly coach report; the web app hides them (the `noPosting` and `noCoach` board hooks) and never calls them.
 
 ## The board
 
-Sections: Drafts, Sources, Topics, Schedule, Settings, then Reads, Coach and Playbook, with the persona switcher at the top of the sidebar. The setup wizard is a page of its own, reached from Add persona, the first-run card and Settings; a progress strip shows its four steps (stacked labels on a phone). Coach carries a badge for proposals waiting for their yes, Sources one for suggested sources. Every setting is a control that saves on click (switch, − / + stepper, segmented choice, hour chips, preset cards); text fields appear only for text (an address, a name, an example post, a note). Lint flags are shown as plain-language chips; "Approve" and "Skip" are the pass and kill verdicts (Skip teaches, like kill always did, and **Bring back** undoes it with a reason).
+Sections: Drafts, Sources, Topics, Brand kit, Schedule, Settings, then Reads and Playbook, with the persona switcher at the top of the sidebar. The Claude page (engine and API key) opens from Settings, and on its own while no engine works. The setup wizard is a page of its own, reached from Add persona, the first-run card and Settings; a progress strip shows its steps (stacked labels on a phone). Sources carries a badge for suggested sources. Every setting is a control that saves on click (switch, − / + stepper, segmented choice, hour chips, preset cards); text fields appear only for text (an address, a name, an example post, a note). Lint flags are shown as plain-language chips; "Approve" and "Skip" are the pass and kill verdicts (Skip teaches, and **Bring back** undoes it with a reason).
 
-- **Look.** All colours, radii, type sizes, spacing, shadows and layout widths are CSS custom properties in `server/ui/skins/light.css`; `board.css` only refers to them (a test fails on any literal colour there). A second skin is one more file in `skins/` scoped to `:root[data-skin="<name>"]`; every skin file is bundled, and a skin named after the host theme (e.g. `dark.css`) is used when the host reports that theme. Without one the board stays light. The host's font is used when it provides one.
-- **Layout.** Over 900 px: sidebar, page, and (over 1180 px) a right column. 641-900 px (a chat-width window): the sidebar becomes a strip of icons with short labels. 640 px and under: a menu button opens the sidebar as a drawer. The board sits in an auto-height iframe, so nothing is fixed to the viewport or sized in `vh` (a bottom tab bar would sit at the end of the page, not the bottom of the screen).
-
-## What changed from the original agent
-
-- No world simulation, personas (the original's simulated people) or memes. Posting is opt-in per account, through their own browser, and only for what they approved on the board. What it reads: RSS and Atom feeds and public subreddit feeds (fetched by the server), pages they paste, and the public, logged-out pages of the X and LinkedIn accounts they chose plus X trending topics and their saved web searches, which Claude reads with its own browser and web search tools during a run and hands back as fenced text. No logins, no cookies, no credentials, no crawling beyond the addresses they approved, and no automated clicking or typing on any site, except posting their approved text in their own signed-in browser on accounts where they turned "Post for me" on.
-- Takes in a set each get their own shape (the original shared one shape per set).
-- The playbook, positions and audience change only by proposals they accept on the board (Claude can propose, never accept), or when they edit them with Claude in setup.
-- Autopass became "our pick": the best-ranked take is highlighted, never approved.
-- "Post this" from a triage note was folded into "Draft this", which writes proper takes.
-- Added: story-level dedupe, a real named-person check, per-platform settings, manual metrics and CSV import.
+- **Look.** All colours, radii, type sizes, spacing, shadows and layout widths are CSS custom properties in `server/ui/skins/light.css`; `board.css` only refers to them (a test fails on any literal colour there). A second skin is one more file in `skins/` scoped to `:root[data-skin="<name>"]`; every skin file is bundled. Only the light skin exists, so the board is light.
+- **Layout.** Over 900 px: sidebar, page, and (over 1180 px) a right column. 641-900 px: the sidebar becomes a strip of icons with short labels. 640 px and under: a menu button opens the sidebar as a drawer.

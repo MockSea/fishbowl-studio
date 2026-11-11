@@ -68,7 +68,7 @@ export function statusTool(ctx) {
     const untriaged = db.items.filter((i) => !i.explore && !i.duplicate_of && !i.triaged_at).length;
     const openProps = db.proposals.filter((p) => p.status === 'open').length;
     const lines = [
-      settings.setup_complete ? `Studio for ${settings.brand || 'your brand'} · data folder: ${ctx.store.home}` : `Setup isn't finished. Run /studio:setup. Data folder: ${ctx.store.home}`,
+      settings.setup_complete ? `Studio for ${settings.brand || 'your brand'} · data folder: ${ctx.store.home}` : `Setup isn't finished. Data folder: ${ctx.store.home}`,
       counterText(c),
       `${waiting} waiting for review · ${jobs.length} queued job(s) (${jobs.map((j) => j.kind).join(', ') || 'none'}) · ${untriaged} untriaged item(s) · ${openProps} open proposal(s)`,
       db.runs.last_fetch ? `Last fetch ${db.runs.last_fetch}` : 'Never fetched.',

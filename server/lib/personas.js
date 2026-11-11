@@ -58,7 +58,7 @@ export function openPersonas(home) {
 
   function read() {
     try { return JSON.parse(fs.readFileSync(regFile, 'utf8')); }
-    catch (e) { if (e.code === 'ENOENT') return null; throw new Error('personas.json in the studio folder is not valid JSON. Ask Claude to repair it.'); }
+    catch (e) { if (e.code === 'ENOENT') return null; throw new Error('personas.json in the studio folder is not valid JSON. Fix it in a text editor, or move it out of the folder to start that file over.'); }
   }
   const write = (reg) => writeAtomic(regFile, JSON.stringify(reg, null, 2) + '\n');
 

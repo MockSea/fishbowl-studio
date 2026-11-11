@@ -24,7 +24,7 @@ async function pool(tasks, n = 4) {
 export async function fetchAll(ctx, { force = false } = {}) {
   const sources = loadSources(ctx.store);
   const feeds = sources.feeds.filter((f) => !f.paused);
-  if (!feeds.length) return { feeds: 0, added: 0, dupes: 0, clustered: 0, errors: [], note: sources.feeds.length ? 'Every feed is paused. Turn one back on under Sources.' : 'No feeds yet. Add one under Sources on the board, or run /studio:setup or /studio:add-source.' };
+  if (!feeds.length) return { feeds: 0, added: 0, dupes: 0, clustered: 0, errors: [], note: sources.feeds.length ? 'Every feed is paused. Turn one back on under Sources.' : 'No feeds yet. Add one under Sources.' };
   if (!force) {
     const due = fetchDue(ctx.settings().fetch_every, ctx.tx((db) => db.runs.last_fetch), ctx.now());
     if (!due.fetch) return { feeds: 0, added: 0, dupes: 0, clustered: 0, errors: [], skipped: true, note: `Didn't read the news this time: ${due.reason}. Carry on with the rest of the run.` };

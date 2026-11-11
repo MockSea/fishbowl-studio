@@ -1,16 +1,19 @@
 {
   "name": "studio",
   "displayName": "Fishbowl Studio",
-  "version": "0.0.1",
-  "description": "Reads the news on your brand's beat every weekday, drafts LinkedIn, X, Threads and Bluesky posts in varied shapes, and puts them on a review board where you pass, edit or kill them. It learns from your verdicts. A setup wizard drafts each brand's voice for your yes. It posts only if you turn that on per account. Needs a paid Claude plan with Cowork.",
-  "author": { "name": "Fishbowl Studio contributors" },
+  "version": "0.1.0",
+  "description": "Starts Fishbowl Studio, a local web app that drafts LinkedIn, X, Threads and Bluesky posts from the news on your brand's beat and puts them on a review board in your browser. /fishbowl runs the same command as a terminal: npx github:MockSea/fishbowl-studio.",
+  "author": {
+    "name": "Fishbowl Studio contributors"
+  },
   "license": "MIT",
-  "keywords": ["social", "linkedin", "x", "threads", "bluesky", "drafting", "mcp-app", "review-board"],
-  "mcpServers": {
-    "studio": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/server/index.js"]
-    }
-  }
+  "keywords": [
+    "social",
+    "linkedin",
+    "x",
+    "threads",
+    "bluesky",
+    "drafting",
+    "review-board"
+  ]
 }

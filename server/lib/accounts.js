@@ -10,12 +10,10 @@
 // (posting.js). handOff() is the one gate every post goes through.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readOwn, listOwn } from './files.js';
 import { oneLine } from './text.js';
 import { safeHttpsUrl } from './urls.js';
 
-// Resolved here rather than imported from config.js, which imports this file.
-export const ACCOUNTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'accounts');
 const CAP_VALUES = [false, 'prompt', true];
 const ID_RE = /^[a-z][a-z0-9-]{0,29}$/;
 
@@ -48,12 +46,15 @@ export function validateAccountType(t, file = 'account type') {
 }
 
 const cache = new Map();
-export function accountTypes(dir = ACCOUNTS_DIR) {
-  if (cache.has(dir)) return cache.get(dir);
-  const list = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort()
-    .map((f) => validateAccountType(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')), f)) : [];
+// The studio's own accounts/ folder by default; a test can pass another folder on disk.
+export function accountTypes(dir = null) {
+  const k = dir || ':own';
+  if (cache.has(k)) return cache.get(k);
+  const names = dir ? (fs.existsSync(dir) ? fs.readdirSync(dir).sort() : []) : listOwn('accounts');
+  const read = (f) => (dir ? fs.readFileSync(path.join(dir, f), 'utf8') : readOwn(`accounts/${f}`));
+  const list = names.filter((f) => f.endsWith('.json')).map((f) => validateAccountType(JSON.parse(read(f)), f));
   const out = Object.fromEntries(list.map((t) => [t.id, t]));
-  cache.set(dir, out);
+  cache.set(k, out);
   return out;
 }
 

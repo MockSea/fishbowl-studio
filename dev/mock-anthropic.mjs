@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// A stand-in for the Anthropic Messages API, for running the desktop app with no API key:
+// A stand-in for the Anthropic Messages API, for running the studio with no API key:
 //   node dev/mock-anthropic.mjs [port]          (default 8787)
-//   STUDIO_ANTHROPIC_BASE_URL=http://127.0.0.1:8787 npm run desktop   (any key works)
+//   STUDIO_ANTHROPIC_BASE_URL=http://127.0.0.1:8787 node bin/fishbowl-studio.js --home DIR   (any key works)
 // It answers each studio brief with canned JSON in the shape the request's schema asks for,
 // and prints one line per request: the schema, and what brand kit came with it.
 import http from 'node:http';

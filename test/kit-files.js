@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { zip, crc32 } from '../scripts/pack.mjs';
+import { zip, crc32 } from './zip.js';
 
 export function pdf(text) {
   const stream = `BT /F1 12 Tf 72 720 Td (${text.replace(/[()\\]/g, '\\$&')}) Tj ET`;

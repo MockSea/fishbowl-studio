@@ -188,11 +188,11 @@ const ACTIONS = {
     if (!LIVE.has(d.status)) return { message: 'Note saved.' };
     const queued = db.jobs.filter((j) => j.kind === 'rewrite' && j.status === 'queued');
     if (queued.some((j) => j.draft_id === d.id)) return { message: 'Note saved. A rewrite for this draft is already queued; it will read this note too.' };
-    if (queued.length >= settings.rewrite_queue_cap) return { message: `Note saved, but ${queued.length} rewrites are already waiting (the limit is ${settings.rewrite_queue_cap}). Ask Claude to run them, then try again.` };
+    if (queued.length >= settings.rewrite_queue_cap) return { message: `Note saved, but ${queued.length} rewrites are already waiting (the limit is ${settings.rewrite_queue_cap}). Run them from the Drafts page, then try again.` };
     db.jobs.push({ id: ctx.id('job'), kind: 'rewrite', draft_id: d.id, feedback_id: fb.id, status: 'queued', created_at: iso });
     fb.rewrite = 'queued';
     d.rewriting = true;
-    return { message: 'Note saved and a rewrite is queued. Ask Claude "do my studio rewrites", or it happens on the next run.', needs_claude: true };
+    return { message: 'Note saved and a rewrite is queued. It happens on the next run, or run the rewrites now from the Drafts page.', needs_claude: true };
   },
 
   draft_this(db, { id, item_id }, { ctx, iso }) {

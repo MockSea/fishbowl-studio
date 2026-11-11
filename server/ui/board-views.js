@@ -312,7 +312,7 @@
   if (document.addEventListener) document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && (state.menu || state.drawer)) { state.menu = false; setDrawer(false); renderPersona(); } });
   let got = false;
   S.onResult((r) => { if (r && r.structuredContent && r.structuredContent.view) { got = true; S.setStamp(r.structuredContent.stamp); show(r.structuredContent); } });
-  S.connect().then(() => setTimeout(() => { if (!got) load(); }, 800)).catch((e) => {
-    $('view').replaceChildren(h('p', { class: 'muted', text: `The board couldn't connect to Claude (${e.message || e}). Ask Claude to "review my drafts in chat" instead.` }));
+  S.connect().then(() => { if (!got) load(); }).catch((e) => {
+    $('view').replaceChildren(h('p', { class: 'muted', text: `The board couldn't reach the studio (${e.message || e}). Run the command again to open it.` }));
   });
 })();
