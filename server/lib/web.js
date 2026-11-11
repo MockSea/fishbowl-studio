@@ -8,17 +8,22 @@
 //     TOKEN_TTL_MS, and is swapped for an HttpOnly, SameSite=Strict cookie.
 //   - Every request must carry a Host of 127.0.0.1:<port> or localhost:<port> (stops DNS
 //     rebinding). No CORS headers are ever sent.
-//   - Anything that changes state is a POST with the cookie, a same-origin Origin header and a
-//     JSON (or, for uploads, octet-stream) body. GET only serves the page and the event stream.
+//   - Under /api/, anything that changes state is a POST with the cookie, a same-origin Origin
+//     header and a JSON (or, for uploads, octet-stream) body. GET only serves the page and the
+//     event stream. /control/launch (below) has its own rules.
 //   - An uploaded file is written to a fresh temporary file with a random name. The name the
 //     person's file had is only shown; it never becomes a path.
-// A second copy of the command asks this one, through a control secret in the app folder, for a
-// new launch link instead of starting another server.
+// A second copy of the command asks this one for a new launch link instead of starting another
+// server. /control/launch is the one state-changing route outside the /api rules above: it takes
+// no cookie and no body, and refuses any request with an Origin header. Both sides prove they
+// hold the control secret from the app folder's 0600 lock file without sending it (control.js),
+// and a nonce is accepted once.
 import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
+import { same, requestValid, answerProof } from './control.js';
 import { boardHtml } from './page.js';
 import { LIMITS } from './brandkit.js';
 
@@ -37,10 +42,6 @@ const HEADERS = {
 };
 
 const secret = () => randomBytes(32).toString('hex');
-const same = (a, b) => {
-  const x = Buffer.from(String(a)), y = Buffer.from(String(b));
-  return x.length === y.length && timingSafeEqual(x, y);
-};
 
 function send(res, status, body, type = 'application/json; charset=utf-8', extra = {}) {
   const data = typeof body === 'string' ? body : JSON.stringify(body);
@@ -96,6 +97,7 @@ function saveUpload(req, limit) {
 export function makeServer({ host, port = 0, page = () => boardHtml(), now = () => Date.now(), control = secret() }) {
   const session = secret();
   const tokens = new Map(); // token -> expiry
+  const usedNonces = new Set(); // control nonces already answered
   const streams = new Set();
   const backlog = []; // notices from before any page was connected
   let origin = null, cookieName = null, allowedHosts = [], allowedOrigins = [];
@@ -166,8 +168,13 @@ export function makeServer({ host, port = 0, page = () => boardHtml(), now = () 
 
     // A second copy of the command asking for a fresh launch link.
     if (url.pathname === '/control/launch') {
-      if (req.method !== 'POST' || req.headers.origin || !same(req.headers['x-control'] || '', control)) return deny(res, 403, 'Not allowed.');
-      return send(res, 200, { url: launchUrl() });
+      if (req.method !== 'POST' || req.headers.origin || !requestValid(control, req.headers)) return deny(res, 403, 'Not allowed.');
+      const nonce = req.headers['x-control-nonce'];
+      if (usedNonces.has(nonce)) return deny(res, 403, 'Not allowed.');
+      usedNonces.add(nonce);
+      if (usedNonces.size > 1000) usedNonces.delete(usedNonces.values().next().value);
+      const u = launchUrl();
+      return send(res, 200, { url: u, proof: answerProof(control, nonce, u) });
     }
 
     if (url.pathname === '/' && req.method === 'GET') {
@@ -236,4 +243,4 @@ export function makeServer({ host, port = 0, page = () => boardHtml(), now = () 
 const gone = `<!doctype html><meta charset="utf-8"><title>Fishbowl Studio</title>
 <body style="font:16px system-ui,sans-serif;max-width:32em;margin:4em auto;padding:0 1em;line-height:1.5">
 <h1 style="font-size:1.3em">Open the studio from its link</h1>
-<p>Each link to the studio works once, so nobody else on this computer can open it. Run the command again and it opens a new one.</p>`;
+<p>Each link expires after five minutes and works once. Run the command again for a new link.</p>`;

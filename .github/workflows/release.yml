@@ -26,6 +26,13 @@ jobs:
           node-version: 26
       - run: npm ci
       - run: npm test
+      - name: Tag matches the version
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          want="v$(node -p "require('./package.json').version")"
+          [ "$TAG" = "$want" ] || { echo "Tag $TAG doesn't match package.json ($want). The npx command points at $want."; exit 1; }
 
   build:
     needs: test

@@ -3,6 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
@@ -13,7 +14,7 @@ import { findOnPath, makeEngine } from '../server/lib/engines/index.js';
 import { ModelError, SCHEMAS, SYSTEM, makeModel } from '../server/lib/engines/api.js';
 import { makeBudget, makeDailyCap } from '../server/lib/runner.js';
 
-test('the claude -p call: no tools, no MCP, no user settings, no session, schema and system prompt set', () => {
+test('the claude -p call: no tools, no MCP, no setting sources (no CLAUDE.md), no session, schema and system prompt set', () => {
   const a = cliArgs({ schema: SCHEMAS.triage, model: null });
   const flag = (f) => a[a.indexOf(f) + 1];
   assert.equal(a[0], '-p');
@@ -23,7 +24,7 @@ test('the claude -p call: no tools, no MCP, no user settings, no session, schema
   assert.deepEqual(JSON.parse(flag('--json-schema')), SCHEMAS.triage);
   assert.equal(flag('--tools'), '');
   assert.equal(flag('--system-prompt'), SYSTEM);
-  assert.equal(flag('--setting-sources'), 'project');
+  assert.equal(flag('--setting-sources'), '', 'an empty list: no settings files and no CLAUDE.md from any folder');
   assert.ok(a.includes('--strict-mcp-config'));
   assert.ok(a.includes('--no-session-persistence'));
   assert.equal(Number(flag('--max-turns')), MAX_TURNS);
@@ -80,15 +81,20 @@ function fakeSpawn(reply) {
   return { spawnImpl, seen };
 }
 
-test('the adapter runs claude from an empty temporary folder and returns the structured answer', async () => {
+test('the adapter runs claude from an empty folder under its own work folder, not the system temp folder', async () => {
+  const workDir = path.join(tempHome(), 'app', 'claude-runs');
   const { spawnImpl, seen } = fakeSpawn(() => ({ stdout: JSON.stringify({ type: 'result', subtype: 'success', structured_output: { takes: [] } }) + '\n' }));
-  const m = makeCliModel({ bin: '/opt/claude', spawnImpl });
+  const m = makeCliModel({ bin: '/opt/claude', workDir, spawnImpl });
   assert.deepEqual(await m.ask({ task: 'T', schema: SCHEMAS.takes, kit: null }), { takes: [] });
   assert.equal(seen[0].cmd, '/opt/claude');
   assert.equal(seen[0].cwdEmpty, true);
+  assert.equal(path.dirname(seen[0].opts.cwd), workDir);
+  assert.ok(!seen[0].opts.cwd.startsWith(os.tmpdir() + path.sep + 'fishbowl-claude-'));
+  if (process.platform !== 'win32') assert.equal(fs.statSync(workDir).mode & 0o077, 0, 'only this user can write the work folder');
+  assert.throws(() => makeCliModel({ bin: '/opt/claude', spawnImpl }), /workDir/);
   assert.ok(!fs.existsSync(seen[0].opts.cwd), 'the temporary folder is removed');
   assert.equal(JSON.parse(seen[0].input).message.content.at(-1).text, 'T');
-  const bad = makeCliModel({ bin: '/opt/claude', spawnImpl: fakeSpawn(() => ({ code: 1, stderr: 'Not logged in' })).spawnImpl });
+  const bad = makeCliModel({ bin: '/opt/claude', workDir, spawnImpl: fakeSpawn(() => ({ code: 1, stderr: 'Not logged in' })).spawnImpl });
   await assert.rejects(bad.ask({ task: 'T', schema: {}, kit: null }), (e) => e.kind === 'cli' && /exit 1: Not logged in/.test(e.message));
 });
 

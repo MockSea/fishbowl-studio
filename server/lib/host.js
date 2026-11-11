@@ -28,7 +28,7 @@ export const MAX_KIT_FILES_PER_ADD = 20;
 export function makeHost({
   home, appDir, os = undefined, claudePath = () => findOnPath('claude'),
   createModel = (apiKey) => makeModel({ client: makeClient({ apiKey }) }),
-  createCli = (bin) => makeCliModel({ bin }),
+  createCli = (bin) => makeCliModel({ bin, workDir: path.join(appDir, 'claude-runs') }),
   emit = () => {}, now, fetchImpl, dailyCap = MAX_CALLS_PER_DAY,
 }) {
   const ctx = makeContext({ home, now, fetchImpl });

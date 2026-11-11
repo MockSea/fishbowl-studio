@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { makeServer, TOKEN_TTL_MS, MAX_JSON_BYTES, MAX_UPLOAD_BYTES } from '../server/lib/web.js';
 import { app } from './host-helpers.js';
+import { controlRequest, answerValid } from '../server/lib/control.js';
 
 function fakeHost() {
   const seen = [];
@@ -238,16 +239,23 @@ test('an upload through the real studio lands in the brand kit under its shown n
   assert.doesNotMatch(JSON.stringify(list), /\.\.\//);
 });
 
-test('a second copy gets a new link through the control secret, and nothing else does', async (t) => {
+test('a second copy gets a new link by proving it holds the control secret, and nothing else does', async (t) => {
   const s = await started();
   t.after(() => s.srv.close());
   const ctl = (headers) => req(s.port, { method: 'POST', path: '/control/launch', headers });
+  const good = () => controlRequest(s.srv.control);
   assert.equal((await ctl({})).status, 403);
-  assert.equal((await ctl({ 'x-control': 'guess' })).status, 403);
-  assert.equal((await ctl({ 'x-control': s.srv.control, origin: s.origin })).status, 403, 'never from a page');
-  assert.equal((await req(s.port, { path: '/control/launch', headers: { 'x-control': s.srv.control } })).status, 403, 'POST only');
-  const r = await ctl({ 'x-control': s.srv.control });
+  assert.equal((await ctl({ 'x-control': s.srv.control })).status, 403, 'the bare secret is not how it asks');
+  assert.equal((await ctl(controlRequest('guess').headers)).status, 403);
+  assert.equal((await ctl({ ...good().headers, origin: s.origin })).status, 403, 'never from a page');
+  assert.equal((await req(s.port, { path: '/control/launch', headers: good().headers })).status, 403, 'POST only');
+  const ask = good();
+  const r = await ctl(ask.headers);
   assert.equal(r.status, 200);
+  assert.ok(answerValid(s.srv.control, ask.nonce, r.json.url, r.json.proof), 'the answer proves it came from the studio');
+  assert.ok(!answerValid('guess', ask.nonce, r.json.url, r.json.proof));
+  assert.ok(!JSON.stringify(r.json).includes(s.srv.control), 'the secret never goes over the wire');
+  assert.equal((await ctl(ask.headers)).status, 403, 'a nonce works once');
   const url = new URL(r.json.url);
   assert.equal(url.origin, s.origin);
   assert.equal((await req(s.port, { path: `/${url.search}` })).status, 303);

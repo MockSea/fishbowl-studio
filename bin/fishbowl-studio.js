@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The fishbowl-studio command (npx github:MockSea/fishbowl-studio, or the standalone build).
+// The fishbowl-studio command (npx github:MockSea/fishbowl-studio#v0.1.0, or the standalone build).
 // Written in plain, old syntax with no static imports, so a Node that is too old still gets as
 // far as the version check and prints one plain fix instead of a stack trace.
 // --extract-child is internal: the brand kit reads a PDF or Word file in a separate process

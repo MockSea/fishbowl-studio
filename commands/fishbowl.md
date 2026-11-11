@@ -1,6 +1,6 @@
 ---
 description: Start Fishbowl Studio and open it in the browser
-allowed-tools: Bash(npx --yes github:MockSea/fishbowl-studio:*)
+allowed-tools: Bash(npx --yes github:MockSea/fishbowl-studio#v0.1.0:*)
 ---
 
 # Start Fishbowl Studio
@@ -10,7 +10,7 @@ Fishbowl Studio is a local web app. This command starts it the same way a termin
 1. Run this with the Bash tool, **in the background** (it keeps running while the studio is open):
 
    ```
-   npx --yes github:MockSea/fishbowl-studio
+   npx --yes github:MockSea/fishbowl-studio#v0.1.0
    ```
 
 2. Wait a few seconds, then read its output. It prints the studio folder and a line starting

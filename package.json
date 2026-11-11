@@ -13,7 +13,8 @@
     "test": "node --test",
     "seed": "node dev/seed.mjs",
     "shots": "node dev/shots.mjs",
-    "build:standalone": "node scripts/build-standalone.mjs"
+    "build:standalone": "node scripts/build-standalone.mjs",
+    "prepare": "node scripts/prepare.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
@@ -35,5 +36,10 @@
     "defaults",
     "README.md",
     "LICENSE"
+  ],
+  "bundleDependencies": [
+    "@anthropic-ai/sdk",
+    "mammoth",
+    "unpdf"
   ]
 }

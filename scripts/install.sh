@@ -17,11 +17,11 @@ esac
 case "$(uname -m)" in
   arm64|aarch64) arch=arm64 ;;
   x86_64|amd64) arch=x64 ;;
-  *) echo "There's no standalone build for $(uname -m). Use npx github:$repo instead (needs Node 20 or newer)." >&2; exit 1 ;;
+  *) echo "There's no standalone build for $(uname -m). Use the npx command from the README instead (needs Node 20 or newer): https://github.com/$repo" >&2; exit 1 ;;
 esac
 asset="fishbowl-studio-$os-$arch"
 if [ "$os" = linux ] && [ "$arch" = arm64 ]; then
-  echo "There's no standalone build for Linux on ARM yet. Use npx github:$repo instead (needs Node 20 or newer)." >&2
+  echo "There's no standalone build for Linux on ARM yet. Use the npx command from the README instead (needs Node 20 or newer): https://github.com/$repo" >&2
   exit 1
 fi
 

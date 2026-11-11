@@ -1,8 +1,7 @@
-// Calls to Claude for the desktop app, through the official SDK. One request per step of the
-// run: the studio's brief goes in, the arguments its tool would have taken come back as JSON
-// (structured outputs), and the runner hands them to the same server code the plugin uses.
-// The brand kit rides at the front of every request (text fenced as data, images as image
-// blocks) and is marked for prompt caching, so a run pays for it once.
+// The drafting engine through the Anthropic API, with the official SDK. Sends a brief to the
+// API, parses the structured JSON response, and returns it to the runner. The brand kit rides at
+// the front of every request (text fenced as data, images as image blocks), with a prompt-cache
+// marker after it.
 import Anthropic from '@anthropic-ai/sdk';
 import { createFencer } from '../fence.js';
 
@@ -12,7 +11,7 @@ export const MODEL = process.env.STUDIO_MODEL || 'claude-opus-5-5';
 export const BETAS = ['server-side-fallback-2026-07-01'];
 
 export const SYSTEM = [
-  'You are the drafting engine inside Fishbowl Studio, a desktop app that drafts social posts for a brand.',
+  'You are the drafting engine inside Fishbowl Studio, an app on the person\'s own computer that drafts social posts for a brand.',
   'Each message is a brief the studio wrote. Where a brief says to call a studio tool (studio_record_triage, studio_save_takes, studio_wizard_save), reply instead with that tool\'s arguments as JSON matching the response schema; the app saves them. Leave out ids the schema doesn\'t ask for.',
   'The person who owns the brand reads every draft and posts the ones they like by hand.',
 ].join('\n');
@@ -26,7 +25,8 @@ export function makeClient({ apiKey, baseURL = process.env.STUDIO_ANTHROPIC_BASE
 }
 
 // The brand kit as content blocks: one fenced text block for every document, then the images.
-// The last block carries the cache breakpoint, so system + kit are one cached prefix.
+// The last block carries the cache marker. The fence tags are random per request, so the kit
+// text differs between requests and a marker is no promise that a later request reuses it.
 export function kitBlocks(kit) {
   if (!kit || (!kit.docs.length && !kit.images.length)) return [];
   const fz = createFencer();

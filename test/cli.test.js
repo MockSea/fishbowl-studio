@@ -2,9 +2,10 @@
 // file a second copy reads, and reusing a running copy instead of starting another.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseArgs, browserCommand, main, LOCK_FILE } from '../server/cli.js';
+import { parseArgs, browserCommand, main, askRunning, LOCK_FILE } from '../server/cli.js';
 import { app } from './host-helpers.js';
 import { tempHome } from './helpers.js';
 
@@ -72,6 +73,51 @@ test('a stale lock from a copy that is gone does not stop a new start', async (t
   const r = await main(['--home', home, '--no-open'], { out: quiet().out, signals: false, makeHostImpl: () => a.host });
   t.after(() => r.close());
   assert.ok(r.origin);
+});
+
+// A program that is not the studio, listening where a stale lock file says the studio was. It
+// answers the control call with a link of its own, the way another user's listener could.
+async function impostor(t) {
+  const hits = [];
+  const srv = http.createServer((req, res) => {
+    hits.push(req.headers);
+    const port = srv.address().port;
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ url: `http://127.0.0.1:${port}/?t=evil`, proof: 'f'.repeat(64) }));
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  t.after(() => new Promise((r) => srv.close(r)));
+  return { port: srv.address().port, hits };
+}
+
+test('a stale lock pointing at a listener that is not the studio: its link is not trusted, a new studio starts', async (t) => {
+  const fake = await impostor(t);
+  const home = tempHome();
+  fs.mkdirSync(path.join(home, 'app'), { recursive: true });
+  const lockFile = path.join(home, 'app', LOCK_FILE);
+  fs.writeFileSync(lockFile, JSON.stringify({ pid: process.pid, port: fake.port, control: 'c'.repeat(64) }));
+  assert.equal(await askRunning(lockFile), null);
+  assert.equal(fake.hits.length, 1);
+  assert.ok(!JSON.stringify(fake.hits[0]).includes('c'.repeat(64)), 'the control secret is never sent');
+
+  const opened = [];
+  const a = await app();
+  const r = await main(['--home', home], { out: quiet().out, open: (u) => opened.push(u), signals: false, makeHostImpl: () => a.host });
+  t.after(() => r.close());
+  assert.ok(r.origin, 'started its own');
+  assert.equal(opened.length, 1);
+  assert.ok(opened[0].startsWith(`${r.origin}/?t=`));
+  assert.ok(!opened.some((u) => u.includes('evil')));
+});
+
+test('a lock whose pid belongs to another user (EPERM) counts as gone: nothing is asked', { skip: process.platform === 'win32' || process.getuid?.() === 0 }, async (t) => {
+  const fake = await impostor(t);
+  const home = tempHome();
+  fs.mkdirSync(path.join(home, 'app'), { recursive: true });
+  const lockFile = path.join(home, 'app', LOCK_FILE);
+  fs.writeFileSync(lockFile, JSON.stringify({ pid: 1, port: fake.port, control: 'c'.repeat(64) }));
+  assert.equal(await askRunning(lockFile), null);
+  assert.equal(fake.hits.length, 0);
 });
 
 test('a folder it cannot write to gets a plain fix, not a stack trace', { skip: process.platform === 'win32' || process.getuid?.() === 0 }, async () => {

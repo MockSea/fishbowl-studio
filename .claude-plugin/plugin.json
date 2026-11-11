@@ -2,7 +2,7 @@
   "name": "studio",
   "displayName": "Fishbowl Studio",
   "version": "0.1.0",
-  "description": "Starts Fishbowl Studio, a local web app that drafts LinkedIn, X, Threads and Bluesky posts from the news on your brand's beat and puts them on a review board in your browser. /fishbowl runs the same command as a terminal: npx github:MockSea/fishbowl-studio.",
+  "description": "Starts Fishbowl Studio, a local web app that drafts LinkedIn, X, Threads and Bluesky posts from the news on your brand's beat and puts them on a review board in your browser. /fishbowl runs the same command as a terminal: npx github:MockSea/fishbowl-studio#v0.1.0.",
   "author": {
     "name": "Fishbowl Studio contributors"
   },

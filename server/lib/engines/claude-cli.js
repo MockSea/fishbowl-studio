@@ -3,16 +3,19 @@
 // the brief (and the brand kit) go in on stdin as one stream-json user message, the answer
 // comes back as structured output matching the schema.
 //
-// The call runs with no tools, no MCP servers, no user or local settings, no saved session,
-// from an empty temporary folder, so Claude Code only writes the answer.
+// The call runs with no tools, no MCP servers, no setting sources (so no settings files and no
+// CLAUDE.md from the folder or any folder above it), no saved session, from a new empty folder
+// under the studio's own app folder, so Claude Code only writes the answer. The folder is not
+// under the system temp folder: on Linux that is a shared /tmp, where another user could leave
+// files next to it.
 // --bare is not used: it skips the person's Claude login and needs an API key.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { SYSTEM, ModelError, kitBlocks } from './api.js';
 
-// The structured answer takes Claude Code one turn plus the turn that returns it.
+// Allow up to four Claude Code turns per drafting step. The answer normally comes back on the
+// first; the spare turns cover Claude Code retrying its structured output.
 export const MAX_TURNS = 4;
 export const TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -25,7 +28,7 @@ export function cliArgs({ schema, model = process.env.STUDIO_MODEL || null }) {
     '--json-schema', JSON.stringify(schema),
     '--tools', '',
     '--system-prompt', SYSTEM,
-    '--setting-sources', 'project',
+    '--setting-sources', '',
     '--strict-mcp-config',
     '--no-session-persistence',
     '--max-turns', String(MAX_TURNS),
@@ -56,11 +59,14 @@ export function parseCliOutput(stdout) {
   catch { throw new ModelError('Claude\'s answer wasn\'t valid JSON.', 'parse'); }
 }
 
-// bin: the claude executable. spawnImpl for tests.
-export function makeCliModel({ bin, spawnImpl = spawn, timeoutMs = TIMEOUT_MS, onCost = () => {} }) {
+// bin: the claude executable. workDir: a folder only this user can write (the studio's app
+// folder); each call runs in a new empty folder inside it. spawnImpl for tests.
+export function makeCliModel({ bin, workDir, spawnImpl = spawn, timeoutMs = TIMEOUT_MS, onCost = () => {} }) {
+  if (!workDir) throw new Error('makeCliModel needs a workDir.');
   return {
     ask({ task, schema, kit }) {
-      const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'fishbowl-claude-'));
+      fs.mkdirSync(workDir, { recursive: true, mode: 0o700 });
+      const cwd = fs.mkdtempSync(path.join(workDir, 'run-'));
       return new Promise((resolve, reject) => {
         let out = '', err = '', done = false;
         const finish = (fn, v) => {

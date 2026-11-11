@@ -11,7 +11,7 @@ $ProgressPreference = 'SilentlyContinue'
 
 $repo = 'MockSea/fishbowl-studio'
 if (-not [Environment]::Is64BitOperatingSystem -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
-  Write-Error "There's no standalone build for this Windows yet. Use npx github:$repo instead (needs Node 20 or newer)."
+  Write-Error "There's no standalone build for this Windows yet. Use the npx command from the README instead (needs Node 20 or newer): https://github.com/$repo"
 }
 $asset = 'fishbowl-studio-windows-x64.exe'
 if ($env:FISHBOWL_VERSION) { $base = "https://github.com/$repo/releases/download/$($env:FISHBOWL_VERSION)" }

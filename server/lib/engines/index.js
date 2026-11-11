@@ -1,14 +1,17 @@
-// Which engine writes the drafts. Two, behind one cost guard (the runner's call budget and the
-// daily cap count every call the same way, whichever engine answers):
+// Which engine writes the drafts. Two, behind one cost guard: the runner's budget and the daily
+// cap count budgeted drafting steps (each ask() here), whichever engine answers. One step can be
+// more than one request underneath (SDK retries, several Claude Code turns, or a Claude Code
+// failure followed by the API), so the caps don't bound requests or charges exactly.
 //   claude  `claude -p` on the person's Claude plan, when the claude command is installed
 //   api     the Anthropic API with their own key
 // The engine preference is auto (Claude Code when it is installed, else the key), claude or api.
-// In auto, if Claude Code fails to run a call (not installed right, signed out, crashed) and a
-// key is saved, that call and the rest of the session go to the API, and notify() says so once.
+// In auto, if Claude Code can't start or can't finish a call (a ModelError of kind 'cli': not
+// installed right, signed out, crashed, timed out) and a key is saved, that call and later ones go
+// to the API until restart or reset() (an engine or key change), and notify() says so once. An
+// answer that isn't valid JSON (kind 'parse') or a refusal is not a reason to switch.
 import fs from 'node:fs';
 import path from 'node:path';
 import { ModelError, makeClient, makeModel } from './api.js';
-import { makeCliModel } from './claude-cli.js';
 
 export const ENGINES = ['auto', 'claude', 'api'];
 
@@ -27,11 +30,12 @@ export function findOnPath(name, { env = process.env, platform = process.platfor
   return null;
 }
 
-// keys: the keystore. mode(): the preference. claudePath(): path or null.
+// keys: the keystore. mode(): the preference. claudePath(): path or null. createCli(bin): the
+// Claude Code engine (host.js gives it the studio's own work folder).
 export function makeEngine({
   keys, mode = () => 'auto', claudePath = () => findOnPath('claude'),
   createApi = (apiKey) => makeModel({ client: makeClient({ apiKey }) }),
-  createCli = (bin) => makeCliModel({ bin }),
+  createCli,
   notify = () => {},
 }) {
   let api = null, apiFor = null, cli = null, cliFor = null, cliBroken = null;
@@ -82,7 +86,7 @@ export function makeEngine({
         const backup = await apiModel();
         if (!backup) throw e;
         cliBroken = e.message;
-        notify(`${e.message} Using your Anthropic API key instead for the rest of this session.`);
+        notify(`${e.message} Using your Anthropic API key instead until you restart the studio or change the engine or key.`);
         return backup.ask(opts);
       }
     },

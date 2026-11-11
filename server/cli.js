@@ -10,6 +10,7 @@ import { makeHost } from './lib/host.js';
 import { makeServer } from './lib/web.js';
 import { setExtractArgs } from './lib/brandkit.js';
 import { STORE_LABELS } from './lib/keystore.js';
+import { controlRequest, answerValid } from './lib/control.js';
 
 export const TICK_MS = 5 * 60 * 1000;
 export const LOCK_FILE = 'server.json';
@@ -60,20 +61,25 @@ export function openBrowser(url, { platform = process.platform, spawnImpl = spaw
   } catch { /* the printed link still works */ }
 }
 
+// Only a process this user owns counts: EPERM means the pid now belongs to someone else.
 const alive = (pid) => {
-  try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; }
+  try { process.kill(pid, 0); return true; } catch { return false; }
 };
 
-// Another copy already running for this folder: ask it for a fresh launch link.
-async function askRunning(lockFile) {
+// Another copy already running for this folder: ask it for a fresh launch link. Its answer is
+// trusted only with a proof made from the lock file's control secret (control.js), so a stale
+// lock file can't send the browser to whatever else now listens on that port.
+export async function askRunning(lockFile, { isAlive = alive } = {}) {
   let lock;
   try { lock = JSON.parse(fs.readFileSync(lockFile, 'utf8')); } catch { return null; }
-  if (!lock || !Number.isInteger(lock.pid) || !Number.isInteger(lock.port) || !alive(lock.pid)) return null;
+  if (!lock || !Number.isInteger(lock.pid) || !Number.isInteger(lock.port) || typeof lock.control !== 'string' || !isAlive(lock.pid)) return null;
   try {
-    const r = await fetch(`http://127.0.0.1:${lock.port}/control/launch`, { method: 'POST', headers: { 'x-control': String(lock.control) }, signal: AbortSignal.timeout(3000) });
+    const { nonce, headers } = controlRequest(lock.control);
+    const r = await fetch(`http://127.0.0.1:${lock.port}/control/launch`, { method: 'POST', headers, signal: AbortSignal.timeout(3000) });
     if (!r.ok) return null;
-    const { url } = await r.json();
-    return typeof url === 'string' && url.startsWith(`http://127.0.0.1:${lock.port}/`) ? url : null;
+    const { url, proof } = await r.json();
+    if (typeof url !== 'string' || !url.startsWith(`http://127.0.0.1:${lock.port}/`)) return null;
+    return answerValid(lock.control, nonce, url, proof) ? url : null;
   } catch { return null; }
 }
 
