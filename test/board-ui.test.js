@@ -15,7 +15,7 @@ import { BOARD_SCRIPTS, boardHtml } from '../server/lib/rpc.js';
 const tick = () => new Promise((r) => setTimeout(r, 5));
 async function settle(n = 20) { for (let i = 0; i < n; i++) await tick(); }
 
-async function boot({ fetchImpl, displayModes, refuseDisplay } = {}) {
+async function boot({ fetchImpl, displayModes, refuseDisplay, hooks } = {}) {
   const home = tempHome();
   seed(home);
   const ctx = makeContext({ home, fetchImpl });
@@ -43,6 +43,7 @@ async function boot({ fetchImpl, displayModes, refuseDisplay } = {}) {
     Promise, Map, Set, Object, Array, Date, Math, Number, String, JSON, Error, console, STUDIO_SKINS: ['light'],
   };
   win.window = win;
+  if (hooks) win.BoardHooks = hooks;
   vm.createContext(win);
   const ui = (f) => fs.readFileSync(path.join(PLUGIN_ROOT, 'server', 'ui', f), 'utf8');
   for (const f of ['board-bridge.js', ...BOARD_SCRIPTS]) vm.runInContext(ui(f), win, { filename: f });
@@ -503,4 +504,15 @@ test('Full screen: shown only when the host offers it, hidden for good when a re
   await refused.document.getElementById('full-btn').click();
   await new Promise((r) => setTimeout(r, 20));
   assert.equal(refused.document.getElementById('full-btn').hidden, true);
+});
+
+test('a host that reads only sites and subreddits offers only those, and says nothing of a coach', async () => {
+  const b = await boot({ hooks: { sourceKinds: () => ['site', 'reddit'], noCoach: () => true } });
+  await b.nav('sources');
+  const t = b.view().textContent;
+  assert.match(t, /A website or a subreddit/);
+  assert.doesNotMatch(t, /X or LinkedIn|Trending on X|Saved searches|Accounts you watch|@example_cargo/);
+  assert.match(t, /Suggested sources \(1\)/);
+  await b.nav('playbook');
+  assert.doesNotMatch(b.view().textContent, /weekly coach/);
 });

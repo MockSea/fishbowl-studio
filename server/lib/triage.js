@@ -57,6 +57,27 @@ export function triageQueue(ctx) {
   });
 }
 
+// Close a batch the model couldn't triage (it refused, ran out of room, or sent something
+// unreadable): its items count as triaged with interest 0, so they are never drafted and never
+// offered again, and the run can go on to drafting.
+export function skipTriage(ctx, { queue_id }) {
+  return ctx.tx((db) => {
+    const q = db.queues.find((x) => x.id === queue_id);
+    if (!q) return { skipped: 0 };
+    const at = ctx.iso();
+    let skipped = 0;
+    for (const id of q.item_ids) {
+      const item = db.items.find((i) => i.id === id);
+      if (!item || item.triaged_at) continue;
+      item.interest = 0;
+      item.triaged_at = at;
+      item.triage_failed = true;
+      skipped++;
+    }
+    return { skipped };
+  });
+}
+
 export function recordTriage(ctx, { queue_id, reactions = [] }) {
   const settings = ctx.settings();
   const topics = new Set(topicsOf(loadBeat(ctx.store)));

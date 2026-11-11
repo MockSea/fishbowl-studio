@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { testContext, at } from './helpers.js';
 import { draftingBrief } from '../server/lib/briefs.js';
-import { saveTakes } from '../server/lib/save.js';
+import { saveTakes, abandonBrief } from '../server/lib/save.js';
 import { callTool } from '../server/lib/tools.js';
 
 const NOW = at(2026, 10, 21, 9, 0);
@@ -96,4 +96,30 @@ test('jobs_only briefs never open new stories', () => {
   const { ctx } = ctxWith();
   assert.equal(draftingBrief(ctx, { jobs_only: true }).done, true);
   assert.equal(draftingBrief(ctx).kind, 'item');
+});
+
+test('a story or evergreen set whose takes were all dropped is used up, not handed out again', () => {
+  const { ctx } = ctxWith();
+  ctx.store.writeFile('settings.json', JSON.stringify({ evergreen_per_day: 1 }));
+  const long = (n) => [...Array(n)].map(() => T('z'.repeat(5000)));
+  const kinds = [];
+  for (let i = 0; i < 6; i++) {
+    const b = draftingBrief(ctx);
+    if (b.done) break;
+    kinds.push(b.kind);
+    assert.equal(saveTakes(ctx, { brief_id: b.brief_id, takes: long(b.takes) }).status, 'redraft');
+    assert.equal(saveTakes(ctx, { brief_id: b.brief_id, takes: long(b.takes) }).status, 'dropped');
+  }
+  assert.deepEqual(kinds, ['item', 'evergreen']);
+});
+
+test('an abandoned brief closes its job and counts as dropped', () => {
+  const { ctx } = ctxWith();
+  ctx.store.writeFile('settings.json', JSON.stringify({ evergreen_per_day: 2 }));
+  ctx.tx((db) => { db.items = []; });
+  const b = draftingBrief(ctx);
+  assert.equal(b.kind, 'evergreen');
+  assert.equal(abandonBrief(ctx, b.brief_id).ok, true);
+  assert.equal(abandonBrief(ctx, b.brief_id).ok, false, 'only once');
+  assert.equal(draftingBrief(ctx).done, true);
 });

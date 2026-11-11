@@ -4,7 +4,7 @@
 (function () {
   const S = window.Studio;
   const B = window.Board;
-  const { h, icon, page, card, call, setting, plural, ago } = B;
+  const { h, icon, page, card, call, setting, plural, ago, since } = B;
   const label = (slug) => String(slug || 'other').replace(/-/g, ' ');
 
   // A text field with one button; the button shows it's working while the call runs.
@@ -30,6 +30,8 @@
     { value: 'search', label: 'Search', placeholder: 'e-bike regulation', aria: 'Saved search', type: 'text', hint: () => 'Claude runs this web search on each run and reads the results like news.' },
   ];
   const ARG = { site: 'url', reddit: 'sub', watch: 'url', search: 'q' };
+  // A host can read fewer kinds (the desktop app reads sites and subreddits only).
+  const kinds = () => { const only = B.hook('sourceKinds'); return only ? KINDS.filter((k) => only.includes(k.value)) : KINDS; };
 
   // One source of any kind: name, what it brought in, how its drafts did, and its controls.
   function sourceRow(f, topics) {
@@ -66,9 +68,12 @@
 
   let addKind = 'site', addList = 'feeds', linkWhen = 'next';
   function sources(d) {
-    const k = KINDS.find((x) => x.value === addKind) || KINDS[0];
-    const add = card({ icon: 'sources', title: 'Add a source', sub: 'A website, a subreddit, an account your audience follows, or a search.' },
-      B.seg(KINDS.map((x) => ({ value: x.value, label: x.label })), addKind, (v) => { addKind = v; B.render(); }, 'What kind of source'),
+    // Trending on X sits with the watched accounts.
+    const ks = kinds(), has = (v) => ks.some((x) => x.value === (v === 'trends' ? 'watch' : v));
+    if (!has(addKind)) addKind = 'site';
+    const k = ks.find((x) => x.value === addKind) || ks[0];
+    const add = card({ icon: 'sources', title: 'Add a source', sub: has('watch') ? 'A website, a subreddit, an account your audience follows, or a search.' : 'A website or a subreddit.' },
+      B.seg(ks.map((x) => ({ value: x.value, label: x.label })), addKind, (v) => { addKind = v; B.render(); }, 'What kind of source'),
       addKind === 'site' ? h('div', { class: 'card-foot' }, B.seg([{ value: 'feeds', label: 'Daily news' }, { value: 'reading', label: 'Slow reading' }], addList, (v) => { addList = v; B.render(); }, 'Add to which list')) : null,
       h('div', { class: 'card-foot' }, inline({ type: k.type, placeholder: k.placeholder, aria: k.aria, button: 'Add', onsubmit: (v) => call('studio_source_add', { kind: addKind, [ARG[addKind]]: v, ...(addKind === 'site' ? { list: addList } : {}) }) })),
       h('p', { class: 'hint', text: k.hint(addList) }));
@@ -76,22 +81,22 @@
       B.seg([{ value: 'next', label: 'With the next run' }, { value: 'now', label: 'Ask Claude now' }], linkWhen, (v) => { linkWhen = v; B.render(); }, 'When to draft it'),
       h('div', { class: 'card-foot' }, inline({ type: 'url', placeholder: 'https://example.com/article', aria: 'Article address', button: 'Draft it', onsubmit: async (url) => {
         const r = await call('studio_draft_link', { url });
-        if (r && r.ok && linkWhen === 'now') { const sent = await S.askClaude('Draft the link I just sent to Fishbowl Studio (do my studio rewrites).'); if (!sent) B.flash('Queued. Ask Claude in the chat: "do my studio rewrites".', 'good'); }
+        if (r && r.ok && linkWhen === 'now') { const sent = await S.askClaude('Draft the link I just sent to Fishbowl Studio (do my studio rewrites).'); if (sent !== true) B.flash(typeof sent === 'string' ? sent : 'Queued. Ask Claude in the chat: "do my studio rewrites".', typeof sent === 'string' ? 'warn' : 'good'); }
       } })),
       d.links.length ? h('div', { class: 'rows card-foot' }, d.links.map((l) => h('div', { class: 'row-item' },
-        h('span', { class: 'who' }, h('span', { class: 'nm', text: l.title || l.url }), h('span', { class: 'sub', text: `${l.host} · ${ago(l.at)} ago` })),
+        h('span', { class: 'who' }, h('span', { class: 'nm', text: l.title || l.url }), h('span', { class: 'sub', text: `${l.host} · ${since(l.at)}` })),
         h('span', { class: `tag ${l.status === 'drafted' ? 'ok' : 'accent'}` }, l.status === 'drafted' ? 'Drafted' : l.status === 'queued' ? 'Queued' : l.status)))) : null);
     const list = (rows, ic, title, sub, emptyText, extra) => card({ icon: ic, title: `${title} (${rows.length})`, sub },
       rows.length ? h('div', { class: 'rows' }, rows.map((f) => sourceRow(f, d.topics))) : B.empty({ icon: ic, title: 'Nothing here yet', text: emptyText }), extra || null);
     const trendsOff = !d.trends.length ? h('div', { class: 'setting card-foot' }, h('div', { class: 'lbl' }, h('b', { text: 'Trending on X' }), h('span', { text: 'What’s trending, checked on each run.' })),
       h('button', { class: 'btn sm', onclick: () => call('studio_source_add', { kind: 'trends' }) }, icon('plus'), 'Add')) : null;
     const browser = d.browser && !d.browser.ok ? h('div', { class: 'banner warn', role: 'status' },
-      h('span', { text: `On the last run (${ago(d.browser.at)} ago) Claude couldn’t use its browser, so it looked your accounts up with web search instead. To read the pages themselves, turn on Claude in Chrome.` })) : null;
-    return page('Sources', `Where it reads${d.last_fetch ? `. News last read ${ago(d.last_fetch)} ago` : ''}.`, null,
-      h('div', { class: 'stack' }, suggestionsCard(d.suggestions), browser, h('div', { class: 'duo' }, add, link),
+      h('span', { text: `On the last run (${since(d.browser.at)}) Claude couldn’t use its browser, so it looked your accounts up with web search instead. To read the pages themselves, turn on Claude in Chrome.` })) : null;
+    return page('Sources', `Where it reads${d.last_fetch ? `. News last read ${since(d.last_fetch)}` : ''}.`, null,
+      h('div', { class: 'stack' }, suggestionsCard(d.suggestions.filter((x) => has(x.kind))), browser, h('div', { class: 'duo' }, add, link),
         list(d.feeds, 'drafts', 'Daily news', 'Websites and subreddits, read on every run. Pause one to skip it for a while.', 'Add a site you read for work, and drafts start from its stories.'),
-        list([...d.watch, ...d.trends], 'eye', 'Accounts you watch', 'Public posts, read logged out by Claude on each run.', 'Add an X handle or a LinkedIn page your audience follows.', trendsOff),
-        list(d.searches, 'search', 'Saved searches', 'Run with Claude’s web search on each run. Sites that keep showing up in good results are suggested above.', 'Save a search like “bike commuting” and its results are read like news.'),
+        has('watch') ? list([...d.watch, ...d.trends], 'eye', 'Accounts you watch', 'Public posts, read logged out by Claude on each run.', 'Add an X handle or a LinkedIn page your audience follows.', trendsOff) : null,
+        has('search') ? list(d.searches, 'search', 'Saved searches', 'Run with Claude’s web search on each run. Sites that keep showing up in good results are suggested above.', 'Save a search like “bike commuting” and its results are read like news.') : null,
         list(d.reading, 'reads', 'Slow reading', 'Browsed a little each day for ideas and evergreen posts.', 'Optional: blogs or journals worth a slow read.')));
   }
 
@@ -133,7 +138,7 @@
 
   // ---------- Schedule ----------
   function schedule(d) {
-    const presets = card({ icon: 'sources', title: 'How often to read the news', sub: 'If Claude runs sooner than this, it skips the news and just drafts and releases.' },
+    const presets = card({ icon: 'sources', title: 'How often to read the news', sub: 'If the studio runs sooner than this, it skips the news and just drafts and releases.' },
       h('div', { class: 'presets', role: 'radiogroup', 'aria-label': 'News frequency' }, d.presets.map((p) => h('button', { class: `preset ${p.key === d.fetch_every ? 'on' : ''}`, role: 'radio', 'aria-checked': String(p.key === d.fetch_every), onclick: () => { if (p.key !== d.fetch_every) setting({ fetch_every: p.key }); } }, h('b', { text: p.label }), h('span', { text: p.blurb })))),
       (d.presets.find((p) => p.key === d.fetch_every) || {}).note ? h('p', { class: 'hint', text: d.presets.find((p) => p.key === d.fetch_every).note }) : null);
     const on = new Set(d.release_hours);
@@ -150,14 +155,14 @@
       return h('div', { class: 'task' }, h('div', { class: 'kv' }, kv.map(([k, v]) => [h('span', { class: 'k', text: k }), h('span', { class: 'v' }, k === 'Prompt' || k === 'Folder' ? h('code', { text: v }) : v), h('span', { class: 'copy' }, B.copyButton(v, 'Copy', 'btn sm ghost'))])));
     };
     const all = d.tasks.map((t) => `${t.text}\nFolder: ${d.home}`).join('\n\n');
-    const cowork = card({ icon: 'bulb', title: 'Set it up in Claude', sub: `The studio can’t start itself. Claude runs it from ${d.tasks.length > 1 ? `${d.tasks.length} scheduled tasks` : 'a scheduled task'} in Cowork. One click asks Claude to make ${d.tasks.length > 1 ? 'them' : 'it'}; you approve ${d.tasks.length > 1 ? 'each' : 'it'} once.`, end: B.askClaudeButton('Set it up for me', d.setup_prompt, 'btn sm primary') },
+    const cowork = B.hook('scheduleCard', d) || card({ icon: 'bulb', title: 'Set it up in Claude', sub: `The studio can’t start itself. Claude runs it from ${d.tasks.length > 1 ? `${d.tasks.length} scheduled tasks` : 'a scheduled task'} in Cowork. One click asks Claude to make ${d.tasks.length > 1 ? 'them' : 'it'}; you approve ${d.tasks.length > 1 ? 'each' : 'it'} once.`, end: B.askClaudeButton('Set it up for me', d.setup_prompt, 'btn sm primary') },
       d.tasks.map(rows),
       d.posting ? h('p', { class: 'hint', text: '“Fishbowl Studio posting” is there because “Post for me” is on for an account. It posts what you approved, a few minutes after each release time.' }) : null,
       h('details', { class: 'by-hand' }, h('summary', { class: 'small muted' }, 'Or set it up by hand'),
         h('div', { class: 'chips card-foot' }, B.copyButton(all, 'Copy all', 'btn sm')),
         h('ol', { class: 'howto' }, h('li', { text: 'In Claude, open Cowork and choose Scheduled.' }), h('li', { text: 'Click New task and fill it in from above.' }), h('li', { text: 'Save. Your computer needs to be on with Claude open; a missed run happens the next time you open Claude.' }))));
     const status = card({ icon: 'schedule', title: 'Right now', cls: 'soft' },
-      h('p', { class: 'small muted', text: d.last_fetch ? `Last read the news ${ago(d.last_fetch)} ago.` : 'Hasn’t read the news yet. That happens on the first run.' }),
+      h('p', { class: 'small muted', text: d.last_fetch ? `Last read the news ${since(d.last_fetch)}.` : 'Hasn’t read the news yet. That happens on the first run.' }),
       h('p', { class: 'small muted', text: `Next read: ${new Date(d.next_fetch) <= new Date() ? 'on the next run' : `from ${B.hm(d.next_fetch)}${new Date(d.next_fetch).toDateString() !== new Date().toDateString() ? ` on ${new Date(d.next_fetch).toLocaleDateString([], { weekday: 'long' })}` : ''}`}.` }),
       B.askClaudeButton('Run it now', 'Run the Fishbowl Studio daily run now.', 'btn sm'));
     return page('Schedule', 'How often it reads the news, and when drafts reach you.', null,
@@ -207,17 +212,17 @@
         h('span', { class: 'who' }, h('span', { class: 'nm', text: a.label }), h('span', { class: 'sub', text: a.enables }),
           h('span', { class: 'sub', text: `Reading signed in: ${capText(a.capabilities.read)} · Posting for you: ${a.capabilities.post !== true ? 'not possible' : a.posting.on ? 'on' : 'off'}` })),
         h('span', { class: 'ctl' }, a.connected
-          ? [h('span', { class: 'tag ok' }, icon('check'), `Connected ${ago(a.connected_at)} ago`), B.confirmButton(`Remove ${a.label}`, 'Remove?', () => call('studio_account_set', { action: 'remove', type: a.id }))]
+          ? [h('span', { class: 'tag ok' }, icon('check'), `Connected ${since(a.connected_at)}`), B.confirmButton(`Remove ${a.label}`, 'Remove?', () => call('studio_account_set', { action: 'remove', type: a.id }))]
           : h('button', { class: 'btn sm', onclick: async () => {
             const r = await call('studio_account_set', { action: 'connect', type: a.id });
-            if (r && r.ok && r.prompt) { const sent = await S.askClaude(r.prompt); if (!sent) B.flash(`Ask Claude in the chat: "${r.prompt}"`, 'warn'); }
+            if (r && r.ok && r.prompt) { const sent = await S.askClaude(r.prompt); if (sent !== true) B.flash(typeof sent === 'string' ? sent : `Ask Claude in the chat: "${r.prompt}"`, typeof sent === 'string' ? 'warn' : 'warn'); }
           } }, icon('plus'), 'Add account')),
         a.connected && a.capabilities.post === true ? h('div', { class: 'full' }, B.postingControl(a)) : null))));
     return page('Settings', `How ${head.brand || 'the brand'}'s studio works. Changes save as you click.`, null,
-      h('div', { class: 'cols' }, h('div', { class: 'stack' }, platforms, amounts, voice, phraseCard, accounts, brand),
-        h('aside', { class: 'rail' }, card({ icon: 'bulb', title: 'Rather just say it?', cls: 'soft', sub: 'Anything here can also be changed by asking Claude in the chat.' },
+      h('div', { class: 'cols' }, h('div', { class: 'stack' }, platforms, amounts, voice, phraseCard, B.hook('noPosting') ? null : accounts, brand),
+        h('aside', { class: 'rail' }, B.hook('settingsRail', d) || card({ icon: 'bulb', title: 'Rather just say it?', cls: 'soft', sub: 'Anything here can also be changed by asking Claude in the chat.' },
           B.askClaudeButton('Change the brand voice', 'I want to change my Fishbowl Studio brand voice.', 'btn sm'), ' ', B.askClaudeButton('Change positions', 'I want to change my Fishbowl Studio positions or audience.', 'btn sm ghost')),
-          card({ icon: 'spark', title: 'Run setup again', cls: 'soft', sub: 'The same four steps as a new brand. Your answers are kept, and Claude’s new drafts wait for your yes.' },
+          card({ icon: 'spark', title: 'Run setup again', cls: 'soft', sub: 'The same steps as a new brand. Your answers are kept, and Claude’s new drafts wait for your yes.' },
             h('button', { class: 'btn sm', onclick: () => B.openWizard() }, 'Open setup')))));
   }
 
@@ -225,7 +230,7 @@
   function reads(d) {
     const cards = d.reads.map((r) => h('article', { class: 'post read' }, h('span', { class: 'letter', text: (r.source || '?')[0] }),
       h('div', { class: 'post-main' },
-        h('div', { class: 'meta-line' }, h('span', { text: `${r.source || 'A story'} · read ${ago(r.triaged_at)} ago` }), r.web ? h('span', { class: 'tag' }, { watch: 'Post', trends: 'Trending', search: 'Search result', reddit: 'Reddit' }[r.web] || r.web) : null, Number.isFinite(r.interest) ? h('span', { class: `tag ${r.interest >= 6 ? 'ok' : ''}` }, `interest ${r.interest}/10`) : h('span', { class: 'tag accent' }, 'You sent this'), r.topic ? h('span', { class: 'tag' }, label(r.topic)) : null, r.also ? h('span', { text: `+${r.also} other outlet${r.also > 1 ? 's' : ''}` }) : null),
+        h('div', { class: 'meta-line' }, h('span', { text: `${r.source || 'A story'} · read ${since(r.triaged_at)}` }), r.web ? h('span', { class: 'tag' }, { watch: 'Post', trends: 'Trending', search: 'Search result', reddit: 'Reddit' }[r.web] || r.web) : null, Number.isFinite(r.interest) ? h('span', { class: `tag ${r.interest >= 6 ? 'ok' : ''}` }, `interest ${r.interest}/10`) : h('span', { class: 'tag accent' }, 'You sent this'), r.topic ? h('span', { class: 'tag' }, label(r.topic)) : null, r.also ? h('span', { text: `+${r.also} other outlet${r.also > 1 ? 's' : ''}` }) : null),
         h('div', { class: 'post-text', text: r.note || r.title }),
         r.boost ? h('div', { class: 'post-ctx', title: r.boost.why.join(' ') }, icon(r.boost.points > 0 ? 'up' : 'down'), `${r.boost.points > 0 ? 'Moved up' : 'Moved down'}: ${r.boost.why[0]}`) : null,
         r.note ? h('button', { class: 'quote', onclick: async () => { if (!(await S.openLink(r.url))) B.flash(r.url); } }, h('span', { class: 'src' }, icon('external'), h('span', { text: 'Open the story' })), h('span', { class: 'ttl', text: r.title })) : null,
@@ -241,11 +246,11 @@
   // ---------- Playbook ----------
   function playbook(d) {
     const props = d.proposals.length ? h('div', { class: 'rows' }, d.proposals.map(B.proposalRow))
-      : B.empty({ icon: 'playbook', title: 'No proposals waiting', text: 'The weekly coach and your edits suggest changes here. Nothing changes until you accept it.' });
+      : B.empty({ icon: 'playbook', title: 'No proposals waiting', text: `${B.hook('noCoach') ? 'Your edits suggest' : 'The weekly coach and your edits suggest'} changes here. Nothing changes until you accept it.` });
     const rows = (list, key) => (list.length ? h('ul', { class: 'list' }, list.map((x) => h('li', {}, B.meter(x[key]), x.text))) : h('p', { class: 'hint', text: 'None yet.' }));
     return page('Playbook', 'The rules it has learned and what the brand believes. Only you can change them.', null,
       h('div', { class: 'stack' },
-        card({ icon: 'spark', title: `Proposed changes (${d.proposals.length})`, sub: 'Suggested by the weekly coach and by your edits.' }, props),
+        card({ icon: 'spark', title: `Proposed changes (${d.proposals.length})`, sub: B.hook('noCoach') ? 'Suggested by your edits.' : 'Suggested by the weekly coach and by your edits.' }, props),
         card({ icon: 'playbook', title: 'Playbook' }, d.playbook.length ? h('ul', { class: 'list' }, d.playbook.map((b) => h('li', { text: b }))) : h('p', { class: 'hint', text: 'Empty.' })),
         h('div', { class: 'duo' }, card({ icon: 'flag', title: 'Positions', sub: 'Yours; Claude only suggests.' }, rows(d.positions, 'strength')),
           card({ icon: 'user', title: 'Who we write for' }, rows(d.audience.who, 'confidence'), h('p', { class: 'section-title', text: 'Buttons' }), rows(d.audience.buttons, 'confidence'))),
@@ -258,7 +263,7 @@
   function coach(d) {
     const r = d.report;
     const lines = (xs, dir, ic) => h('div', { class: 'learned' }, xs.map((x) => h('div', { class: `learn ${dir}` }, h('span', { class: 'dir' }, icon(ic)), h('div', { class: 'nm', text: x }))));
-    const report = r ? card({ icon: 'coach', title: `Week of ${r.week}`, sub: `Written ${ago(r.at)} ago from your verdicts, edits and numbers.` },
+    const report = r ? card({ icon: 'coach', title: `Week of ${r.week}`, sub: `Written ${since(r.at)} from your verdicts, edits and numbers.` },
       r.summary ? h('p', { class: 'coach-summary', text: r.summary }) : null,
       r.working.length ? [h('p', { class: 'section-title', text: 'What’s working' }), lines(r.working, 'up', 'up')] : null,
       r.not_working.length ? [h('p', { class: 'section-title', text: 'What isn’t' }), lines(r.not_working, 'down', 'down')] : null,

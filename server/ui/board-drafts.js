@@ -3,7 +3,7 @@
 (function () {
   const S = window.Studio;
   const B = window.Board;
-  const { h, icon, state, act, ago } = B;
+  const { h, icon, state, act, ago, since } = B;
 
   const TABS = [['waiting', 'To review'], ['passed', 'Approved'], ['killed', 'Skipped'], ['scrapped', 'Expired']];
   const CHIP_LABEL = { all: 'Everything', sets: 'Pick one', singles: 'Single drafts', experiments: 'Experiments', flagged: 'Needs a look', rewritten: 'Rewritten', 'to post': 'Not posted yet', posted: 'Posted', killed: 'Skipped', 'passed over': 'None of these', unpicked: 'Not picked', stale: 'Went stale', 'over cap': 'Over the daily cap' };
@@ -193,7 +193,7 @@
     const at = p.slot ? `${B.hm(p.slot)}${new Date(p.slot).toDateString() !== new Date().toDateString() ? ` on ${new Date(p.slot).toLocaleDateString([], { weekday: 'long' })}` : ''}` : '';
     if (p.status === 'scheduled') return h('div', { class: 'post-ctx' }, icon('schedule'), `Claude posts this to ${p.platform} at ${at}, if your computer is awake.`);
     if (p.status === 'posting') return h('div', { class: 'post-ctx' }, icon('at'), `Claude is posting this to ${p.platform} now.`);
-    if (p.status === 'posted') return h('div', { class: 'post-ctx' }, icon('check'), `Posted to ${p.platform} by Claude ${B.ago(p.done_at)} ago.`, p.unchecked ? h('span', { class: 'tag warn' }, 'text not checked') : null);
+    if (p.status === 'posted') return h('div', { class: 'post-ctx' }, icon('check'), `Posted to ${p.platform} by Claude ${since(p.done_at)}.`, p.unchecked ? h('span', { class: 'tag warn' }, 'text not checked') : null);
     if (p.status === 'cancelled') return h('div', { class: 'post-ctx' }, icon('x'), `Not posted: ${p.reason}`);
     const label = { missed: `Missed the ${B.hm(p.slot)} slot`, failed: 'Didn’t post', blocked: 'Held back' }[p.status] || p.status;
     return h('div', { class: 'post-problem', role: 'status' }, h('div', { class: 'row' }, icon('flag'), h('b', { text: label }), h('span', { text: p.reason || '' })),

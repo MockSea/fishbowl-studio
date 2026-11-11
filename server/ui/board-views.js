@@ -31,6 +31,7 @@
     if (s < 86400) return `${Math.floor(s / 3600)}h`;
     return `${Math.floor(s / 86400)}d`;
   }
+  const since = (iso) => { const a = ago(iso); return a === 'just now' || !a ? a : `${a} ago`; };
   const hm = (iso) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -49,9 +50,13 @@
   function askClaudeButton(label, prompt, cls = 'btn ghost') {
     return h('button', { class: cls, onclick: async () => {
       const ok = await S.askClaude(prompt);
-      flash(ok ? 'Sent to Claude.' : `Ask Claude in the chat: "${prompt}"`, ok ? 'good' : 'warn');
+      flash(ok === true ? (S.sentText || 'Sent to Claude.') : typeof ok === 'string' ? ok : `Ask Claude in the chat: "${prompt}"`, ok === true ? 'good' : 'warn');
     } }, label);
   }
+
+  // A host can swap a few cards for its own (the desktop app's schedule and key cards), and
+  // noPosting hides what only applies where the studio can post for them.
+  const hook = (name, ...a) => { const f = window.BoardHooks && window.BoardHooks[name]; return f ? f(...a) : null; };
 
   // ---------- server calls ----------
   async function load(params) {
@@ -107,7 +112,8 @@
     const c = head.counter || {};
     const next = c.next ? `next batch ${hm(c.next)}` : 'no more batches today';
     $('counter').replaceChildren(icon('schedule'), h('span', {}, h('b', { text: String(c.released ?? 0) }), ` of ${c.cap ?? 0} today`), h('span', { class: 'long', text: ` · ${c.held ?? 0} held · ${next}` }));
-    $('badge-coach').textContent = head.proposals || '';
+    const coachBadge = $('badge-coach');
+    if (coachBadge) coachBadge.textContent = head.proposals || '';
     $('badge-sources').textContent = head.suggestions || '';
     const jobs = $('jobs');
     jobs.replaceChildren();
@@ -281,7 +287,7 @@
           h('button', { class: `btn sm ${s.done ? 'ghost' : 'primary'}`, onclick: go }, s.done ? 'Done · change' : cta)); })));
   }
 
-  window.Board = { state, h, icon, load, call, act, setting, flash, render, ago, hm, plural, meter, page, card, empty, seg, switchCtl, stepper, confirmButton, copyButton, askClaudeButton, avatar, todayCard, profilesCard, firstRunCard, switchTo, proposalRow, postingControl, openWizard, setDrawer, KIND_LABEL, OP_LABEL };
+  window.Board = { state, hook, h, icon, load, call, act, setting, flash, render, ago, since, hm, plural, meter, page, card, empty, seg, switchCtl, stepper, confirmButton, copyButton, askClaudeButton, avatar, todayCard, profilesCard, firstRunCard, switchTo, proposalRow, postingControl, openWizard, setDrawer, KIND_LABEL, OP_LABEL };
   window.BoardPages = window.BoardPages || {};
 
   // ---------- boot ----------

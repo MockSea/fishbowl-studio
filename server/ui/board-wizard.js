@@ -11,13 +11,16 @@
   const ORDER = { brand: 0, questions: 1, drafting: 2, review: 2, posting: 3, finish: 4, done: 4 };
   const SECTIONS = [
     ['voice', 'Voice', 'How the brand sounds. Every draft is written from this.'],
-    ['playbook', 'Playbook', 'How it writes. The weekly coach refines these with you.'],
+    ['playbook', 'Playbook', 'How it writes. It suggests refinements as it learns, and you accept each one.'],
     ['topic:add', 'Topics', 'What it reads and writes about.'],
     ['topic:avoid', 'Off limits', 'What it never posts about.'],
     ['audience', 'Who it’s for', 'Who the posts are written for.'],
   ];
   let poll = null, polls = 0;
 
+  // A host where nothing posts for them (the desktop app) skips the Posting step.
+  const posting = () => !B.hook('noPosting');
+  const steps = () => posting() ? STEPS : STEPS.filter(([k]) => k !== 'posting');
   const stop = () => { clearTimeout(poll); poll = null; };
   const go = async (step, server) => {
     state.wstep = step;
@@ -26,8 +29,8 @@
   };
 
   function progress(cur) {
-    const at = ORDER[cur] ?? 0;
-    return h('ol', { class: 'wsteps', 'aria-label': 'Setup steps' }, STEPS.map(([k, l], i) => h('li', { class: `${i < at ? 'done' : ''} ${i === at ? 'on' : ''}`, 'aria-current': i === at ? 'step' : null },
+    const at = Math.min(ORDER[cur] ?? 0, steps().length);
+    return h('ol', { class: 'wsteps', 'aria-label': 'Setup steps' }, steps().map(([k, l], i) => h('li', { class: `${i < at ? 'done' : ''} ${i === at ? 'on' : ''}`, 'aria-current': i === at ? 'step' : null },
       h('span', { class: 'num' }, i < at ? icon('check') : String(i + 1)), h('span', { class: 'lbl', text: l }))));
   }
 
@@ -70,7 +73,7 @@
       draft.disabled = false;
       if (!r || !r.ok) return;
       const sent = await S.askClaude(r.prompt);
-      if (!sent) B.flash(`Ask Claude in the chat: "${r.prompt}"`, 'warn');
+      if (sent !== true) B.flash(typeof sent === 'string' ? sent : `Ask Claude in the chat: "${r.prompt}"`, typeof sent === 'string' ? 'warn' : 'warn');
       polls = 0; state.wstep = null; await B.load();
     });
     return card({ icon: 'note', title: `A few questions about ${w.brand}`, sub: 'Plain answers are best. Skip anything you’re not sure about; Claude makes a sensible guess and you can change it after.' },
@@ -115,13 +118,13 @@
         h('span', { class: 'ctl' }, x.status === 'open' ? [h('button', { class: 'btn sm approve', onclick: () => call('studio_proposal_decide', { id: x.id, decision: 'accept' }) }, icon('plus'), 'Add'), h('button', { class: 'btn sm ghost', onclick: () => call('studio_proposal_decide', { id: x.id, decision: 'reject' }) }, 'Dismiss')] : h('span', { class: `tag ${x.status === 'accepted' ? 'ok' : ''}` }, x.status === 'accepted' ? 'Added' : 'Dismissed')))))) : null;
     const open = w.drafts.filter((x) => x.status === 'open');
     const keepAll = async () => { for (const x of open) await call('studio_proposal_decide', { id: x.id, decision: 'accept', ...(fields[x.id] && fields[x.id].value.trim() !== x.text ? { text: fields[x.id].value } : {}) }, { reload: false, quiet: true }); await B.load(); B.flash('Kept them. Change any of it later in Settings, Topics and Playbook.', 'good'); };
-    const again = async () => { const r = await call('studio_wizard', { action: 'draft' }, { reload: false, quiet: true }); if (r && r.ok) { const sent = await S.askClaude(r.prompt); if (!sent) B.flash(`Ask Claude in the chat: "${r.prompt}"`, 'warn'); polls = 0; state.wstep = null; await B.load(); } };
+    const again = async () => { const r = await call('studio_wizard', { action: 'draft' }, { reload: false, quiet: true }); if (r && r.ok) { const sent = await S.askClaude(r.prompt); if (sent !== true) B.flash(typeof sent === 'string' ? sent : `Ask Claude in the chat: "${r.prompt}"`, typeof sent === 'string' ? 'warn' : 'warn'); polls = 0; state.wstep = null; await B.load(); } };
     const site = w.site && w.site.error ? h('p', { class: 'hint', text: `Your link wasn’t read (${w.site.error}), so these come from your answers.` }) : null;
     return [card({ icon: 'spark', title: `Here’s a first draft of ${w.brand}`, sub: 'Change any line, then Keep it, or Drop what’s wrong. Nothing changes until you keep it.', end: open.length > 1 ? h('button', { class: 'btn sm', onclick: keepAll }, 'Keep everything') : null }, site,
       !groups.length && !srcs.length ? B.empty({ icon: 'spark', title: 'Nothing drafted', text: 'Ask Claude to draft it again.' }) : null),
     ...groups, sources,
     h('div', { class: 'chips' }, h('button', { class: 'btn ghost', onclick: () => go('questions', 'questions') }, 'Back'), h('button', { class: 'btn ghost', onclick: again }, icon('redo'), 'Draft it again'), h('span', { class: 'grow' }),
-      h('button', { class: 'btn primary', onclick: () => go('posting', 'posting') }, open.length ? `Next (${open.length} still open)` : 'Next'))];
+      h('button', { class: 'btn primary', onclick: () => posting() ? go('posting', 'posting') : go('finish') }, open.length ? `Next (${open.length} still open)` : 'Next'))];
   }
 
   // Step 4: "Post for me", per account, off unless they turn it on.
@@ -133,7 +136,7 @@
         h('span', { class: 'who' }, h('span', { class: 'nm', text: a.label }), h('span', { class: 'sub', text: a.connected ? 'Connected' : 'Not connected' })),
         h('span', { class: 'ctl' }, a.connected ? null : h('button', { class: 'btn sm', onclick: async () => {
           const r = await call('studio_account_set', { action: 'connect', type: a.id });
-          if (r && r.ok && r.prompt) { const sent = await S.askClaude(r.prompt); if (!sent) B.flash(`Ask Claude in the chat: "${r.prompt}"`, 'warn'); }
+          if (r && r.ok && r.prompt) { const sent = await S.askClaude(r.prompt); if (sent !== true) B.flash(typeof sent === 'string' ? sent : `Ask Claude in the chat: "${r.prompt}"`, typeof sent === 'string' ? 'warn' : 'warn'); }
         } }, icon('plus'), 'Connect')),
         h('div', { class: 'full' }, B.postingControl(a))))),
       h('div', { class: 'chips card-foot' }, h('button', { class: 'btn ghost', onclick: () => go('review', w.drafted_at ? 'review' : 'questions') }, 'Back'), h('button', { class: 'btn primary', onclick: () => go('finish') }, 'Next')));
@@ -142,11 +145,12 @@
   // Finish: make it run on its own (one click asks Claude to create the scheduled tasks).
   function finishStep(d, w) {
     const sch = d.schedule;
-    return card({ icon: 'schedule', title: 'Make it run on its own', sub: 'A plugin can’t start itself. Claude can make the scheduled task in Cowork for you; you approve it once.' },
-      h('ul', { class: 'list small' }, sch.tasks.map((t) => h('li', {}, h('b', { text: t.name }), ` · ${t.repeat}${t.time ? ` at ${t.time}` : ''}`))),
-      h('div', { class: 'chips card-foot' }, B.askClaudeButton('Set it up for me', sch.setup_prompt, 'btn primary'), h('button', { class: 'btn ghost', onclick: () => { state.wstep = null; B.load({ view: 'schedule' }); } }, 'I’ll do it by hand')),
-      h('p', { class: 'hint', text: 'Your computer needs to be awake with Claude open at those times. A missed run happens the next time you open Claude.' }),
-      h('div', { class: 'chips card-foot' }, h('button', { class: 'btn ghost', onclick: () => go('posting', 'posting') }, 'Back'), h('span', { class: 'grow' }),
+    const own = B.hook('finishBody', d);
+    return card({ icon: 'schedule', title: 'Make it run on its own', sub: own ? own.sub : 'A plugin can’t start itself. Claude can make the scheduled task in Cowork for you; you approve it once.' },
+      own ? own.body : [h('ul', { class: 'list small' }, sch.tasks.map((t) => h('li', {}, h('b', { text: t.name }), ` · ${t.repeat}${t.time ? ` at ${t.time}` : ''}`))),
+        h('div', { class: 'chips card-foot' }, B.askClaudeButton('Set it up for me', sch.setup_prompt, 'btn primary'), h('button', { class: 'btn ghost', onclick: () => { state.wstep = null; B.load({ view: 'schedule' }); } }, 'I’ll do it by hand')),
+        h('p', { class: 'hint', text: 'Your computer needs to be awake with Claude open at those times. A missed run happens the next time you open Claude.' })],
+      h('div', { class: 'chips card-foot' }, h('button', { class: 'btn ghost', onclick: () => posting() ? go('posting', 'posting') : go('review', w.drafted_at ? 'review' : 'questions') }, 'Back'), h('span', { class: 'grow' }),
         h('button', { class: 'btn approve', onclick: async () => { const r = await call('studio_wizard', { action: 'finish' }, { reload: false }); if (r && r.ok) { state.wstep = null; B.load({ view: 'drafts', tab: 'waiting', chip: 'all' }); } } }, icon('check'), w.finished_at ? 'Done' : 'Finish setup')));
   }
 
@@ -154,7 +158,7 @@
     const w = d.wizard;
     let step = state.wnew ? 'brand' : state.wstep || w.step || 'brand';
     if (w.step === 'drafting' && !state.wstep) step = 'drafting';
-    if (step === 'done') step = 'finish';
+    if (step === 'done' || (step === 'posting' && !posting())) step = 'finish';
     if (step !== 'drafting') stop();
     const body = { brand: brandStep, questions: questionsStep, drafting: draftingStep, review: reviewStep, posting: postingStep, finish: finishStep }[step](d, w);
     return B.page(state.wnew ? 'Add a brand' : `Set up ${w.brand}`, 'One setup for each brand. Close it any time: your answers are kept.', null,
