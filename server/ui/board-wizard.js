@@ -11,7 +11,7 @@
   const ORDER = { brand: 0, questions: 1, drafting: 2, review: 2, posting: 3, finish: 4, done: 4 };
   const SECTIONS = [
     ['voice', 'Voice', 'How the brand sounds. Every draft is written from this.'],
-    ['playbook', 'Playbook', 'How it writes. The weekly coach refines these with you.'],
+    ['playbook', 'Playbook', 'How it writes. It suggests refinements as it learns, and you accept each one.'],
     ['topic:add', 'Topics', 'What it reads and writes about.'],
     ['topic:avoid', 'Off limits', 'What it never posts about.'],
     ['audience', 'Who it’s for', 'Who the posts are written for.'],

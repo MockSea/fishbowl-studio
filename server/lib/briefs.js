@@ -46,7 +46,9 @@ export function choosePlatform(platforms, drafts, now, rng) {
 export const weightedInterest = (item, beat, boosts = null) => item.interest + (beat ? topicWeight(beat, item.topic) - 2 : 0) + boostFor(item, boosts).points;
 
 export function nextItem(db, settings, now, beat = null) {
-  const drafted = new Set([...db.drafts.map((d) => d.item_id), ...db.briefs.filter((b) => !b.done && now - Date.parse(b.created_at) < 6 * H).map((b) => b.item_id)]);
+  // A story is used up once it has drafts, an open brief from the last six hours, or a finished
+  // brief (one whose takes were all dropped still counts, so it isn't drafted over and over).
+  const drafted = new Set([...db.drafts.map((d) => d.item_id), ...db.briefs.filter((b) => b.done || now - Date.parse(b.created_at) < 6 * H).map((b) => b.item_id)]);
   const boosts = interestBoosts({ drafts: db.drafts, items: db.items, hearts: db.hearts, now });
   const wi = (i) => weightedInterest(i, beat, boosts);
   return db.items
@@ -54,10 +56,18 @@ export function nextItem(db, settings, now, beat = null) {
     .sort((a, b) => wi(b) - wi(a) || Date.parse(b.published || b.fetched_at) - Date.parse(a.published || a.fetched_at))[0] || null;
 }
 
+// Sets drafted today, counting a brief whose takes were all dropped as one used slot.
 function countToday(db, now, kind) {
   const today = localDate(now);
-  return new Set(db.drafts.filter((d) => d.kind === kind && localDate(Date.parse(d.created_at)) === today).map((d) => d.set_id ?? d.id)).size;
+  const isToday = (iso) => localDate(Date.parse(iso)) === today;
+  const sets = new Set(db.drafts.filter((d) => d.kind === kind && isToday(d.created_at)).map((d) => d.set_id ?? d.id));
+  for (const b of db.briefs) if (b.kind === kind && b.dropped && isToday(b.created_at)) sets.add(`brief:${b.id}`);
+  return sets.size;
 }
+
+// One evergreen brief a day asks for the whole day's count, so once one is finished (saved or
+// dropped) evergreen is done for the day.
+const evergreenDoneToday = (db, now) => db.briefs.some((b) => b.kind === 'evergreen' && b.done && localDate(Date.parse(b.created_at)) === localDate(now));
 
 // The work queue: queued jobs first (rewrites, then redos and owner requests), then items, then evergreen.
 export function nextWork(db, settings, now, args = {}, beat = null) {
@@ -72,7 +82,7 @@ export function nextWork(db, settings, now, args = {}, beat = null) {
     const item = nextItem(db, settings, now, beat);
     if (item) return { kind: 'item', item };
   }
-  if (countToday(db, now, 'evergreen') < settings.evergreen_per_day) return { kind: 'evergreen' };
+  if (countToday(db, now, 'evergreen') < settings.evergreen_per_day && !evergreenDoneToday(db, now)) return { kind: 'evergreen' };
   return null;
 }
 
@@ -194,7 +204,7 @@ export function draftingBrief(ctx, args = {}) {
     };
     db.briefs = [...db.briefs.filter((b) => now - Date.parse(b.created_at) < 48 * H), brief];
     if (job) job.brief_id = brief.id;
-    return { done: false, brief_id: brief.id, kind, platform: platform.id, takes: nTakes, text: `brief_id: ${brief.id} · ${kind} · ${platform.name}\n\n` + parts.filter(Boolean).join('\n\n').replace(/\{brief_id/, `{brief_id: ${brief.id}`) };
+    return { done: false, brief_id: brief.id, kind, item_id: brief.item_id, job_id: brief.job_id, platform: platform.id, takes: nTakes, text: `brief_id: ${brief.id} · ${kind} · ${platform.name}\n\n` + parts.filter(Boolean).join('\n\n').replace(/\{brief_id/, `{brief_id: ${brief.id}`) };
   });
 }
 

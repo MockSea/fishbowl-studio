@@ -40,8 +40,9 @@ export const fetchImpl = async (url) => (url in feeds ? { ok: true, status: 200,
 const LINES = ['Lanes beat paint every time.', 'Ask any courier where the hills are.', 'Good roads make good habits.'];
 
 // Answers like Claude would, by which schema the request asks for. counts: how many takes each
-// takes request gets back, in order (after that, all three).
-export function fakeApi({ counts = [] } = {}) {
+// takes request gets back, in order (after that, all three). answer(task, n): takes to send
+// instead, or undefined for the usual ones.
+export function fakeApi({ counts = [], answer } = {}) {
   const requests = [];
   let n = 0;
   const create = async (p) => {
@@ -55,19 +56,24 @@ export function fakeApi({ counts = [] } = {}) {
     } else if (schema === SCHEMAS.takes) {
       n++;
       const lines = [...LINES, ...LINES].slice(0, counts[n - 1] ?? LINES.length);
-      out = { takes: lines.map((l, i) => ({ text: `${l} Story ${n}.${i >= LINES.length ? ' Again.' : ''}`, thinking: 'honest first reaction', topic: 'infrastructure', cites: [] })) };
+      const custom = answer?.(task, n);
+      if (custom) out = { takes: custom }; else out = { takes: lines.map((l, i) => ({ text: `${l} Story ${n}.${i >= LINES.length ? ' Again.' : ''}`, thinking: 'honest first reaction', topic: 'infrastructure', cites: [] })) };
+    } else if (schema === SCHEMAS.wizard) {
+      // A search source is outside the desktop schema; it is here to check it gets dropped.
+      out = { voice: '## Who we are\nA bike shop.\n\n## Voice\nPlain.\n\n## Never\nHype.', playbook: ['Lead with the detail'], topics: ['city cycling'], off_limits: [], audience: ['Commuters'],
+        sources: [{ kind: 'site', url: 'https://cycling-news.example.org/feed', topic: 'city cycling', reason: 'local news' }, { kind: 'reddit', sub: 'r/bikecommuting', topic: 'city cycling', reason: 'riders talk' }, { kind: 'search', q: 'bike lanes', topic: 'city cycling', reason: 'news' }] };
     } else throw new Error('unexpected schema');
     return { stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(out) }] };
   };
   return { requests, create };
 }
 
-export async function app({ createModel, counts } = {}) {
+export async function app({ createModel, counts, answer, fetch = fetchImpl } = {}) {
   const home = tempHome(), appDir = tempHome();
-  const api = fakeApi({ counts });
+  const api = fakeApi({ counts, answer });
   const events = [];
   const clock = { t: NOW };
-  const host = makeHost({ home, appDir, safeStorage: fakeSafeStorage(), now: () => clock.t, fetchImpl, emit: (e) => events.push(e), createModel: createModel || (() => makeModel({ create: api.create })) });
+  const host = makeHost({ home, appDir, safeStorage: fakeSafeStorage(), now: () => clock.t, fetchImpl: fetch, emit: (e) => events.push(e), createModel: createModel || (() => makeModel({ create: api.create })) });
   return { host, home, appDir, api, events, clock };
 }
 

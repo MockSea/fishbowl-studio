@@ -30,6 +30,8 @@
     { value: 'search', label: 'Search', placeholder: 'e-bike regulation', aria: 'Saved search', type: 'text', hint: () => 'Claude runs this web search on each run and reads the results like news.' },
   ];
   const ARG = { site: 'url', reddit: 'sub', watch: 'url', search: 'q' };
+  // A host can read fewer kinds (the desktop app reads sites and subreddits only).
+  const kinds = () => { const only = B.hook('sourceKinds'); return only ? KINDS.filter((k) => only.includes(k.value)) : KINDS; };
 
   // One source of any kind: name, what it brought in, how its drafts did, and its controls.
   function sourceRow(f, topics) {
@@ -66,9 +68,12 @@
 
   let addKind = 'site', addList = 'feeds', linkWhen = 'next';
   function sources(d) {
-    const k = KINDS.find((x) => x.value === addKind) || KINDS[0];
-    const add = card({ icon: 'sources', title: 'Add a source', sub: 'A website, a subreddit, an account your audience follows, or a search.' },
-      B.seg(KINDS.map((x) => ({ value: x.value, label: x.label })), addKind, (v) => { addKind = v; B.render(); }, 'What kind of source'),
+    // Trending on X sits with the watched accounts.
+    const ks = kinds(), has = (v) => ks.some((x) => x.value === (v === 'trends' ? 'watch' : v));
+    if (!has(addKind)) addKind = 'site';
+    const k = ks.find((x) => x.value === addKind) || ks[0];
+    const add = card({ icon: 'sources', title: 'Add a source', sub: has('watch') ? 'A website, a subreddit, an account your audience follows, or a search.' : 'A website or a subreddit.' },
+      B.seg(ks.map((x) => ({ value: x.value, label: x.label })), addKind, (v) => { addKind = v; B.render(); }, 'What kind of source'),
       addKind === 'site' ? h('div', { class: 'card-foot' }, B.seg([{ value: 'feeds', label: 'Daily news' }, { value: 'reading', label: 'Slow reading' }], addList, (v) => { addList = v; B.render(); }, 'Add to which list')) : null,
       h('div', { class: 'card-foot' }, inline({ type: k.type, placeholder: k.placeholder, aria: k.aria, button: 'Add', onsubmit: (v) => call('studio_source_add', { kind: addKind, [ARG[addKind]]: v, ...(addKind === 'site' ? { list: addList } : {}) }) })),
       h('p', { class: 'hint', text: k.hint(addList) }));
@@ -88,10 +93,10 @@
     const browser = d.browser && !d.browser.ok ? h('div', { class: 'banner warn', role: 'status' },
       h('span', { text: `On the last run (${since(d.browser.at)}) Claude couldn’t use its browser, so it looked your accounts up with web search instead. To read the pages themselves, turn on Claude in Chrome.` })) : null;
     return page('Sources', `Where it reads${d.last_fetch ? `. News last read ${since(d.last_fetch)}` : ''}.`, null,
-      h('div', { class: 'stack' }, suggestionsCard(d.suggestions), browser, h('div', { class: 'duo' }, add, link),
+      h('div', { class: 'stack' }, suggestionsCard(d.suggestions.filter((x) => has(x.kind))), browser, h('div', { class: 'duo' }, add, link),
         list(d.feeds, 'drafts', 'Daily news', 'Websites and subreddits, read on every run. Pause one to skip it for a while.', 'Add a site you read for work, and drafts start from its stories.'),
-        list([...d.watch, ...d.trends], 'eye', 'Accounts you watch', 'Public posts, read logged out by Claude on each run.', 'Add an X handle or a LinkedIn page your audience follows.', trendsOff),
-        list(d.searches, 'search', 'Saved searches', 'Run with Claude’s web search on each run. Sites that keep showing up in good results are suggested above.', 'Save a search like “bike commuting” and its results are read like news.'),
+        has('watch') ? list([...d.watch, ...d.trends], 'eye', 'Accounts you watch', 'Public posts, read logged out by Claude on each run.', 'Add an X handle or a LinkedIn page your audience follows.', trendsOff) : null,
+        has('search') ? list(d.searches, 'search', 'Saved searches', 'Run with Claude’s web search on each run. Sites that keep showing up in good results are suggested above.', 'Save a search like “bike commuting” and its results are read like news.') : null,
         list(d.reading, 'reads', 'Slow reading', 'Browsed a little each day for ideas and evergreen posts.', 'Optional: blogs or journals worth a slow read.')));
   }
 
@@ -241,11 +246,11 @@
   // ---------- Playbook ----------
   function playbook(d) {
     const props = d.proposals.length ? h('div', { class: 'rows' }, d.proposals.map(B.proposalRow))
-      : B.empty({ icon: 'playbook', title: 'No proposals waiting', text: 'The weekly coach and your edits suggest changes here. Nothing changes until you accept it.' });
+      : B.empty({ icon: 'playbook', title: 'No proposals waiting', text: `${B.hook('noCoach') ? 'Your edits suggest' : 'The weekly coach and your edits suggest'} changes here. Nothing changes until you accept it.` });
     const rows = (list, key) => (list.length ? h('ul', { class: 'list' }, list.map((x) => h('li', {}, B.meter(x[key]), x.text))) : h('p', { class: 'hint', text: 'None yet.' }));
     return page('Playbook', 'The rules it has learned and what the brand believes. Only you can change them.', null,
       h('div', { class: 'stack' },
-        card({ icon: 'spark', title: `Proposed changes (${d.proposals.length})`, sub: 'Suggested by the weekly coach and by your edits.' }, props),
+        card({ icon: 'spark', title: `Proposed changes (${d.proposals.length})`, sub: B.hook('noCoach') ? 'Suggested by your edits.' : 'Suggested by the weekly coach and by your edits.' }, props),
         card({ icon: 'playbook', title: 'Playbook' }, d.playbook.length ? h('ul', { class: 'list' }, d.playbook.map((b) => h('li', { text: b }))) : h('p', { class: 'hint', text: 'Empty.' })),
         h('div', { class: 'duo' }, card({ icon: 'flag', title: 'Positions', sub: 'Yours; Claude only suggests.' }, rows(d.positions, 'strength')),
           card({ icon: 'user', title: 'Who we write for' }, rows(d.audience.who, 'confidence'), h('p', { class: 'section-title', text: 'Buttons' }), rows(d.audience.buttons, 'confidence'))),

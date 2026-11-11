@@ -112,7 +112,8 @@
     const c = head.counter || {};
     const next = c.next ? `next batch ${hm(c.next)}` : 'no more batches today';
     $('counter').replaceChildren(icon('schedule'), h('span', {}, h('b', { text: String(c.released ?? 0) }), ` of ${c.cap ?? 0} today`), h('span', { class: 'long', text: ` · ${c.held ?? 0} held · ${next}` }));
-    $('badge-coach').textContent = head.proposals || '';
+    const coachBadge = $('badge-coach');
+    if (coachBadge) coachBadge.textContent = head.proposals || '';
     $('badge-sources').textContent = head.suggestions || '';
     const jobs = $('jobs');
     jobs.replaceChildren();

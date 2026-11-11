@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { tempHome } from './helpers.js';
-import { writeKitFiles, png } from './kit-files.js';
-import { openKit, LIMITS, sniff } from '../desktop/brandkit.js';
+import { writeKitFiles, png, docx, pdf } from './kit-files.js';
+import { openKit, LIMITS, sniff, zipTooBig, isolatedExtract } from '../desktop/brandkit.js';
 
 const setup = () => {
   const home = tempHome();
@@ -94,4 +94,35 @@ test('sniff checks magic bytes', () => {
   assert.equal(sniff(png(), 'png'), true);
   assert.equal(sniff(Buffer.from([0xff, 0xd8, 0xff, 0xe0]), 'jpeg'), true);
   assert.equal(sniff(png(), 'jpeg'), false);
+});
+
+// A DOCX whose one paragraph unpacks to 80 MB but deflates to well under the 10 MB file cap.
+const bomb = () => docx(['a'.repeat(80 * 1024 * 1024)]);
+
+test('a DOCX that claims to unpack past the limit is refused before it is opened', async () => {
+  const b = bomb();
+  assert.ok(b.length < LIMITS.file_bytes);
+  assert.match(zipTooBig(b), /unpacks to more than 64 MB/);
+  assert.equal(zipTooBig(docx(['Fine.'])), null);
+  const { kit, home } = setup();
+  const p = path.join(home, 'bomb.docx');
+  fs.writeFileSync(p, b);
+  const r = await kit.add(p);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /unpacks to more than/);
+  assert.equal(kit.list().files.length, 0);
+});
+
+test('a file that unpacks past the memory limit only stops the reader process, not the app', async () => {
+  // 200 MB unpacked, read with no zip check: the watchdog stops the reader at 150 MB.
+  const big = docx(['a'.repeat(200 * 1024 * 1024)]);
+  const heapBefore = process.memoryUsage().heapUsed;
+  await assert.rejects(isolatedExtract(big, 'docx', { rssMb: 150 }), /too big to read/);
+  assert.ok(process.memoryUsage().heapUsed - heapBefore < 64 * 1024 * 1024, 'the unpacking happened elsewhere');
+  // The app carries on: the next file reads normally.
+  assert.match(await isolatedExtract(pdf('Still here.'), 'pdf'), /Still here/);
+});
+
+test('reading a document is time-limited', async () => {
+  await assert.rejects(isolatedExtract(pdf('Slow.'), 'pdf', { timeoutMs: 1 }), /too long/);
 });

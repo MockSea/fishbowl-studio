@@ -87,6 +87,6 @@ export const SCHEMAS = {
   takes: S({ takes: { type: 'array', items: S({ text: str, thinking: str, topic: str, cites: { type: 'array', items: int } }) } }),
   wizard: S({
     voice: str, playbook: strs, topics: strs, off_limits: strs, audience: strs,
-    sources: { type: 'array', items: S({ kind: { type: 'string', enum: ['site', 'reddit', 'search'] }, url: str, sub: str, q: str, topic: str, reason: str }) },
+    sources: { type: 'array', items: S({ kind: { type: 'string', enum: ['site', 'reddit'] }, url: str, sub: str, topic: str, reason: str }) },
   }),
 };

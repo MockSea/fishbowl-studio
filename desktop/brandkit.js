@@ -5,6 +5,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { fork, execFile } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 export const LIMITS = {
   file_bytes: 10 * 1024 * 1024, // per file on disk
@@ -14,6 +16,11 @@ export const LIMITS = {
   text_chars: 20000, // extracted text kept per file
   prompt_text_chars: 60000, // kit text sent with one call
   prompt_images: 6, // kit images sent with one call
+  docx_unzipped_bytes: 64 * 1024 * 1024, // what a DOCX may claim to unpack to
+  docx_entries: 5000,
+  extract_ms: 30000, // reading one PDF or DOCX
+  extract_heap_mb: 256, // JS heap for the process that reads it
+  extract_rss_mb: 512, // all memory for that process; past this it is stopped
 };
 
 const KINDS = {
@@ -59,6 +66,58 @@ export async function extractText(buf, kind) {
   return '';
 }
 
+// A DOCX is a zip. Read its central directory and refuse one that claims to unpack to more
+// than the limit or holds too many entries. Returns null when fine, or a reason.
+export function zipTooBig(buf, { maxBytes = LIMITS.docx_unzipped_bytes, maxEntries = LIMITS.docx_entries } = {}) {
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 22 - 65535); i--) if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) return 'It doesn\'t look like a real Word file.';
+  const entries = buf.readUInt16LE(eocd + 10);
+  let off = buf.readUInt32LE(eocd + 16);
+  if (entries === 0xffff || off === 0xffffffff) return 'Word files this large aren\'t supported.';
+  if (entries > maxEntries) return 'This Word file holds too many parts to read.';
+  let total = 0;
+  for (let n = 0; n < entries; n++) {
+    if (off + 46 > buf.length || buf.readUInt32LE(off) !== 0x02014b50) return 'It doesn\'t look like a real Word file.';
+    total += buf.readUInt32LE(off + 24);
+    if (total > maxBytes) return `This Word file unpacks to more than ${Math.round(maxBytes / 1048576)} MB.`;
+    off += 46 + buf.readUInt16LE(off + 28) + buf.readUInt16LE(off + 30) + buf.readUInt16LE(off + 32);
+  }
+  return null;
+}
+
+const CHILD = path.join(path.dirname(fileURLToPath(import.meta.url)), 'extract-child.js');
+
+// The resident memory of a process in MB, from ps (macOS and Linux). null if it can't be read.
+const rssOf = (pid) => new Promise((resolve) => execFile('ps', ['-o', 'rss=', '-p', String(pid)], (e, out) => resolve(e ? null : Number(String(out).trim()) / 1024 || null)));
+
+// Read a PDF or DOCX in a separate process with a time limit and memory limits: a heap cap, and a
+// watchdog that stops the process once its memory passes extract_rss_mb (the heap cap alone
+// doesn't count unpacked buffers). A file built to blow up when unpacked takes down that
+// process, not the app. Plain text is read here.
+export function isolatedExtract(buf, kind, { timeoutMs = LIMITS.extract_ms, heapMb = LIMITS.extract_heap_mb, rssMb = LIMITS.extract_rss_mb } = {}) {
+  if (kind === 'text') return extractText(buf, kind);
+  return new Promise((resolve, reject) => {
+    const child = fork(CHILD, [], {
+      execArgv: [`--max-old-space-size=${heapMb}`],
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+      serialization: 'advanced',
+      stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+    });
+    let settled = false;
+    const finish = (fn, v) => { if (settled) return; settled = true; clearTimeout(timer); clearInterval(watch); child.kill('SIGKILL'); fn(v); };
+    const timer = setTimeout(() => finish(reject, new Error('Reading the file took too long.')), timeoutMs);
+    const watch = setInterval(async () => {
+      const mb = await rssOf(child.pid);
+      if (mb && mb > rssMb) finish(reject, new Error('The file is too big to read once unpacked.'));
+    }, 100);
+    child.on('message', (m) => (m && m.ok ? finish(resolve, m.text) : finish(reject, new Error(m?.error || 'unreadable'))));
+    child.on('error', (e) => finish(reject, e));
+    child.on('exit', () => finish(reject, new Error('The reader stopped before it finished.')));
+    child.send({ kind, data: buf });
+  });
+}
+
 const displayName = (p) => path.basename(String(p)).replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 120) || 'file';
 
 export function openKit(dir) {
@@ -101,9 +160,10 @@ export function openKit(dir) {
     if (files.reduce((n, f) => n + f.bytes, 0) + st.size > LIMITS.total_bytes) return { ok: false, name, reason: `The brand kit is full (${Math.round(LIMITS.total_bytes / 1048576)} MB in all).` };
     const buf = fs.readFileSync(src);
     if (!sniff(buf, kind)) return { ok: false, name, reason: `It doesn't look like a real ${KINDS[kind].label} file.` };
+    if (kind === 'docx') { const why = zipTooBig(buf); if (why) return { ok: false, name, reason: why }; }
     let text = null;
     if (!KINDS[kind].image) {
-      try { text = await extractText(buf, kind); } catch { return { ok: false, name, reason: `No text could be read from this ${KINDS[kind].label} file.` }; }
+      try { text = await isolatedExtract(buf, kind); } catch { return { ok: false, name, reason: `No text could be read from this ${KINDS[kind].label} file.` }; }
       if (!text) return { ok: false, name, reason: 'There is no text in it to read (a scanned PDF needs to be added as images).' };
     }
     const id = randomBytes(6).toString('hex');

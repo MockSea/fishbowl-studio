@@ -25,6 +25,9 @@
   const kitBtn = h('button', { class: 'navbtn', 'data-view': 'brandkit', 'data-icon': 'briefcase' }, icon('briefcase'), h('span', { class: 'lbl' }, 'Brand kit'));
   kitBtn.addEventListener('click', () => { Object.assign(B.state, { open: {}, why: null, menu: false, wnew: false, wstep: null, arming: null }); B.setDrawer(false); B.load({ view: 'brandkit' }); });
   topics.after(kitBtn);
+  // The weekly coach runs in the plugin only, so the app has no Coach page. Proposals from
+  // edits wait on the Playbook page.
+  document.querySelector('.navbtn[data-view="coach"]')?.remove();
 
   const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
@@ -110,7 +113,7 @@
   window.BoardHooks = {
     scheduleCard: () => card({ icon: 'bulb', title: 'Runs in the app', sub: 'The app releases batches at your times whenever it is open. Drafting can run on its own too.' },
       autorunRow(),
-      h('p', { class: 'hint', text: 'Close the app and nothing runs. A missed batch is released the next time you open it.' })),
+      h('p', { class: 'hint', text: 'Closing the window keeps it running. Quit the app (Command-Q) and nothing runs; a missed batch is released the next time you open it.' })),
     settingsRail: () => [
       card({ icon: 'settings', title: 'Claude', cls: 'soft', sub: keyState.has ? `API key saved (${keyState.hint || 'hidden'}).` : 'No API key yet.' },
         h('button', { class: 'btn sm', onclick: () => B.load({ view: 'apikey' }) }, keyState.has ? 'Change key' : 'Add key')),
@@ -118,6 +121,8 @@
         h('button', { class: 'btn sm', onclick: () => B.load({ view: 'brandkit' }) }, 'Open the brand kit')),
     ],
     noPosting: () => true,
+    noCoach: () => true,
+    sourceKinds: () => ['site', 'reddit'],
     finishBody: () => ({ sub: 'The app runs it while it is open. Turn this on to have it read and draft by itself.', body: [autorunRow()] }),
   };
 

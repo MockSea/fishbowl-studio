@@ -9,9 +9,13 @@ import { releaseTool } from '../server/lib/run.js';
 import { kitFor } from './brandkit.js';
 import { makeKeystore } from './keystore.js';
 import { makeClient, makeModel, MODEL } from './llm.js';
-import { makeRunner } from './runner.js';
+import { makeRunner, MAX_CALLS_PER_RUN, CALLS_PER_BRIEF } from './runner.js';
 
 const DEFAULT_PREFS = { autorun: false };
+// The most model calls one tick of the timer may make, across every brand.
+export const MAX_CALLS_PER_TICK = MAX_CALLS_PER_RUN;
+// After an automatic run fails, that brand is left alone this long.
+const RETRY_AFTER_MS = 60 * 60 * 1000;
 
 // home: the studio data folder. appDir: the app's own folder (key and preferences).
 // createModel(apiKey) -> {ask}; tests pass a fake.
@@ -28,6 +32,7 @@ export function makeHost({ home, appDir, safeStorage, createModel = (apiKey) => 
   };
   const runner = makeRunner({ ctx, model: { ask: async (o) => (await getModel()).ask(o) }, kit: (slug) => kitFor(ctx, slug).content(), progress: emit });
   const active = () => ctx.personas.active();
+  const failedAt = new Map();
 
   // Desktop-only pages ride on the settings view for the header the shell needs.
   async function desktopView(view) {
@@ -85,14 +90,22 @@ export function makeHost({ home, appDir, safeStorage, createModel = (apiKey) => 
       fs.writeFileSync(prefsFile, JSON.stringify(next, null, 2) + '\n');
       return next;
     },
-    // Every few minutes while the app is open: release due batches for every brand and, if they
-    // turned it on, run the daily run (it fetches only when their news setting says so).
+    // Every few minutes while the app is running: release due batches for every brand and, if
+    // autorun is on, run the daily run. That run calls the model only when its news setting says
+    // it's time to read, or a rewrite is queued. The whole tick shares one call budget, and a
+    // brand whose last automatic run failed sits out for an hour.
     async tick() {
+      const budget = runner.budget(MAX_CALLS_PER_TICK);
       for (const p of ctx.personas.list()) {
         const c = ctx.persona(p.slug);
         try { releaseTool(c); } catch { /* a broken persona shouldn't stop the others */ }
-        if (prefs().autorun && keys.has() && c.settings().setup_complete && !runner.busy(p.slug)) await runner.daily(p.slug);
+        if (!prefs().autorun || !keys.has() || !c.settings().setup_complete || runner.busy(p.slug)) continue;
+        if (ctx.now() - (failedAt.get(p.slug) ?? -Infinity) < RETRY_AFTER_MS) continue;
+        if (!budget.can(CALLS_PER_BRIEF)) break;
+        const r = await runner.daily(p.slug, { budget });
+        if (r.ok) failedAt.delete(p.slug); else failedAt.set(p.slug, ctx.now());
       }
+      return { calls: budget.used };
     },
   };
 }

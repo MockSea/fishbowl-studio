@@ -9,6 +9,7 @@ import { writeKitFiles, png } from './kit-files.js';
 import { KEY, fakeSafeStorage, NOW, fetchImpl, app, setUpBrand } from './desktop-helpers.js';
 import { makeHost } from '../desktop/host.js';
 import { makeModel, MODEL } from '../desktop/llm.js';
+import { editDiff } from '../server/lib/learn.js';
 
 test('add a key, set up a brand, add a source and a brand kit, run: drafts land, written with the kit', async () => {
   const { host, api, events, clock } = await app();
@@ -125,4 +126,42 @@ test('autorun is off until turned on, and preferences keep only what they know',
   assert.deepEqual(host.prefsSet({ autorun: true, evil: 1 }), { autorun: true });
   await host.tick();
   assert.ok(api.requests.length > 0);
+});
+
+test('setup drafts in the app suggest only sites and subreddits, never searches', async () => {
+  const { host, api } = await app();
+  await host.keySet(KEY);
+  const call = (name, args) => host.call(name, args).then((r) => r.structuredContent || JSON.parse(r.content[0].text));
+  await call('studio_wizard', { action: 'create', name: 'Northwind Bicycles' });
+  await call('studio_wizard', { action: 'answer', answers: { audience: 'City commuters', tone: 'Plain', topics: 'city cycling', off_limits: '' } });
+  const d = await call('studio_wizard', { action: 'draft' });
+  const r = host.ask(d.prompt);
+  assert.equal(r.kind, 'wizard', JSON.stringify(d));
+  const out = await r.done;
+  assert.equal(out.ok, true, out.message);
+  const task = api.requests[0].messages[0].content.at(-1).text;
+  assert.match(task, /subreddits/);
+  assert.doesNotMatch(task, /search/i);
+  assert.deepEqual(api.requests[0].output_config.format.schema.properties.sources.items.properties.kind.enum, ['site', 'reddit']);
+  const kinds = host.ctx.tx((db) => db.proposals.filter((p) => p.kind === 'source').map((p) => p.target.kind));
+  assert.deepEqual(kinds.sort(), ['reddit', 'site']);
+});
+
+test('a run turns patterns in their edits into playbook proposals, without a model call', async () => {
+  const { host, api } = await app();
+  await host.keySet(KEY);
+  await setUpBrand(host);
+  const pairs = [
+    ['Ever wondered about lanes? Kerbs work.', 'Kerbs work.'],
+    ['Is your chain squeaking? A drop of oil fixes most squeaks.', 'A drop of oil fixes most squeaks.'],
+    ['Ready for winter? Studded tyres sell early this year.', 'Studded tyres sell early this year.'],
+    ['What makes a lane? A kerb does.', 'A kerb makes a lane.'],
+  ];
+  host.ctx.tx((db) => { db.edits = pairs.map(([before, after], i) => ({ id: i + 1, draft_id: i + 1, before, after, at: new Date(NOW - 3600e3 * 24 * (i + 1)).toISOString(), diff: editDiff(before, after) })); });
+  host.prefsSet({ autorun: true });
+  host.ctx.tx((db) => { db.runs.last_fetch = new Date(NOW - 3600e3).toISOString(); });
+  assert.equal((await host.tick()).calls, 0);
+  assert.equal(api.requests.length, 0);
+  const p = host.ctx.tx((db) => db.proposals.find((x) => x.key === 'edits:cut_opening_question'));
+  assert.equal(p?.status, 'open');
 });

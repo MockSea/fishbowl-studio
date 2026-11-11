@@ -96,13 +96,27 @@ export function saveTakes(ctx, { brief_id, takes = [] }) {
     brief.done = true;
     const job = brief.job_id ? db.jobs.find((j) => j.id === brief.job_id) : null;
     if (job) Object.assign(job, { status: 'done', done_at: new Date(now).toISOString() });
-    if (!kept.length) return { status: 'dropped', dropped, text: 'Every take was dropped. Move on to the next brief.' };
+    if (!kept.length) { brief.dropped = true; return { status: 'dropped', dropped, text: 'Every take was dropped. Move on to the next brief.' }; }
     const saved = store(ctx, db, brief, kept, now, beat);
     return {
       status: 'saved', drafts: saved.map((d) => d.id), dropped,
       flags: saved.map((d) => ({ id: d.id, flags: d.lint.map((f) => f.label) })),
       text: `Saved ${saved.length} draft(s)${dropped.length ? `, dropped ${dropped.length}` : ''}. Call studio_drafting_brief for the next piece of work.`,
     };
+  });
+}
+
+// Close a brief that can't be finished (the model never sent the right takes back). It counts
+// as dropped, and its job (if any) is closed, so the same work isn't asked for again.
+export function abandonBrief(ctx, brief_id) {
+  const now = ctx.now();
+  return ctx.tx((db) => {
+    const brief = db.briefs.find((b) => b.id === brief_id);
+    if (!brief || brief.done) return { ok: false };
+    Object.assign(brief, { done: true, dropped: true });
+    const job = brief.job_id ? db.jobs.find((j) => j.id === brief.job_id) : null;
+    if (job && job.status === 'queued') Object.assign(job, { status: 'done', done_at: new Date(now).toISOString() });
+    return { ok: true };
   });
 }
 
