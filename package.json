@@ -1,6 +1,6 @@
 {
   "name": "fishbowl-studio",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "A social-post drafting studio: a desktop app, or a plugin inside Claude.",
   "private": true,
   "type": "module",
