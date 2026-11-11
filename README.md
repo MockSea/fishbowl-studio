@@ -4,7 +4,7 @@
 
 Fishbowl Studio is for the person who writes a brand's LinkedIn, X, Threads and Bluesky posts. Every weekday it reads the news on your beat and the places your audience actually talks, drafts a few takes on each story worth talking about, and lays them out on a review board inside Claude. You approve the good ones, fix the nearly-good ones and skip the rest. It learns from every one of those, so it writes more like you the longer you use it.
 
-It runs inside the Claude desktop app as a plugin. Nothing to host, no account to create.
+It comes two ways: a desktop app for macOS that drafts through your own Anthropic API key, or a plugin inside the Claude desktop app. Nothing to host, no account to create.
 
 > [!WARNING]
 > **Early alpha (v0.0.1).** This is the first public build and it hasn't been tested much on real Cowork installs yet. Expect rough edges, keep **Post for me** off while you try it, and please [open an issue](https://github.com/MockSea/fishbowl-studio/issues) when something breaks.
@@ -13,7 +13,7 @@ It runs inside the Claude desktop app as a plugin. Nothing to host, no account t
   <img src="docs/screenshots/drafts.png" alt="The Drafts page: a feed of post drafts for a bicycle shop, with today's counts and a list of brands on the right" width="100%">
 </p>
 
-> **You need** the Claude desktop app, a paid Claude plan that includes **Cowork**, and Node.js. It doesn't work on the free plan or in the browser. [Install it](#install-it) takes four steps.
+> **The desktop app needs** an Anthropic API key. **The plugin needs** the Claude desktop app, a paid Claude plan that includes **Cowork**, and Node.js. See [the desktop app](#the-desktop-app) or [install the plugin](#install-the-plugin).
 
 ## Your drafts, like a feed
 
@@ -92,7 +92,50 @@ In a narrow Claude window the sidebar shrinks to icons, and on a phone it become
 
 You can change all of those times on the **Schedule** page, down to reading the news every hour.
 
-## Install it
+## The desktop app
+
+The desktop app runs the same board in its own window, with the studio in-process. It drafts with Claude through the Anthropic API, so usage is billed to your API account.
+
+**Run it from source** (macOS, Node.js 20 or later):
+
+```sh
+npm install
+npm run desktop
+```
+
+**Build an app** with `npm run make`. It writes an unsigned `.dmg` and `.app` to `dist/`. macOS blocks unsigned apps on first open: Control-click the app, choose **Open**, then **Open** again.
+
+**First run.** The app opens on the **Claude** page. Paste an API key from the Anthropic Console. It's encrypted with the macOS keychain (Electron `safeStorage`) and kept in the app's own folder, `~/Library/Application Support/Fishbowl Studio`, never in plain text. Then set up a brand and add a source, as in the plugin.
+
+**Brand kit.** Each brand has a **Brand kit** page. Drop in brand guidelines, a tone-of-voice doc, a logo or on-brand images:
+
+- PDF, Word (.docx), Markdown and plain text are read as text. Scanned PDFs have no text; add those pages as images.
+- PNG and JPG are sent as images.
+- Up to 10 MB a file (5 MB for images) and 20 files a brand. Long documents are cut to their first part, and the page says so.
+
+Files are copied into the brand's `brand-kit/` folder. The page shows what was read from each one, and **Remove** deletes the copy. Every drafting request includes the kit, marked as reference material and never as instructions.
+
+**Running on its own.** Batches are released at your Schedule times while the app is open; a batch missed while it was closed comes out the next time you open it. Reading the news and drafting by itself is off until you turn on **Run on its own** (Schedule page or the end of setup), because each run uses your API key. **Run it now** works any time.
+
+**What's plugin-only.** Reading X and LinkedIn pages, learning your voice from old posts, the nightly explorations, Cowork scheduled tasks and posting for you all need Claude's browser and tools, so the desktop app leaves them out. You copy an approved draft and post it yourself.
+
+**Settings for trying it out:**
+
+| Variable | What it does |
+| --- | --- |
+| `STUDIO_HOME` | Studio folder (default `~/Documents/Fishbowl Studio`) |
+| `STUDIO_APP_DIR` | Where the key and app preferences live |
+| `STUDIO_MODEL` | Model for drafting (default `claude-opus-5-5`) |
+| `STUDIO_ANTHROPIC_BASE_URL` | Send API calls somewhere else, such as the local mock |
+
+To try the app without an API key, run the mock in one terminal and the app in another, then save any made-up key of 20 or more letters and digits, such as `sk-ant-test-0000000000000000`:
+
+```sh
+node dev/mock-anthropic.mjs
+STUDIO_ANTHROPIC_BASE_URL=http://127.0.0.1:8787 STUDIO_HOME=/tmp/studio-try STUDIO_APP_DIR=/tmp/studio-try-app npm run desktop
+```
+
+## Install the plugin
 
 1. In the Claude desktop app, open **Customize → Plugins**.
 2. Click **Add marketplace** and enter `MockSea/fishbowl-studio`.
@@ -144,7 +187,8 @@ Each brand has its own folder inside **Documents → Fishbowl Studio → persona
 
 - [How it works](docs/HOW-IT-WORKS.md): the pipeline, the ranking formula, how it learns.
 - [Assumptions](docs/ASSUMPTIONS.md): platform behaviour we couldn't verify yet.
-- `npm test` runs the tests. There are no runtime dependencies.
+- `npm test` runs the tests. The plugin has no runtime dependencies; the desktop app adds the Anthropic SDK and two document readers (`unpdf`, `mammoth`).
+- The desktop app is `desktop/`: `main.js` (window and IPC), `host.js` (studio calls, key, brand kit, runs), `runner.js` (the pipeline against the API), `llm.js`, `keystore.js`, `brandkit.js`, and `ui/` (the bridge and the desktop-only pages).
 - `npm run dev` serves the board at http://localhost:7611 with two fictional demo brands. Add `?view=sources&width=390` to open a section at phone width.
 - `npm run shots` screenshots every section at desktop and phone width into `dev/shots/` (needs Chrome). `npm run shots -- --readme` regenerates the images in this README.
 - `npm run pack` builds a zip for **Upload plugin**.

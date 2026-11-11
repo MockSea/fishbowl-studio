@@ -1,16 +1,57 @@
 {
   "name": "fishbowl-studio",
   "version": "0.0.1",
-  "description": "A social-post drafting studio that runs inside Claude as a plugin.",
+  "description": "A social-post drafting studio: a desktop app, or a plugin inside Claude.",
   "private": true,
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "test": "node --test",
     "dev": "node dev/serve.mjs",
     "seed": "node dev/seed.mjs",
     "pack": "node scripts/pack.mjs",
-    "shots": "node dev/shots.mjs"
+    "shots": "node dev/shots.mjs",
+    "desktop": "node scripts/ensure-electron.mjs && electron .",
+    "make": "node scripts/ensure-electron.mjs && electron-builder --mac dmg --publish never"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
+    "mammoth": "^1.13.0",
+    "unpdf": "^2.1.0"
+  },
+  "devDependencies": {
+    "electron": "^45.3.0",
+    "electron-builder": "^26.18.0"
+  },
+  "main": "desktop/main.js",
+  "build": {
+    "appId": "dev.fishbowl.studio",
+    "productName": "Fishbowl Studio",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "desktop/**",
+      "server/**",
+      "platforms/**",
+      "shapes/**",
+      "accounts/**",
+      "defaults/**",
+      "package.json",
+      "LICENSE"
+    ],
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.productivity",
+      "identity": null
+    },
+    "dmg": {
+      "writeUpdateInfo": false
+    }
   }
 }

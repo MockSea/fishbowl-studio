@@ -76,7 +76,7 @@
       B.seg([{ value: 'next', label: 'With the next run' }, { value: 'now', label: 'Ask Claude now' }], linkWhen, (v) => { linkWhen = v; B.render(); }, 'When to draft it'),
       h('div', { class: 'card-foot' }, inline({ type: 'url', placeholder: 'https://example.com/article', aria: 'Article address', button: 'Draft it', onsubmit: async (url) => {
         const r = await call('studio_draft_link', { url });
-        if (r && r.ok && linkWhen === 'now') { const sent = await S.askClaude('Draft the link I just sent to Fishbowl Studio (do my studio rewrites).'); if (!sent) B.flash('Queued. Ask Claude in the chat: "do my studio rewrites".', 'good'); }
+        if (r && r.ok && linkWhen === 'now') { const sent = await S.askClaude('Draft the link I just sent to Fishbowl Studio (do my studio rewrites).'); if (sent !== true) B.flash(typeof sent === 'string' ? sent : 'Queued. Ask Claude in the chat: "do my studio rewrites".', typeof sent === 'string' ? 'warn' : 'good'); }
       } })),
       d.links.length ? h('div', { class: 'rows card-foot' }, d.links.map((l) => h('div', { class: 'row-item' },
         h('span', { class: 'who' }, h('span', { class: 'nm', text: l.title || l.url }), h('span', { class: 'sub', text: `${l.host} · ${ago(l.at)} ago` })),
@@ -150,7 +150,7 @@
       return h('div', { class: 'task' }, h('div', { class: 'kv' }, kv.map(([k, v]) => [h('span', { class: 'k', text: k }), h('span', { class: 'v' }, k === 'Prompt' || k === 'Folder' ? h('code', { text: v }) : v), h('span', { class: 'copy' }, B.copyButton(v, 'Copy', 'btn sm ghost'))])));
     };
     const all = d.tasks.map((t) => `${t.text}\nFolder: ${d.home}`).join('\n\n');
-    const cowork = card({ icon: 'bulb', title: 'Set it up in Claude', sub: `The studio can’t start itself. Claude runs it from ${d.tasks.length > 1 ? `${d.tasks.length} scheduled tasks` : 'a scheduled task'} in Cowork. One click asks Claude to make ${d.tasks.length > 1 ? 'them' : 'it'}; you approve ${d.tasks.length > 1 ? 'each' : 'it'} once.`, end: B.askClaudeButton('Set it up for me', d.setup_prompt, 'btn sm primary') },
+    const cowork = B.hook('scheduleCard', d) || card({ icon: 'bulb', title: 'Set it up in Claude', sub: `The studio can’t start itself. Claude runs it from ${d.tasks.length > 1 ? `${d.tasks.length} scheduled tasks` : 'a scheduled task'} in Cowork. One click asks Claude to make ${d.tasks.length > 1 ? 'them' : 'it'}; you approve ${d.tasks.length > 1 ? 'each' : 'it'} once.`, end: B.askClaudeButton('Set it up for me', d.setup_prompt, 'btn sm primary') },
       d.tasks.map(rows),
       d.posting ? h('p', { class: 'hint', text: '“Fishbowl Studio posting” is there because “Post for me” is on for an account. It posts what you approved, a few minutes after each release time.' }) : null,
       h('details', { class: 'by-hand' }, h('summary', { class: 'small muted' }, 'Or set it up by hand'),
@@ -210,14 +210,14 @@
           ? [h('span', { class: 'tag ok' }, icon('check'), `Connected ${ago(a.connected_at)} ago`), B.confirmButton(`Remove ${a.label}`, 'Remove?', () => call('studio_account_set', { action: 'remove', type: a.id }))]
           : h('button', { class: 'btn sm', onclick: async () => {
             const r = await call('studio_account_set', { action: 'connect', type: a.id });
-            if (r && r.ok && r.prompt) { const sent = await S.askClaude(r.prompt); if (!sent) B.flash(`Ask Claude in the chat: "${r.prompt}"`, 'warn'); }
+            if (r && r.ok && r.prompt) { const sent = await S.askClaude(r.prompt); if (sent !== true) B.flash(typeof sent === 'string' ? sent : `Ask Claude in the chat: "${r.prompt}"`, typeof sent === 'string' ? 'warn' : 'warn'); }
           } }, icon('plus'), 'Add account')),
         a.connected && a.capabilities.post === true ? h('div', { class: 'full' }, B.postingControl(a)) : null))));
     return page('Settings', `How ${head.brand || 'the brand'}'s studio works. Changes save as you click.`, null,
-      h('div', { class: 'cols' }, h('div', { class: 'stack' }, platforms, amounts, voice, phraseCard, accounts, brand),
-        h('aside', { class: 'rail' }, card({ icon: 'bulb', title: 'Rather just say it?', cls: 'soft', sub: 'Anything here can also be changed by asking Claude in the chat.' },
+      h('div', { class: 'cols' }, h('div', { class: 'stack' }, platforms, amounts, voice, phraseCard, B.hook('noPosting') ? null : accounts, brand),
+        h('aside', { class: 'rail' }, B.hook('settingsRail', d) || card({ icon: 'bulb', title: 'Rather just say it?', cls: 'soft', sub: 'Anything here can also be changed by asking Claude in the chat.' },
           B.askClaudeButton('Change the brand voice', 'I want to change my Fishbowl Studio brand voice.', 'btn sm'), ' ', B.askClaudeButton('Change positions', 'I want to change my Fishbowl Studio positions or audience.', 'btn sm ghost')),
-          card({ icon: 'spark', title: 'Run setup again', cls: 'soft', sub: 'The same four steps as a new brand. Your answers are kept, and Claude’s new drafts wait for your yes.' },
+          card({ icon: 'spark', title: 'Run setup again', cls: 'soft', sub: 'The same steps as a new brand. Your answers are kept, and Claude’s new drafts wait for your yes.' },
             h('button', { class: 'btn sm', onclick: () => B.openWizard() }, 'Open setup')))));
   }
 

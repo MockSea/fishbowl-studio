@@ -16,16 +16,21 @@ const INSTRUCTIONS = 'Fishbowl Studio drafts social posts for their brands (one 
 // The board is one self-contained HTML resource, assembled from small files (no build step).
 // Every skin in ui/skins/ is included; light is the default, others apply by data-skin.
 export const BOARD_SCRIPTS = ['board-icons.js', 'board-views.js', 'board-drafts.js', 'board-pages.js', 'board-wizard.js'];
-let html = null;
-export function boardHtml() {
-  if (html) return html;
+const built = new Map();
+
+// The plugin board uses the MCP Apps bridge. Another host (the desktop app) passes its own
+// bridge file and any extra page scripts, as absolute paths; the rest of the board is shared.
+export function boardHtml({ bridge = null, extra = [] } = {}) {
+  const key = JSON.stringify([bridge, extra]);
+  if (built.has(key)) return built.get(key);
   const ui = (f) => fs.readFileSync(path.join(PLUGIN_ROOT, 'server', 'ui', f), 'utf8');
   const skins = fs.readdirSync(path.join(PLUGIN_ROOT, 'server', 'ui', 'skins')).filter((f) => f.endsWith('.css')).sort((a, b) => (a === 'light.css' ? -1 : b === 'light.css' ? 1 : a.localeCompare(b)));
-  html = ui('board.html')
+  const html = ui('board.html')
     .replace('/*__SKINS__*/', () => skins.map((f) => ui(`skins/${f}`)).join('\n'))
     .replace('/*__CSS__*/', () => ui('board.css'))
-    .replace('//__BRIDGE__', () => `window.STUDIO_SKINS = ${JSON.stringify(skins.map((f) => f.replace(/\.css$/, '')))};\n` + ui('board-bridge.js'))
-    .replace('//__VIEWS__', () => BOARD_SCRIPTS.map(ui).join('\n'));
+    .replace('//__BRIDGE__', () => `window.STUDIO_SKINS = ${JSON.stringify(skins.map((f) => f.replace(/\.css$/, '')))};\n` + (bridge ? fs.readFileSync(bridge, 'utf8') : ui('board-bridge.js')))
+    .replace('//__VIEWS__', () => [...BOARD_SCRIPTS.map(ui), ...extra.map((f) => fs.readFileSync(f, 'utf8'))].join('\n'));
+  built.set(key, html);
   return html;
 }
 
