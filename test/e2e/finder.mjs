@@ -3,7 +3,7 @@
 // passed with `open --env` so the real ~/Documents/Fishbowl Studio is never touched, and a
 // debugging port lets Playwright attach to the window that LaunchServices started.
 //   STUDIO_E2E=1 node finder.mjs        (needs `npm run make` first)
-// Screenshots go to docs/qa/electron-0.1.0/shots/finder-*.png, checks to finder-results.json.
+// Screenshots go to docs/qa/<version>/shots/finder-*.png (or QA_OUT), checks to finder-results.json.
 if (process.env.STUDIO_E2E !== '1') process.exit(0);
 
 const fs = await import('node:fs');
@@ -139,3 +139,4 @@ await quitApp(browser);
 mock.stop();
 fs.writeFileSync(path.join(OUT, 'finder-results.json'), JSON.stringify({ mode: 'finder', at: new Date().toISOString(), results }, null, 2) + '\n');
 console.log(`\n${results.filter((r) => r.ok).length} passed, ${results.filter((r) => !r.ok).length} failed. Data folder: ${dirs.base}`);
+if (results.some((r) => !r.ok)) process.exitCode = 1;

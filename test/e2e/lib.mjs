@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 
 export const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(HERE, '..', '..');
-export const OUT = path.resolve(process.env.QA_OUT || path.join(ROOT, 'docs', 'qa', 'electron-0.1.0', 'shots'));
+export const OUT = path.resolve(process.env.QA_OUT || path.join(ROOT, 'docs', 'qa', 'electron-0.1.1', 'shots'));
 export const FIX = path.join(HERE, 'fixtures');
 export const BUILT_APP = process.env.QA_APP || path.join(ROOT, 'dist', `mac-${process.arch}`, 'Fishbowl Studio.app');
 // What a Dock or Finder launch gets: launchd's PATH, with no node on it.

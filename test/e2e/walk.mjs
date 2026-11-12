@@ -1,8 +1,10 @@
 // The full walk of the desktop app, run once per launch mode:
 //   STUDIO_E2E=1 node walk.mjs source   (like `npm run desktop`)
 //   STUDIO_E2E=1 node walk.mjs built    (the packaged .app binary, Finder-like PATH)
-// Each step screenshots into docs/qa/electron-0.1.0/shots/<mode>-*.png and records a check in
-// <mode>-results.json. No real API key: a local mock answers, a refusing server plays a bad key,
+// Each step screenshots into docs/qa/<version>/shots/<mode>-*.png (or QA_OUT) and records a check
+// in <mode>-results.json. A check tagged with a bug id (B1...) is that bug's regression check. A
+// check marked known is a bug tracked on another card: it is reported but does not fail the run.
+// The process exits 1 if any other check fails. No real API key: a local mock answers, a refusing server plays a bad key,
 // a closed port plays no network, and one call goes to the real API with a made-up key.
 if (process.env.STUDIO_E2E !== '1') process.exit(0);
 
@@ -20,10 +22,16 @@ const results = [];
 const FAKE_KEY = 'sk-ant-qa-not-a-real-key-0000000000000000';
 const LINK = 'https://example.com/';
 
-function check(area, name, ok, detail = '', shotName = null) {
-  results.push({ area, name, ok: !!ok, detail: String(detail).slice(0, 600), shot: shotName ? `${mode}-${shotName}.png` : null });
-  console.log(`${ok ? 'PASS' : 'FAIL'} [${area}] ${name}${detail ? ` :: ${String(detail).slice(0, 200)}` : ''}`);
+// opts: bug (the report's bug id this check covers), known (a card that tracks a known failure).
+function check(area, name, ok, detail = '', shotName = null, opts = {}) {
+  results.push({ area, name, ok: !!ok, detail: String(detail).slice(0, 600), shot: shotName ? `${mode}-${shotName}.png` : null, bug: opts.bug || null, known: opts.known || null });
+  const tag = `${opts.bug ? ` ${opts.bug}` : ''}${!ok && opts.known ? ` (known, ${opts.known})` : ''}`;
+  console.log(`${ok ? 'PASS' : 'FAIL'}${tag} [${area}] ${name}${detail ? ` :: ${String(detail).slice(0, 200)}` : ''}`);
 }
+const highlighted = (page) => page.evaluate(() => Array.from(document.querySelectorAll('.navbtn.active')).map((b) => b.dataset.view));
+// Names cut off with an ellipsis: an element whose text is wider than its box.
+const clipped = (page, sel) => page.evaluate((s) => Array.from(document.querySelectorAll(s)).filter((e) => e.offsetParent && e.scrollWidth > e.clientWidth + 1).map((e) => `${e.textContent} (${e.clientWidth} of ${e.scrollWidth}px)`), sel);
+const handles = (page) => page.evaluate(() => Array.from(document.querySelectorAll('.persona-btn .hd, .post-head .identity .meta')).map((e) => e.textContent.trim()).filter((t) => t.startsWith('@')));
 const text = (page, sel = 'main') => page.evaluate((s) => (document.querySelector(s) || document.body).innerText, sel);
 const has = async (page, s) => (await text(page)).includes(s);
 
@@ -53,8 +61,9 @@ try {
   await shot(page, '01-first-run');
   const first = await text(page);
   check('First run', 'opens on the Claude (API key) page when no key is saved', first.includes('Anthropic API key') && first.includes('Save key'), '', '01-first-run');
-  const active = await page.evaluate(() => Array.from(document.querySelectorAll('.navbtn.active')).map((b) => b.dataset.view));
-  check('First run', 'the sidebar shows which page is open', active.length === 1 && active[0] !== 'drafts', `highlighted nav: ${JSON.stringify(active)}`, '01-first-run');
+  const active = await highlighted(page);
+  check('First run', 'the sidebar highlights the key page it opened on', active.length === 1 && active[0] === 'apikey', `highlighted nav: ${JSON.stringify(active)}`, '01-first-run', { bug: 'B7' });
+  check('First run', 'the key page has its own sidebar entry', await page.locator('.navbtn[data-view="apikey"]').count() === 1, '', '01-first-run', { bug: 'B7' });
   check('First run', 'a default brand exists', await page.evaluate(() => document.querySelector('.persona-btn')?.innerText.includes('My brand')));
 
   for (const v of ['drafts', 'sources', 'topics', 'brandkit', 'schedule', 'settings', 'reads', 'playbook']) {
@@ -66,10 +75,11 @@ try {
   check('Screens', 'no Coach page in the app', !(await page.$('.navbtn[data-view="coach"]')));
   await nav(page, 'drafts');
   const dt = await text(page);
-  check('Copy', 'Drafts "how this works" step 3 describes the desktop app', !/scheduled task/.test(dt), 'Step 3 reads: "One click asks Claude to make the scheduled task." The app has no scheduled task; it runs while open.', '02-screen-drafts');
-  check('Copy', 'Drafts step 1 counts the setup steps the app shows', !/Four short steps/.test(dt) , 'Step 1 says "Four short steps ... and whether it posts for you"; the app wizard shows three numbered steps and has no posting.', '02-screen-drafts');
+  check('Copy', 'Drafts "how this works" step 3 describes the desktop app', !/scheduled task/.test(dt), 'Step 3 reads: "One click asks Claude to make the scheduled task." The app has no scheduled task; it runs while open.', '02-screen-drafts', { bug: 'B5' });
+  check('Copy', 'Drafts step 1 counts the setup steps the app shows', !/Four short steps/.test(dt) , 'Step 1 says "Four short steps ... and whether it posts for you"; the app wizard shows three numbered steps and has no posting.', '02-screen-drafts', { bug: 'B5' });
+  check('Copy', 'Drafts step 1 does not offer posting', !/posts for you/.test(dt), (dt.match(/Set up the brand[^\n]*\n[^\n]*/) || [''])[0], '02-screen-drafts', { bug: 'B5' });
   await nav(page, 'topics');
-  check('Copy', 'Topics page does not point to the Coach page the app removed', !(await has(page, 'Coach page')), '"Changes to the voice and playbook always wait for your yes on the Coach page."', '02-screen-topics');
+  check('Copy', 'Topics page does not point to the Coach page the app removed', !(await has(page, 'Coach page')), '"Changes to the voice and playbook always wait for your yes on the Coach page."', '02-screen-topics', { bug: 'B6', known: 'WS-106' });
 
   // No key: every model action says to add one.
   await draftLinkNow(page);
@@ -85,6 +95,9 @@ try {
 
   // ---------- 2. API key entry ----------
   await goKeyPage(page);
+  const keyActive = await highlighted(page);
+  await shot(page, '04-key-page');
+  check('API key', 'the sidebar highlights the key page when opened from Settings', keyActive.length === 1 && keyActive[0] === 'apikey', `highlighted nav: ${JSON.stringify(keyActive)}`, '04-key-page', { bug: 'B7' });
   for (const [label, val, want] of [['empty', '', /Paste your/], ['too short', 'hello', /does not look like/], ['with a space', 'sk-ant-abc def-0000000000000000', /does not look like/], ['bad characters', 'sk-ant-<script>0000000000000000', /does not look like/]]) {
     seen = await saveKey(page, val);
     if (label === 'empty') await shot(page, '04-key-empty');
@@ -130,7 +143,7 @@ try {
   await settle(page, 1500);
   await shot(page, '05-setup-drafts', { full: true });
   check('Setup', 'Draft it for me returns Claude\'s setup drafts (mock API)', await has(page, 'first draft'), seen.join(' / '), '05-setup-drafts');
-  check('Copy', 'setup drafts message is written for the person', !seen.some((t) => /suggestion\(s\)|for them to/.test(t)), seen.join(' / '), '05-setup-drafts');
+  check('Copy', 'setup drafts message is written for the person', !seen.some((t) => /suggestion\(s\)|for them to/.test(t)), seen.join(' / '), '05-setup-drafts', { bug: 'B3' });
   check('Setup', 'the brand name from step 1 is used', await has(page, 'Spoke and Chain'), (await text(page)).slice(0, 120), '05-setup-drafts');
   await page.click('button:has-text("Keep everything")');
   await settle(page, 1500);
@@ -153,6 +166,10 @@ try {
   await shot(page, '06-link-drafts', { full: true });
   const dtext = await text(page);
   check('Draft from a link', 'Ask Claude now produces drafts on the Drafts page (mock API)', /Draft \d/.test(dtext), seen.join(' / '), '06-link-drafts');
+  const cut = await clipped(page, '.profile .nm, .persona-btn .nm');
+  check('Layout', 'brand names are not cut off in Your brands or the switcher', !cut.length, cut.join(', ') || 'none cut', '06-link-drafts', { bug: 'B9' });
+  const hd = await handles(page);
+  check('Personas', 'the renamed first brand\'s handle follows its name, not @my-brand', hd.length > 0 && hd.every((x) => x === '@spoke-and-chain'), JSON.stringify([...new Set(hd)]), '06-link-drafts', { bug: 'B10' });
   // A link draft comes as three takes. "Use this one" keeps that take as a draft to review;
   // Approve then moves it to Approved.
   const pick = page.locator('main button:has-text("Use this one")').first();
@@ -172,12 +189,12 @@ try {
     await shot(page, '06-draft-approved');
     check('Drafts', 'Approve moves a draft to Approved', /Approved\s*[1-9]/.test(await text(page)), (await text(page)).match(/To review\s*\d+\s*Approved\s*\d+/)?.[0] || '', '06-draft-approved');
     const said = [...(pickSeen || []), ...seen];
-    check('Copy', 'pick and approve messages use the app\'s own words (Approve, Skip, the Approved tab)', !said.some((t) => /Passed tab|pass, edit or kill/.test(t)), said.join(' / '), '06-draft-approved');
+    check('Copy', 'pick and approve messages use the app\'s own words (Approve, Skip, the Approved tab)', !said.some((t) => /Passed tab|pass, edit or kill/.test(t)), said.join(' / '), '06-draft-approved', { bug: 'B4' });
   } else check('Drafts', 'Approve button present on a draft', false, 'no draft to approve');
   await settle(page, 600);
   await shot(page, '06-approved-tab'); // nothing left to review: a page shorter than the window
   const sp = await page.evaluate(() => ({ window: window.innerHeight, page: Math.round(document.body.getBoundingClientRect().height) }));
-  check('Layout', 'the app background fills the window when a page is short', sp.page >= sp.window - 1, `window ${sp.window}px tall, page ${sp.page}px`, '06-approved-tab');
+  check('Layout', 'the app background fills the window when a page is short', sp.page >= sp.window - 1, `window ${sp.window}px tall, page ${sp.page}px`, '06-approved-tab', { bug: 'B8' });
   check('Draft from a link', 'the mock received one setup call and at least one drafting call', mock.lines.some((l) => /takes/.test(l)), mock.lines.slice(1).join(' / '));
 
   // ---------- 5. Brand kit ----------
@@ -215,15 +232,28 @@ try {
   check('Brand kit', 'the PDF row shows the text it read', /Spoke and Chain/.test(pdfRow), pdfRow.replace(/\s+/g, ' ').slice(0, 200), '07-kit-full-list');
   const docxRow = await page.locator('.kit-file:has-text("tone-of-voice.docx")').innerText().catch(() => '');
   check('Brand kit', 'the DOCX row shows the text it read', /Spoke and Chain/.test(docxRow), docxRow.replace(/\s+/g, ' ').slice(0, 200), '07-kit-full-list');
+  // The same file again: refused with a reason, no second copy.
+  let k0 = await page.locator('.kit-file').count();
+  await dropFiles(page, [fx.pdf]);
+  seen = await waitFlash(page, /./, 10000);
+  await shot(page, '07-kit-duplicate-drop', { full: true });
+  let names = await page.locator('.kit-file .nm').allInnerTexts();
+  const pdfCopies = names.filter((n) => n === 'brand-guidelines.pdf').length;
+  check('Brand kit', 'dropping a file that is already in the kit is refused and says so', pdfCopies === 1 && names.length === k0 && seen.some((t) => /already in the kit/.test(t)), `${seen.join(' / ') || '(no message)'}; brand-guidelines.pdf appears ${pdfCopies} times`, '07-kit-duplicate-drop', { bug: 'B1' });
+  // The same contents under another name: also refused.
+  k0 = names.length;
+  await dropFiles(page, [fx.pdfCopy]);
+  seen = await waitFlash(page, /./, 10000);
+  check('Brand kit', 'a renamed copy of a file in the kit is refused too', (await page.locator('.kit-file').count()) === k0 && seen.some((t) => /already in the kit/.test(t)), `${seen.join(' / ') || '(no message)'}`, null, { bug: 'B1' });
   // Several at once, one good and one bad.
-  await dropFiles(page, [fx.pdf, fx.gif]);
+  k0 = await page.locator('.kit-file').count();
+  await dropFiles(page, [fx.txt, fx.gif]);
   seen = await waitFlash(page, /./, 10000);
   await shot(page, '07-kit-mixed-drop', { full: true });
-  const names = await page.locator('.kit-file .nm').allInnerTexts();
-  check('Brand kit', 'a mixed drop (one good, one bad) reports both', seen.some((t) => /animation\.gif/.test(t)) && seen.some((t) => /Added|brand-guidelines/.test(t)), `${seen.join(' / ')}; files now: ${names.join(', ')}`, '07-kit-mixed-drop');
-  check('Brand kit', 'adding a file that is already in the kit does not add a second copy', names.filter((n) => n === 'brand-guidelines.pdf').length === 1, `brand-guidelines.pdf appears ${names.filter((n) => n === 'brand-guidelines.pdf').length} times`, '07-kit-mixed-drop');
+  names = await page.locator('.kit-file .nm').allInnerTexts();
+  check('Brand kit', 'a mixed drop (one good, one bad) reports both', names.length === k0 + 1 && seen.some((t) => /animation\.gif/.test(t) && /house-style\.txt|Added 1 file/.test(t)), `${seen.join(' / ')}; files now: ${names.join(', ')}`, '07-kit-mixed-drop', { bug: 'B2' });
   // Choose files, through the real button with the native dialog stubbed.
-  await stubOpenDialog(app, [fx.md]);
+  await stubOpenDialog(app, [fx.md2]);
   const n0 = await page.locator('.kit-file').count();
   await page.click('button:has-text("Choose files")');
   seen = await waitFlash(page, /Added|Only|Too/, 15000);
@@ -319,6 +349,8 @@ try {
   const t = await text(page);
   check('Relaunch', 'opens on Drafts (not the key page) once a key is saved', !t.includes('Paste an API key to start'), '', '10-relaunch');
   check('Relaunch', 'remembers the active brand', /Spoke and Chain/.test(await page.locator('.persona-btn').innerText()), await page.locator('.persona-btn').innerText());
+  const hd2 = await handles(page);
+  check('Relaunch', 'after a restart the switcher still shows the brand\'s own handle', hd2.length > 0 && !hd2.includes('@my-brand'), JSON.stringify([...new Set(hd2)]), '10-relaunch', { bug: 'B10' });
   await nav(page, 'brandkit');
   await shot(page, '10-relaunch-kit');
   check('Relaunch', 'the brand kit is still there', (await page.locator('.kit-file').count()) > 0, '', '10-relaunch-kit');
@@ -374,4 +406,6 @@ rl.stop();
 if (process.env.QA_REAL_API !== '0') await errorRun('the real Anthropic API refuses a made-up key with the bad-key message', {}, /refused the API key/, '11-real-api-fake-key');
 
 fs.writeFileSync(path.join(OUT, `${mode}-results.json`), JSON.stringify({ mode, at: new Date().toISOString(), results }, null, 2) + '\n');
-console.log(`\n${results.filter((r) => r.ok).length} passed, ${results.filter((r) => !r.ok).length} failed. Data folder: ${dirs.base}`);
+const failed = results.filter((r) => !r.ok && !r.known), known = results.filter((r) => !r.ok && r.known);
+console.log(`\n${results.filter((r) => r.ok).length} passed, ${failed.length} failed, ${known.length} known (tracked elsewhere). Data folder: ${dirs.base}`);
+if (failed.length) process.exitCode = 1;

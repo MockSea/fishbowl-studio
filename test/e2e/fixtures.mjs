@@ -48,6 +48,10 @@ export function makeFixtures(dir) {
   execFileSync('textutil', ['-convert', 'docx', p('tone.txt'), '-output', p('tone-of-voice.docx')]);
   f.docx = p('tone-of-voice.docx');
   f.md = w('words-we-use.md', '# Words we use\n\n- ride, not cycle\n- tune-up, not service\n');
+  f.md2 = w('post-checklist.md', '# Before a post goes out\n\n- One idea.\n- A verb in the first line.\n');
+  f.txt = w('house-style.txt', 'House style: sentence case headings, no exclamation marks, numbers as digits.\n');
+  // The PDF's exact bytes under another name (a duplicate the kit should spot by contents).
+  f.pdfCopy = w('brand-guidelines (1).pdf', pdf(BRAND));
   f.png = w('logo.png', png());
   execFileSync('sips', ['-s', 'format', 'jpeg', f.png, '--out', p('shopfront.jpg')], { stdio: 'ignore' });
   f.jpg = p('shopfront.jpg');
