@@ -27,9 +27,10 @@ The repository holds two things: the **drafting core** (`core/`), a package with
 | `core/lib/files.js` | Reads files shipped inside a package (the core's platforms, shapes, accounts and defaults; the web app's board). In the standalone build they come from the bundle instead of the disk. |
 | `core/platforms/`, `core/shapes/`, `core/accounts/`, `core/defaults/` | Data: one file per platform, post shape and account type, and the default settings. |
 | `core/test/` | The core's own tests. `cd core && npm test` runs only these; `npm test` at the root runs them with the web app's. |
-| `bin/fishbowl-studio.js` | The command. Checks the Node version, then runs `server/cli.js`. With `--extract-child` it runs the brand kit reader instead (the standalone build starts itself that way). |
+| `bin/fishbowl-studio.js` | The command. Checks the Node version and the packages (reinstalling missing ones, see `heal.js`), then runs `server/cli.js`. With `--extract-child` it runs the brand kit reader instead (the standalone build starts itself that way). |
 | `server/cli.js` | Options, the lock file a second copy reads, catching up missed release times on start, opening the browser, and the five-minute timer. |
 | `server/lib/web.js` | The HTTP server: launch token, session cookie, Host and Origin checks, the JSON API, the event stream and kit uploads. Its header says what keeps other people and other pages out. |
+| `server/lib/heal.js` | The repairs a start makes: missing packages reinstalled once with npm (checked in a separate Node process), our own stuck studio found by its command line (`ps`) or by the port it holds (`lsof`) and stopped, with SIGTERM then SIGKILL. A process not started as `fishbowl-studio` is never signalled. Built-in modules only. |
 | `server/lib/control.js` | How a second copy of the command and the running studio prove to each other that they hold the lock file's control secret, without sending it. |
 | `server/lib/host.js` | Everything the page can ask for, as plain functions over the core: studio tools, the engine, the key, the brand kit, preferences, the timer tick. |
 | `server/lib/keystore.js` | The API key in the system's secret store (`security`, `secret-tool`, DPAPI through PowerShell) or a 0600 file. |
@@ -55,7 +56,7 @@ The repository holds two things: the **drafting core** (`core/`), a package with
 
 **Hooks.** `web-pages.js` sets `window.BoardHooks` so shared pages fit the web app: `noPosting` (no Posting step or accounts), `noCoach` (no Coach page; the web app shows Coach, so it doesn't set this), `sourceKinds` (only sites and subreddits on the Sources page), `scheduleCard`, `settingsRail` and `finishBody`.
 
-**Security tests.** `test/web.test.js` covers the server's rules (token, cookie, Host, Origin, methods, body types, uploads, the control proof), `test/cli.test.js` the command and its lock file (including a stale lock pointing at a listener that isn't the studio), `test/keystore.test.js` each secret store.
+**Security tests.** `test/web.test.js` covers the server's rules (token, cookie, Host, Origin, methods, body types, uploads, the control proof), `test/cli.test.js` the command and its lock file (including a stale lock pointing at a listener that isn't the studio), `test/heal.test.js` the repairs on start (which processes may be stopped, and that other programs on the port are left alone), `test/keystore.test.js` each secret store.
 
 ## Trying it without Claude
 

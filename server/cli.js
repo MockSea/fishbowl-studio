@@ -1,6 +1,9 @@
 // The fishbowl-studio command: starts the studio on this computer and opens it in the browser.
 // It runs until the window it was started from is closed or Ctrl+C. If the studio is already
-// running, it opens a new link to that one instead of starting a second.
+// running, it opens a new link to that one instead of starting a second. Before it starts, it
+// repairs what an earlier start left behind (see heal.js): a lock file from a studio that has
+// gone, our own stuck studio still running or holding the port. What it can't repair ends in one
+// plain sentence.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,6 +14,7 @@ import { makeServer } from './lib/web.js';
 import { setExtractArgs } from '#core/brandkit.js';
 import { STORE_LABELS } from './lib/keystore.js';
 import { controlRequest, answerValid } from './lib/control.js';
+import { alive, isStudio, stopProcess, portHolder, answers } from './lib/heal.js';
 
 export const TICK_MS = 5 * 60 * 1000;
 export const LOCK_FILE = 'server.json';
@@ -61,11 +65,6 @@ export function openBrowser(url, { platform = process.platform, spawnImpl = spaw
   } catch { /* the printed link still works */ }
 }
 
-// Only a process this user owns counts: EPERM means the pid now belongs to someone else.
-const alive = (pid) => {
-  try { process.kill(pid, 0); return true; } catch { return false; }
-};
-
 // Another copy already running for this folder: ask it for a fresh launch link. Its answer is
 // trusted only with a proof made from the lock file's control secret (control.js), so a stale
 // lock file can't send the browser to whatever else now listens on that port.
@@ -81,6 +80,41 @@ export async function askRunning(lockFile, { isAlive = alive } = {}) {
     if (typeof url !== 'string' || !url.startsWith(`http://127.0.0.1:${lock.port}/`)) return null;
     return answerValid(lock.control, nonce, url, proof) ? url : null;
   } catch { return null; }
+}
+
+function readLock(file) {
+  try { const l = JSON.parse(fs.readFileSync(file, 'utf8')); return l && typeof l === 'object' ? l : {}; }
+  catch (e) { return e.code === 'ENOENT' ? null : {}; }
+}
+
+// The lock file names a studio that didn't answer. Its process has gone (the lock is stale), was
+// replaced by an unrelated one (also stale), or is our own studio, stuck: stop that one.
+export async function clearStale(lockFile, { say, isOurs = isStudio, stop = stopProcess } = {}) {
+  const lock = readLock(lockFile);
+  if (!lock) return null;
+  if (Number.isInteger(lock.pid) && isOurs(lock.pid)) {
+    say(`A studio from an earlier start is stuck (process ${lock.pid}). Restarting it.`);
+    if (!(await stop(lock.pid))) {
+      throw new Error(`An earlier copy of Fishbowl Studio (process ${lock.pid}) is stuck and couldn't be stopped. Restart the computer, then run the command again.`);
+    }
+    fs.rmSync(lockFile, { force: true });
+    return 'stopped';
+  }
+  say('Cleared a leftover record from a studio that didn\'t shut down cleanly.');
+  fs.rmSync(lockFile, { force: true });
+  return 'cleared';
+}
+
+// --port is taken. Our own stuck studio is stopped and the port reused; anything else keeps it,
+// and the studio starts on a free port instead.
+export async function freePort(port, { say, holder = portHolder, isOurs = isStudio, isAnswering = answers, stop = stopProcess } = {}) {
+  const pid = holder(port);
+  if (pid && isOurs(pid) && !(await isAnswering(port))) {
+    say(`An earlier copy of Fishbowl Studio is stuck on port ${port} (process ${pid}). Restarting it.`);
+    if (await stop(pid)) return port;
+  }
+  say(`Port ${port} is in use by another program. Using a free port instead.`);
+  return 0;
 }
 
 function writePrivate(file, data) {
@@ -130,22 +164,28 @@ export async function main(argv = process.argv.slice(2), { env = process.env, ou
   }
   const lockFile = path.join(appDir, LOCK_FILE);
 
-  const running = await askRunning(lockFile);
+  // A lock whose studio doesn't answer at first gets one more try before it is treated as stuck.
+  const running = await askRunning(lockFile) || (readLock(lockFile) && await askRunning(lockFile));
   if (running) {
     say(`Fishbowl Studio is already running. Opening it: ${running}`);
     if (o.open) open(running);
     return { reused: running };
   }
 
+  await clearStale(lockFile, { say });
+
   carryOverPrefs(appDir, env);
   let srv = null;
   const host = makeHostImpl({ home, appDir, emit: (ev) => srv && srv.emit(ev) });
-  srv = makeServer({ host, port: o.port });
-  try { await srv.listen(); }
-  catch (e) {
-    if (e.code === 'EADDRINUSE') throw new Error(`Port ${o.port} is in use. Run it without --port to pick a free one.`);
-    throw e;
-  }
+  const listen = async (port) => {
+    srv = makeServer({ host, port });
+    try { await srv.listen(); return null; }
+    catch (e) { return e; }
+  };
+  let err = await listen(o.port);
+  if (err?.code === 'EADDRINUSE' && o.port) err = await listen(await freePort(o.port, { say }));
+  if (err?.code === 'EADDRINUSE' && o.port) err = await listen(0);
+  if (err) throw new Error(`Fishbowl Studio couldn't open a port on this computer (${err.code || err.message}). Restart the computer, then run the command again.`);
   writePrivate(lockFile, JSON.stringify({ pid: process.pid, port: Number(new URL(srv.origin).port), control: srv.control }) + '\n');
 
   const { batches, drafts } = host.catchUp();

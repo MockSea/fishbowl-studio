@@ -26,13 +26,24 @@ Both run the same app on your computer, with the same files. Pick by who starts 
 | **Run it yourself** | You're fine typing one command, or you'd rather not involve Claude in setup. | The `npx` command above, or a [standalone build](#standalone-builds) if you don't have Node.js. |
 | **Have Claude set it up** | You use Claude (in Cowork or Claude Code) and would rather ask than type commands. | Add the Fishbowl Studio skill to Claude once, then ask Claude to start Fishbowl Studio. |
 
-**Adding the skill.** Download `fishbowl-studio-skill.zip` from the [latest release](https://github.com/MockSea/fishbowl-studio/releases/latest). In the Claude app, add it under **Settings → Capabilities → Skills**. In Claude Code, unzip it into `~/.claude/skills/` instead. After that, "start Fishbowl Studio" is enough: Claude checks Node.js, starts the studio in the background and gives you the link to open. The skill only installs and starts the app; you use the studio itself in your browser, the same as when you run it yourself.
+### Setting it up with Claude
 
-If Claude works in a sandbox your browser can't reach, the link won't open. Claude says so and gives you the command to run yourself instead.
+You do this once:
+
+1. Download [fishbowl-studio-skill.zip](https://github.com/MockSea/fishbowl-studio/releases/latest/download/fishbowl-studio-skill.zip). Leave it zipped.
+2. In the Claude desktop app, open **Settings**, then **Capabilities**, and under **Skills** upload the file you downloaded.
+
+Then, whenever you want the studio, open Cowork and type **Start Fishbowl Studio**. Claude starts it and gives you a link. Click the link; the studio opens in your browser and walks you through the rest.
+
+If anything goes wrong, ask Claude to start it again. Each start checks the studio first and fixes what it can by itself: a copy left over from last time, a copy that has stopped responding, missing files. If it can't fix something, it says what to do in one sentence, and Claude passes that on. Your brands and drafts stay in the studio folder through all of this.
+
+If Claude works somewhere your browser can't reach, the link won't open. Claude says so and gives you one command to paste into the Terminal app instead.
+
+(In Claude Code, unzip the file into `~/.claude/skills/` instead of step 2.)
 
 ## Starting it
 
-The command prints a link and opens it in your default browser. The link works once; after that the browser keeps a cookie for this session. It runs while the terminal window is open. **Ctrl+C** stops it. Running the command again while it's already running opens a fresh link to the same studio instead of starting a second.
+The command prints a link and opens it in your default browser. The link works once; after that the browser keeps a cookie for this session. It runs while the terminal window is open. **Ctrl+C** stops it. Running the command again while it's already running opens a fresh link to the same studio instead of starting a second. Each start also repairs what it can first: missing files are reinstalled, a copy that has stopped responding is restarted, and a taken port is swapped for a free one. What it can't fix, it explains in one sentence.
 
 | Option | What it does |
 | --- | --- |

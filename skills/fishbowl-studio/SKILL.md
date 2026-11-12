@@ -38,6 +38,8 @@ npx --yes github:MockSea/fishbowl-studio#v0.1.0 --no-open --home "<studio folder
 
 Leave out `--home` if step 2 said to. Keep `--no-open`: you give the person the link instead (step 4).
 
+This one command does every check itself, every time: it reinstalls any of its own files that are missing, clears what an earlier start left behind, stops an earlier copy of the studio that has stopped responding, and moves to a free port if its port is taken. Its log says what it fixed. So when the studio seems broken, or the person asks you to restart or fix it, run this same command again before anything else.
+
 The first start downloads the app, which can take a minute. Read the log every few seconds until it has a line starting `Open it here (the link works once):` followed by an `http://127.0.0.1:<port>/?t=...` link. Stop waiting after two minutes and go to "When something goes wrong".
 
 If the log says `Fishbowl Studio is already running. Opening it: <link>`, the studio was already running for this folder; the command printed a fresh link to it and exited. Use that link.
@@ -60,10 +62,13 @@ Pass on the studio's own message; it is written for the person. In particular:
 
 - **Node.js too old or missing**: it prints one sentence with the fix. Pass it on, or use the standalone build (step 1).
 - **Can't write to the studio folder**: pass the message on as written, and offer to use another folder with `--home`.
+- **It couldn't repair its files, or an earlier copy is stuck and couldn't be stopped**: the message says what to do (get online, or restart the computer). Pass it on, then run the command again once they have.
+- **Anything else**: run the command once more. If the same message comes back, pass it on as written.
 - **The link doesn't open in their browser** (the page can't be reached): the studio may be running somewhere their browser can't reach, such as a sandbox. Tell them so plainly, and give them the command to run in their own terminal instead: `npx github:MockSea/fishbowl-studio#v0.1.0`. That starts it and opens the browser by itself.
 
 ## What not to do
 
+- Don't delete or move the studio folder or anything in it to fix a problem. It holds the person's brands; the command repairs what it can without touching them.
 - Don't call the studio's API or read or change files in the studio folder. The person does everything through the board.
 - Don't open the one-time link.
 - Don't write a new interface, server or script for the studio. If something the person wants isn't in the app, say so.
