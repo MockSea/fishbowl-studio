@@ -8,12 +8,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { makeContext } from '../server/lib/state.js';
-import { writePlaybook, validateConfig } from '../server/lib/config.js';
-import { localDate } from '../server/lib/text.js';
-import { formOf } from '../server/lib/forms.js';
-import { editDiff } from '../server/lib/learn.js';
-import { textHash, nextSlot } from '../server/lib/posting.js';
+import { makeContext } from '#core/state.js';
+import { writePlaybook, validateConfig } from '#core/config.js';
+import { localDate } from '#core/text.js';
+import { formOf } from '#core/forms.js';
+import { editDiff } from '#core/learn.js';
+import { textHash, nextSlot } from '#core/posting.js';
 
 const DEV = path.dirname(fileURLToPath(import.meta.url));
 export const DEMO_HOME = path.join(DEV, '.demo-home');

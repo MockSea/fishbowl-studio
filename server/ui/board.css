@@ -116,12 +116,12 @@ input::placeholder, textarea::placeholder { color: var(--ink-3); }
 .persona-btn { display: flex; align-items: center; gap: var(--s-3); width: 100%; padding: var(--s-2); border: var(--border) solid var(--line); border-radius: var(--inset-radius); background: var(--surface); cursor: pointer; text-align: left; }
 .persona-btn:hover { background: var(--hover); }
 .persona-btn .who { flex: 1; min-width: 0; }
-.persona-btn .nm { display: block; font-weight: var(--w-bold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.persona-btn .nm { display: block; font-weight: var(--w-bold); overflow-wrap: break-word; }
 .persona-btn .hd { display: block; font-size: var(--t-xs); color: var(--ink-3); }
 .menu { position: absolute; z-index: 5; top: calc(100% + var(--s-2)); left: 0; right: 0; min-width: var(--menu-min); background: var(--surface); border: var(--border) solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-2); padding: var(--s-2); }
 .menu .item { display: flex; align-items: center; gap: var(--s-3); width: 100%; padding: var(--s-2); border: 0; border-radius: var(--inset-radius); background: transparent; cursor: pointer; text-align: left; }
 .menu .item:hover { background: var(--hover); }
-.menu .item .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--w-medium); }
+.menu .item .nm { flex: 1; min-width: 0; overflow-wrap: break-word; font-weight: var(--w-medium); }
 .menu .add { color: var(--accent-text); font-weight: var(--w-medium); }
 .menu .newp { display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-2); }
 .menu hr { border: 0; height: var(--border); background: var(--line); margin: var(--s-2) 0; }
@@ -233,8 +233,10 @@ details.why summary:hover { color: var(--ink); }
 .profile { display: flex; align-items: center; gap: var(--s-3); width: 100%; padding: var(--s-3); border-radius: var(--inset-radius); border: var(--border) solid var(--line); background: var(--surface-2); text-align: left; cursor: pointer; }
 .profile:hover { border-color: var(--line-strong); }
 .profile.active { background: var(--accent-soft); border-color: var(--accent-soft); }
-.profile .who { flex: 1; min-width: 0; }
-.profile .nm { display: block; font-weight: var(--w-bold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile { flex-wrap: wrap; }
+.profile .who { flex: 1 1 8em; min-width: 0; }
+.profile > .tag { margin-left: auto; }
+.profile .nm { display: block; font-weight: var(--w-bold); overflow-wrap: break-word; }
 .profile .sub { display: block; color: var(--ink-3); font-size: var(--t-xs); }
 
 /* ---------- lists (sources, topics, samples) ---------- */

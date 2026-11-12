@@ -1,21 +1,23 @@
 {
   "name": "fishbowl-studio",
-  "version": "0.1.0",
-  "description": "A social-post drafting studio: a desktop app, or a plugin inside Claude.",
+  "version": "0.2.0",
+  "description": "A social-post drafting studio that runs on your computer and opens in your browser.",
   "private": true,
   "type": "module",
+  "imports": {
+    "#core/*": "./core/lib/*"
+  },
   "license": "MIT",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
+    "start": "node bin/fishbowl-studio.js",
     "test": "node --test",
-    "dev": "node dev/serve.mjs",
     "seed": "node dev/seed.mjs",
-    "pack": "node scripts/pack.mjs",
     "shots": "node dev/shots.mjs",
-    "desktop": "node scripts/ensure-electron.mjs && electron .",
-    "make": "node scripts/ensure-electron.mjs && electron-builder --mac dmg --publish never"
+    "build:standalone": "node scripts/build-standalone.mjs",
+    "prepare": "node scripts/prepare.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
@@ -23,35 +25,27 @@
     "unpdf": "^2.1.0"
   },
   "devDependencies": {
-    "electron": "^45.3.0",
-    "electron-builder": "^26.18.0"
+    "esbuild": "^0.28.2"
   },
-  "main": "desktop/main.js",
-  "build": {
-    "appId": "dev.fishbowl.studio",
-    "productName": "Fishbowl Studio",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "desktop/**",
-      "server/**",
-      "platforms/**",
-      "shapes/**",
-      "accounts/**",
-      "defaults/**",
-      "package.json",
-      "LICENSE"
-    ],
-    "mac": {
-      "target": [
-        "dmg"
-      ],
-      "category": "public.app-category.productivity",
-      "identity": null
-    },
-    "dmg": {
-      "writeUpdateInfo": false
-    }
-  }
+  "bin": {
+    "fishbowl-studio": "bin/fishbowl-studio.js"
+  },
+  "files": [
+    "bin",
+    "server",
+    "core/lib",
+    "core/platforms",
+    "core/shapes",
+    "core/accounts",
+    "core/defaults",
+    "core/package.json",
+    "core/README.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "bundleDependencies": [
+    "@anthropic-ai/sdk",
+    "mammoth",
+    "unpdf"
+  ]
 }

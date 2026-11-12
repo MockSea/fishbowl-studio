@@ -1,0 +1,244 @@
+// The fishbowl-studio command: starts the studio on this computer and opens it in the browser.
+// It runs until the window it was started from is closed or Ctrl+C. If the studio is already
+// running, it opens a new link to that one instead of starting a second. Before it starts, it
+// repairs what an earlier start left behind (see heal.js): a lock file from a studio that has
+// gone, our own stuck studio still running or holding the port. What it can't repair ends in one
+// plain sentence.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { resolveHome } from '#core/store.js';
+import { makeHost } from './lib/host.js';
+import { makeServer } from './lib/web.js';
+import { setExtractArgs } from '#core/brandkit.js';
+import { STORE_LABELS } from './lib/keystore.js';
+import { controlRequest, answerValid } from './lib/control.js';
+import { alive, isStudio, startedAt, stopProcess, portHolder, answers } from './lib/heal.js';
+
+export const TICK_MS = 5 * 60 * 1000;
+export const LOCK_FILE = 'server.json';
+export const LINK_FILE = 'link.txt';
+
+export const HELP = `Fishbowl Studio: drafts social posts from the news, on your computer.
+
+  fishbowl-studio              start the studio and open it in your browser
+  fishbowl-studio --no-open    start it and only print the link
+  fishbowl-studio --link-file  don't print the link: write it to app/link.txt in the studio
+                               folder, readable only by you, and print where it is
+  fishbowl-studio --port 4100  use this port instead of a free one
+  fishbowl-studio --home DIR   keep the studio's files in DIR
+                               (default: Documents/Fishbowl Studio in your home folder)
+  fishbowl-studio --version    print the version
+
+It runs while this window is open. Press Ctrl+C to stop it.
+`;
+
+export function parseArgs(argv) {
+  const o = { open: true, port: 0, home: null, help: false, version: false, linkFile: false };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--no-open') o.open = false;
+    else if (a === '--link-file') o.linkFile = true;
+    else if (a === '--help' || a === '-h') o.help = true;
+    else if (a === '--version' || a === '-v') o.version = true;
+    else if (a === '--port' || a === '--home') {
+      const v = argv[++i];
+      if (v === undefined) throw new Error(`${a} needs a value.`);
+      if (a === '--port') {
+        o.port = Number(v);
+        if (!Number.isInteger(o.port) || o.port < 1 || o.port > 65535) throw new Error('--port needs a number from 1 to 65535.');
+      } else o.home = path.resolve(v);
+    } else throw new Error(`Unknown option ${a}. Run fishbowl-studio --help to see the options.`);
+  }
+  return o;
+}
+
+// Opens a URL in the default browser. Failing is fine: the link is printed too.
+export function browserCommand(url, platform = process.platform) {
+  if (platform === 'darwin') return ['open', [url]];
+  if (platform === 'win32') return ['rundll32', ['url.dll,FileProtocolHandler', url]];
+  return ['xdg-open', [url]];
+}
+export function openBrowser(url, { platform = process.platform, spawnImpl = spawn } = {}) {
+  const [cmd, args] = browserCommand(url, platform);
+  try {
+    const child = spawnImpl(cmd, args, { detached: true, stdio: 'ignore', windowsHide: true });
+    child.on('error', () => {});
+    child.unref();
+  } catch { /* the printed link still works */ }
+}
+
+// Another copy already running for this folder: ask it for a fresh launch link. Its answer is
+// trusted only with a proof made from the lock file's control secret (control.js), so a stale
+// lock file can't send the browser to whatever else now listens on that port.
+export async function askRunning(lockFile, { isAlive = alive } = {}) {
+  let lock;
+  try { lock = JSON.parse(fs.readFileSync(lockFile, 'utf8')); } catch { return null; }
+  if (!lock || !Number.isInteger(lock.pid) || !Number.isInteger(lock.port) || typeof lock.control !== 'string' || !isAlive(lock.pid)) return null;
+  try {
+    const { nonce, headers } = controlRequest(lock.control);
+    const r = await fetch(`http://127.0.0.1:${lock.port}/control/launch`, { method: 'POST', headers, signal: AbortSignal.timeout(3000) });
+    if (!r.ok) return null;
+    const { url, proof } = await r.json();
+    if (typeof url !== 'string' || !url.startsWith(`http://127.0.0.1:${lock.port}/`)) return null;
+    return answerValid(lock.control, nonce, url, proof) ? url : null;
+  } catch { return null; }
+}
+
+function readLock(file) {
+  try { const l = JSON.parse(fs.readFileSync(file, 'utf8')); return l && typeof l === 'object' ? l : {}; }
+  catch (e) { return e.code === 'ENOENT' ? null : {}; }
+}
+
+// The lock file names a studio that didn't answer. Its process has gone (the lock is stale), was
+// replaced by an unrelated one (also stale), or is our own studio, stuck: stop that one. Ours means
+// the pid's command line is a studio's and its start time is the one the lock recorded.
+export async function clearStale(lockFile, { say, isOurs = (pid, started) => isStudio(pid, { started }), stop = stopProcess } = {}) {
+  const lock = readLock(lockFile);
+  if (!lock) return null;
+  if (Number.isInteger(lock.pid) && isOurs(lock.pid, typeof lock.started === 'string' ? lock.started : null)) {
+    say(`A studio from an earlier start is stuck (process ${lock.pid}). Restarting it.`);
+    if (!(await stop(lock.pid))) {
+      throw new Error(`An earlier copy of Fishbowl Studio (process ${lock.pid}) is stuck and couldn't be stopped. Restart the computer, then run the command again.`);
+    }
+    fs.rmSync(lockFile, { force: true });
+    return 'stopped';
+  }
+  say('Cleared a leftover record from a studio that didn\'t shut down cleanly.');
+  fs.rmSync(lockFile, { force: true });
+  return 'cleared';
+}
+
+// --port is taken. Our own stuck studio (by its whole command line; see isStudio) is stopped and the
+// port reused; anything else keeps it, and the studio starts on a free port instead.
+export async function freePort(port, { say, holder = portHolder, isOurs = isStudio, isAnswering = answers, stop = stopProcess } = {}) {
+  const pid = holder(port);
+  if (pid && isOurs(pid) && !(await isAnswering(port))) {
+    say(`An earlier copy of Fishbowl Studio is stuck on port ${port} (process ${pid}). Restarting it.`);
+    if (await stop(pid)) return port;
+  }
+  say(`Port ${port} is in use by another program. Using a free port instead.`);
+  return 0;
+}
+
+function writePrivate(file, data) {
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.rmSync(tmp, { force: true });
+  fs.writeFileSync(tmp, data, { mode: 0o600, flag: 'wx' });
+  fs.renameSync(tmp, file);
+}
+
+// --link-file: the one-time link goes to a file only this user can read, not to the output, which
+// whoever started the command may be keeping in a log anyone on the computer can read.
+function writeLink(appDir, url) {
+  const file = path.join(appDir, LINK_FILE);
+  writePrivate(file, `${url}\n`);
+  return file;
+}
+
+// The old desktop app kept its run-on-its-own preference in its own folder; carry it over once.
+function carryOverPrefs(appDir, env = process.env) {
+  const target = path.join(appDir, 'prefs.json');
+  if (fs.existsSync(target)) return;
+  const base = process.platform === 'darwin' ? path.join(os.homedir(), 'Library', 'Application Support')
+    : process.platform === 'win32' ? env.APPDATA : (env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'));
+  if (!base) return;
+  try {
+    const old = JSON.parse(fs.readFileSync(path.join(base, 'Fishbowl Studio', 'prefs.json'), 'utf8'));
+    if (typeof old.autorun === 'boolean') writePrivate(target, JSON.stringify({ autorun: old.autorun, engine: 'auto' }, null, 2) + '\n');
+  } catch { /* nothing to carry over */ }
+}
+
+function engineLine(status) {
+  if (status.engine === 'claude') return 'Drafting with Claude Code, on your Claude plan.';
+  if (status.engine === 'api') return 'Drafting with your Anthropic API key.';
+  return 'Not connected to Claude yet: the studio will walk you through it.';
+}
+
+// Starts the studio. Returns { origin, launchUrl, close } (or { reused: url } when another copy
+// is running), for tests and for the signal handlers.
+export async function main(argv = process.argv.slice(2), { env = process.env, out = process.stdout, open = openBrowser, makeHostImpl = makeHost, signals = true } = {}) {
+  const say = (s) => out.write(`${s}\n`);
+  const o = parseArgs(argv);
+  if (o.help) { out.write(HELP); return null; }
+  if (o.version) {
+    const { readOwn } = await import('./lib/files.js');
+    say(JSON.parse(readOwn('package.json')).version);
+    return null;
+  }
+  if (globalThis.__FISHBOWL_FILES__) setExtractArgs(['--extract-child']);
+
+  const home = o.home || resolveHome(env);
+  const appDir = path.join(home, 'app');
+  try { fs.mkdirSync(appDir, { recursive: true }); fs.accessSync(appDir, fs.constants.W_OK); }
+  catch (e) {
+    const mac = process.platform === 'darwin' ? ' On a Mac, allow your terminal to use the Documents folder (System Settings, Privacy & Security, Files and Folders).' : '';
+    throw new Error(`Fishbowl Studio can't write to ${home} (${e.code || e.message}).${mac} Or choose another folder: fishbowl-studio --home <folder>`);
+  }
+  const lockFile = path.join(appDir, LOCK_FILE);
+
+  // A lock whose studio doesn't answer at first gets one more try before it is treated as stuck.
+  const running = await askRunning(lockFile) || (readLock(lockFile) && await askRunning(lockFile));
+  if (running) {
+    if (o.linkFile) say(`Fishbowl Studio is already running. Its new link is in: ${writeLink(appDir, running)}`);
+    else say(`Fishbowl Studio is already running. Opening it: ${running}`);
+    if (o.open) open(running);
+    return { reused: running };
+  }
+
+  await clearStale(lockFile, { say });
+
+  carryOverPrefs(appDir, env);
+  let srv = null;
+  const host = makeHostImpl({ home, appDir, emit: (ev) => srv && srv.emit(ev) });
+  const listen = async (port) => {
+    srv = makeServer({ host, port });
+    try { await srv.listen(); return null; }
+    catch (e) { return e; }
+  };
+  let err = await listen(o.port);
+  if (err?.code === 'EADDRINUSE' && o.port) err = await listen(await freePort(o.port, { say }));
+  if (err?.code === 'EADDRINUSE' && o.port) err = await listen(0);
+  if (err) throw new Error(`Fishbowl Studio couldn't open a port on this computer (${err.code || err.message}). Restart the computer, then run the command again.`);
+  writePrivate(lockFile, JSON.stringify({ pid: process.pid, started: startedAt(process.pid), port: Number(new URL(srv.origin).port), control: srv.control }) + '\n');
+
+  const { batches, drafts } = host.catchUp();
+  const url = srv.launchUrl();
+  say('Fishbowl Studio is running.');
+  say(`Studio folder: ${home}`);
+  say(engineLine(host.engine.status()));
+  const where = host.keys.where();
+  if (where) say(`Your API key is kept in: ${STORE_LABELS[where]}.`);
+  if (batches) {
+    const msg = `${drafts} draft${drafts === 1 ? '' : 's'} came due while the studio was closed (${batches} batch${batches === 1 ? '' : 'es'}); they're waiting for review now.`;
+    say(msg);
+    srv.emit({ kind: 'notice', state: 'notice', message: msg });
+  }
+  say('');
+  if (o.linkFile) say(`The link is in (it works once): ${writeLink(appDir, url)}`);
+  else say(`Open it here (the link works once): ${url}`);
+  say('Keep this window open while you use it. Press Ctrl+C to stop.');
+  if (o.open) open(url);
+
+  const tick = () => host.tick().catch(() => {});
+  const timer = setInterval(tick, TICK_MS);
+  tick();
+
+  let closed = false;
+  async function close() {
+    if (closed) return;
+    closed = true;
+    clearInterval(timer);
+    try { if (JSON.parse(fs.readFileSync(lockFile, 'utf8')).pid === process.pid) fs.rmSync(lockFile, { force: true }); } catch { /* already gone */ }
+    if (o.linkFile) fs.rmSync(path.join(appDir, LINK_FILE), { force: true });
+    await srv.close();
+  }
+  if (signals) {
+    const stop = () => { say('\nStopped. Run the command again to start it.'); close().finally(() => process.exit(0)); };
+    process.once('SIGINT', stop);
+    process.once('SIGTERM', stop);
+    if (process.platform !== 'win32') process.once('SIGHUP', stop);
+  }
+  return { origin: srv.origin, launchUrl: srv.launchUrl, close, host, home };
+}
