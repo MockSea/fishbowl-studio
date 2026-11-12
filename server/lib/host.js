@@ -81,9 +81,11 @@ export function makeHost({
   // What the Settings page shows about the engine and the key. Never the key.
   async function keyStatus() {
     const where = keys.where();
+    const missing = await keys.missing();
     return {
-      has: keys.has(), hint: keys.has() ? await keys.hint() : null,
+      has: keys.has() && !missing, hint: keys.has() && !missing ? await keys.hint() : null,
       where, where_label: where ? STORE_LABELS[where] : null,
+      missing, missing_label: missing ? STORE_LABELS[missing] : null,
       target: keys.target(), target_label: STORE_LABELS[keys.target()],
       engine: engine.status(),
       calls_today: daily.used(), calls_per_day: daily.cap,

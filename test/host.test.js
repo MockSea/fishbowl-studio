@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { tempHome, at } from '../core/test/helpers.js';
+import { tempHome, at, setSources } from '../core/test/helpers.js';
 import { writeKitFiles, png } from '../core/test/kit-files.js';
 import { KEY, NOW, fetchImpl, app, setUpBrand } from './host-helpers.js';
 import { makeHost } from '../server/lib/host.js';
@@ -140,6 +140,9 @@ test('setup drafts in the app suggest only sites and subreddits, never searches'
   assert.equal(r.kind, 'wizard', JSON.stringify(d));
   const out = await r.done;
   assert.equal(out.ok, true, out.message);
+  // The studio shows this message to the person (B3): plain counts, spoken to them.
+  assert.doesNotMatch(out.message, /\(s\)|for them|their board/, out.message);
+  assert.match(out.message, /^Claude drafted \d+ suggestions? and 2 sources\. Keep, edit or drop each one below\./, out.message);
   const task = api.requests[0].messages[0].content.at(-1).text;
   assert.match(task, /subreddits/);
   assert.doesNotMatch(task, /search/i);
@@ -165,4 +168,32 @@ test('a run turns patterns in their edits into playbook proposals, without a mod
   assert.equal(api.requests.length, 0);
   const p = host.ctx.tx((db) => db.proposals.find((x) => x.key === 'edits:cut_opening_question'));
   assert.equal(p?.status, 'open');
+});
+
+test('Run it now with no feeds ends its sentence once (W4)', async () => {
+  const { host } = await app();
+  await host.keySet(KEY);
+  await setUpBrand(host);
+  setSources(host.ctx, { feeds: [] });
+  const r = await host.ask('Run the Fishbowl Studio daily run now.').done;
+  assert.equal(r.ok, true, r.message);
+  assert.match(r.message, /^No feeds yet\. Add one under Sources\./, r.message);
+  assert.doesNotMatch(r.message, /\.\./, r.message);
+});
+
+test('a queued link at the day\'s limit says it waits for tomorrow, not that nothing was waiting (W3)', async () => {
+  const { host } = await app({ dailyCap: 1 });
+  await host.keySet(KEY);
+  await setUpBrand(host);
+  await host.ask('Run the Fishbowl Studio daily run now.').done;
+  assert.equal(host.daily.left(), 0);
+  const items = host.ctx.store.read('items', []);
+  host.ctx.tx((db) => { db.jobs.push({ id: host.ctx.id('job'), kind: 'draft_item', item_id: items[0].id, status: 'queued', created_at: host.ctx.iso() }); });
+  const r = await host.ask('Draft the link I just sent to Fishbowl Studio.').done;
+  assert.equal(r.ok, true, r.message);
+  assert.equal(r.message, "Queued. Today's limit of 1 model calls is used up, so it is drafted tomorrow.");
+  const empty = await app();
+  await empty.host.keySet(KEY);
+  await setUpBrand(empty.host);
+  assert.equal((await empty.host.ask('Draft the link I just sent to Fishbowl Studio.').done).message, 'Nothing was waiting.');
 });

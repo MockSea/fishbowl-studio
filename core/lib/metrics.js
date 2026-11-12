@@ -84,7 +84,7 @@ export function metricsTool(ctx, args) {
     if (args.action === 'add') {
       const d = db.drafts.find((x) => x.id === Number(args.draft_id));
       if (!d) throw new Error(`No draft ${args.draft_id}.`);
-      if (d.status !== 'posted') throw new Error('Mark the draft as posted first (it needs to be on the Passed tab, marked posted).');
+      if (d.status !== 'posted') throw new Error('Mark the draft as posted first (it needs to be on the Approved tab, marked posted).');
       const snap = addSnapshot(d, args, iso);
       return { ok: true, text: `Saved numbers for draft ${d.id}: ${FIELDS.map((f) => `${f} ${snap[f]}`).join(', ')}.` };
     }

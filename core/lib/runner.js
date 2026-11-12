@@ -176,7 +176,8 @@ export function makeRunner({ ctx, model, kit, progress = () => {}, daily = null 
       const triaged = await triage(c, k, bud);
       const d = await draft(c, k, bud);
       releaseTool(c);
-      const read = f.note ? f.note : `Read ${f.added} new ${f.added === 1 ? 'story' : 'stories'}`;
+      // The note is a sentence of its own; the message adds the full stop.
+      const read = f.note ? f.note.replace(/\.$/, '') : `Read ${f.added} new ${f.added === 1 ? 'story' : 'stories'}`;
       const capped = bud.can(CALLS_PER_BRIEF) ? ''
         : daily && daily.left() < CALLS_PER_BRIEF ? ` It stopped at today's limit of ${daily.cap} model calls; the rest waits for tomorrow.`
           : ' It stopped at its limit of model calls; the rest waits for the next run.';
@@ -186,7 +187,13 @@ export function makeRunner({ ctx, model, kit, progress = () => {}, daily = null 
     jobs: (slug) => once(slug, 'jobs', async (c, k, bud) => {
       const d = await draft(c, k, bud, { jobs_only: true });
       releaseTool(c);
-      return { message: d.briefs ? `Wrote ${plural(d.drafts, 'draft')} from the queue.` : 'Nothing was waiting.', drafts: d.drafts };
+      if (d.briefs) return { message: `Wrote ${plural(d.drafts, 'draft')} from the queue.`, drafts: d.drafts };
+      // Nothing was written: either the queue is empty, or a cap stopped it before the first brief.
+      const waiting = c.tx((db) => db.jobs.some((j) => j.status === 'queued'));
+      if (waiting && !bud.can(CALLS_PER_BRIEF)) {
+        return { message: daily && daily.left() < CALLS_PER_BRIEF ? `Queued. Today's limit of ${daily.cap} model calls is used up, so it is drafted tomorrow.` : 'Queued. This run had no model calls left, so it is drafted with the next run.', drafts: 0 };
+      }
+      return { message: 'Nothing was waiting.', drafts: 0 };
     }),
 
     wizard: (slug) => once(slug, 'wizard', async (c, k, bud) => {
@@ -199,7 +206,9 @@ export function makeRunner({ ctx, model, kit, progress = () => {}, daily = null 
       }));
       const r = wizardSave(c, { brief_id: b.brief_id, voice: out.voice, playbook: out.playbook, topics: out.topics, off_limits: out.off_limits, audience: out.audience, sources });
       if (!r.ok) throw new Error(r.message);
-      return { message: r.message };
+      // wizardSave's message is written for a model reading a tool result; the app shows this one.
+      const left = r.rejected && r.rejected.length ? ` ${plural(r.rejected.length, 'suggestion')} didn't fit and ${r.rejected.length === 1 ? 'was' : 'were'} left out.` : '';
+      return { message: `Claude drafted ${plural(r.added, 'suggestion')}${r.sources ? ` and ${plural(r.sources, 'source')}` : ''}. Keep, edit or drop each one below.${left}` };
     }),
 
     // The weekly coach. Part 1 sees only the numbers and proposes playbook changes; part 2 adds

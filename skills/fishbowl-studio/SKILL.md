@@ -62,7 +62,7 @@ Pass on the studio's own message; it is written for the person. In particular:
 
 - **Node.js too old or missing**: it prints one sentence with the fix. Pass it on, or use the standalone build (step 1).
 - **Can't write to the studio folder**: pass the message on as written, and offer to use another folder with `--home`.
-- **Missing some of its files**: the message names a folder to delete, npm's downloaded copy of the app (its path has `_npx` in it). Delete exactly that folder, nothing else, and run the command again; it downloads a fresh copy of the same release. If the message names no such folder, pass it on as written.
+- **Missing some of its files**: the message names a folder to delete, npm's downloaded copy of the app (its path has `_npx` in it). If its path ends in `/_npx/` and then a single name of letters and digits, delete exactly that folder with `rm -rf -- "<that path>"`, nothing else, and run the command again; it downloads a fresh copy of the same release. If the message names no such folder, pass it on as written.
 - **An earlier copy is stuck and couldn't be stopped**: the message says to restart the computer. Pass it on, then run the command again once they have.
 - **Anything else**: run the command once more. If the same message comes back, pass it on as written.
 - **The link doesn't open in their browser** (the page can't be reached): the studio may be running somewhere their browser can't reach, such as a sandbox. Tell them so plainly, and give them the command to run in their own terminal instead: `npx github:MockSea/fishbowl-studio#v0.2.0`. That starts it and opens the browser by itself.

@@ -4,7 +4,7 @@
 // image blocks. Every drafting call includes the kit (see kitContent).
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { spawn, execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -150,6 +150,9 @@ export function openKit(dir) {
     fs.renameSync(tmp, manifestPath);
   };
   const textOf = (f) => (f.text_file ? fs.readFileSync(path.join(dir, f.text_file), 'utf8') : '');
+  const sha = (buf) => createHash('sha256').update(buf).digest('hex');
+  // Entries saved before the manifest kept a hash: hash the stored copy.
+  const storedSha = (f) => { try { return sha(fs.readFileSync(path.join(dir, path.basename(f.file)))); } catch { return null; } };
 
   // What the Brand kit page shows. No file contents, only what was ingested.
   function list() {
@@ -175,10 +178,14 @@ export function openKit(dir) {
     if (st.size > cap) return { ok: false, name, reason: `Too big: ${KINDS[kind].image ? 'images' : 'files'} can be up to ${Math.round(cap / 1048576)} MB.` };
     if (st.size === 0) return { ok: false, name, reason: 'The file is empty.' };
     const files = read();
+    if (files.some((f) => f.name.toLowerCase() === name.toLowerCase())) return { ok: false, name, reason: `${name} is already in the kit. Remove it first to add a newer version.` };
     if (files.length >= LIMITS.files) return { ok: false, name, reason: `A brand kit holds up to ${LIMITS.files} files. Remove one first.` };
     if (files.reduce((n, f) => n + f.bytes, 0) + st.size > LIMITS.total_bytes) return { ok: false, name, reason: `The brand kit is full (${Math.round(LIMITS.total_bytes / 1048576)} MB in all).` };
     const buf = fs.readFileSync(src);
     if (!sniff(buf, kind)) return { ok: false, name, reason: `It doesn't look like a real ${KINDS[kind].label} file.` };
+    const sha256 = sha(buf);
+    const same = files.find((f) => (f.sha256 || storedSha(f)) === sha256);
+    if (same) return { ok: false, name, reason: `That file is already in the kit as ${same.name}.` };
     if (kind === 'docx') { const why = zipTooBig(buf); if (why) return { ok: false, name, reason: why }; }
     let text = null;
     if (!KINDS[kind].image) {
@@ -189,7 +196,7 @@ export function openKit(dir) {
     const ext = KINDS[kind].exts[0];
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, `${id}${ext}`), buf);
-    const f = { id, name, kind, media_type: KINDS[kind].media, file: `${id}${ext}`, bytes: st.size, added_at: new Date(now()).toISOString() };
+    const f = { id, name, kind, media_type: KINDS[kind].media, file: `${id}${ext}`, bytes: st.size, sha256, added_at: new Date(now()).toISOString() };
     if (text != null) {
       f.chars = text.length;
       f.truncated = text.length > LIMITS.text_chars;

@@ -14,6 +14,8 @@ import path from 'node:path';
 import { ModelError, makeClient, makeModel } from './api.js';
 
 export const ENGINES = ['auto', 'claude', 'api'];
+// A key was saved but its store no longer has it (deleted in Keychain Access, say).
+export const MISSING_KEY = 'Your saved Anthropic API key can\'t be found any more. Add it again in Settings, on the Claude page.';
 
 // The full path of a command on PATH, or null. On Windows only .exe counts: a .cmd shim would
 // have to go through cmd.exe, which re-parses the arguments.
@@ -79,7 +81,11 @@ export function makeEngine({
           ? 'Claude Code isn\'t installed on this computer. Install it, or switch the engine to your API key in Settings.'
           : 'Add your Anthropic API key in Settings, or install Claude Code, first.', 'auth');
       }
-      if (which === 'api') return (await apiModel()).ask(opts);
+      if (which === 'api') {
+        const m = await apiModel();
+        if (!m) throw new ModelError(MISSING_KEY, 'auth');
+        return m.ask(opts);
+      }
       try { return await cliModel().ask(opts); }
       catch (e) {
         if (!(e instanceof ModelError) || e.kind !== 'cli' || mode() === 'claude') throw e;

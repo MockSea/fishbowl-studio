@@ -11,8 +11,13 @@
 // ANTHROPIC_API_KEY in the environment is used when nothing is stored, read-only.
 //
 // key.json in the app folder records which store holds the key and its last four characters.
+//
+// Each studio folder has its own entry in the Keychain and the Secret Service: the account name
+// ends in a short hash of the app folder's real path (keyAccount), so two studios started with
+// different --home folders never read, replace or delete each other's key.
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 
 export const KEY_FILE = 'anthropic-key';
@@ -20,6 +25,14 @@ export const DPAPI_FILE = 'anthropic-key.dpapi';
 export const MARK_FILE = 'key.json';
 const SERVICE = 'Fishbowl Studio';
 const ACCOUNT = 'anthropic-api-key';
+
+// The account name this app folder's key is stored under.
+export function keyAccount(dir) {
+  if (!dir) throw new Error('The key store needs the app folder.');
+  let real;
+  try { real = fs.realpathSync(dir); } catch { real = path.resolve(dir); }
+  return `${ACCOUNT}-${createHash('sha256').update(real).digest('hex').slice(0, 16)}`;
+}
 
 export const STORE_LABELS = {
   keychain: 'the macOS Keychain',
@@ -56,23 +69,24 @@ const onPath = (name, env = process.env) => (env.PATH || '').split(path.delimite
 export function osStore({ platform = process.platform, run = runTool, dir, env = process.env } = {}) {
   if (platform === 'darwin') {
     const sec = '/usr/bin/security';
+    const account = keyAccount(dir);
     return {
       name: 'keychain',
       // `security -i` reads its command from stdin, so the key is not in any process's argv.
       async set(key) {
-        const r = await run(sec, ['-i'], `add-generic-password -U -s "${SERVICE}" -a ${ACCOUNT} -w ${key}\n`);
+        const r = await run(sec, ['-i'], `add-generic-password -U -s "${SERVICE}" -a ${account} -w ${key}\n`);
         return r.code === 0 && (await this.get()) === key;
       },
       async get() {
-        const r = await run(sec, ['find-generic-password', '-s', SERVICE, '-a', ACCOUNT, '-w']);
+        const r = await run(sec, ['find-generic-password', '-s', SERVICE, '-a', account, '-w']);
         return r.code === 0 ? r.stdout.trim() || null : null;
       },
-      async clear() { await run(sec, ['delete-generic-password', '-s', SERVICE, '-a', ACCOUNT]); },
+      async clear() { await run(sec, ['delete-generic-password', '-s', SERVICE, '-a', account]); },
     };
   }
   if (platform === 'linux') {
     if (!onPath('secret-tool', env)) return null;
-    const attrs = ['service', 'fishbowl-studio', 'account', ACCOUNT];
+    const attrs = ['service', 'fishbowl-studio', 'account', keyAccount(dir)];
     return {
       name: 'secret-service',
       // secret-tool store reads the secret from stdin.
@@ -153,6 +167,15 @@ export function makeKeystore({ dir, os = osStore({ dir }), env = process.env }) 
       const m = mark();
       if (m) return stores[m.store].get();
       return envKey();
+    },
+    // The store a saved key was recorded in but can't be read from now (deleted in Keychain
+    // Access, or the keyring is locked), or null. The record is kept: saving a key again replaces it.
+    async missing() {
+      const m = mark();
+      if (!m) return null;
+      let k = null;
+      try { k = await stores[m.store].get(); } catch { /* unreadable */ }
+      return k ? null : m.store;
     },
     async set(raw) {
       const c = checkKey(raw);
