@@ -1,0 +1,839 @@
+{
+  "mode": "source",
+  "at": "2026-11-12T15:16:48.120Z",
+  "results": [
+    {
+      "area": "Start",
+      "name": "prints the folder, the engine and a one-time link",
+      "ok": true,
+      "detail": "Fishbowl Studio is running. | Studio folder: /private/var/folders/vz/2jd6t7d12952xkd0d0vfz1440000gn/T/studio-web-e2e-source-SLDU1n/home | Not connected to Claude yet: the studio will walk you through it. | ",
+      "shot": null
+    },
+    {
+      "area": "Start",
+      "name": "the link opens the studio and drops the token from the address bar",
+      "ok": true,
+      "detail": "http://127.0.0.1:PORT/",
+      "shot": null
+    },
+    {
+      "area": "First run",
+      "name": "opens on the Claude page when nothing can draft yet",
+      "ok": true,
+      "detail": "",
+      "shot": "source-01-first-run.png"
+    },
+    {
+      "area": "First run",
+      "name": "the sidebar shows which page is open (WS-102 B7)",
+      "ok": true,
+      "detail": "highlighted nav: [\"apikey\"]",
+      "shot": "source-01-first-run.png"
+    },
+    {
+      "area": "First run",
+      "name": "a default brand exists",
+      "ok": true,
+      "detail": "",
+      "shot": null
+    },
+    {
+      "area": "First run",
+      "name": "the Claude page says Claude Code is not installed when it is not on PATH",
+      "ok": true,
+      "detail": "",
+      "shot": "source-01-first-run.png"
+    },
+    {
+      "area": "Screens",
+      "name": "drafts opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "source-02-screen-drafts.png"
+    },
+    {
+      "area": "Screens",
+      "name": "sources opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "source-02-screen-sources.png"
+    },
+    {
+      "area": "Screens",
+      "name": "topics opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "source-02-screen-topics.png"
+    },
+    {
+      "area": "Screens",
+      "name": "brandkit opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "source-02-screen-brandkit.png"
+    },
+    {
+      "area": "Screens",
+      "name": "schedule opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "source-02-screen-schedule.png"
+    },
+    {
+      "area": "Screens",
+      "name": "settings opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "source-02-screen-settings.png"
+    },
+    {
+      "area": "Screens",
+      "name": "reads opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "source-02-screen-reads.png"
+    },
+    {
+      "area": "Screens",
+      "name": "coach opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "source-02-screen-coach.png"
+    },
+    {
+      "area": "Screens",
+      "name": "playbook opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "source-02-screen-playbook.png"
+    },
+    {
+      "area": "Screens",
+      "name": "the Coach page is in the studio",
+      "ok": true,
+      "detail": "",
+      "shot": null
+    },
+    {
+      "area": "Screens",
+      "name": "no script errors in the page so far",
+      "ok": true,
+      "detail": "",
+      "shot": null
+    },
+    {
+      "area": "Copy",
+      "name": "Drafts \"how this works\" does not mention a scheduled task (WS-102 B5)",
+      "ok": true,
+      "detail": "",
+      "shot": "source-02-screen-drafts.png"
+    },
+    {
+      "area": "Copy",
+      "name": "Drafts setup step counts the steps the wizard shows (WS-102 B5)",
+      "ok": true,
+      "detail": "",
+      "shot": "source-02-screen-drafts.png"
+    },
+    {
+      "area": "Copy",
+      "name": "Topics page points to the Coach page only while there is one (WS-102 B6)",
+      "ok": true,
+      "detail": "Changes to the voice and playbook always wait for your yes on the Coach page. (links to it)",
+      "shot": "source-02-screen-topics.png"
+    },
+    {
+      "area": "Nothing connected",
+      "name": "Draft from a link, Ask Claude now, says to add a key or install Claude Code",
+      "ok": true,
+      "detail": "Queued \"Example Domain\". It is drafted with the next run, or click Run it now on Schedule. / Add your Anthropic API key in Settings, or install Claude Code, first.",
+      "shot": "source-03-nothing-draft-link.png"
+    },
+    {
+      "area": "Nothing connected",
+      "name": "the link is still queued for later",
+      "ok": true,
+      "detail": "",
+      "shot": "source-03-nothing-draft-link.png"
+    },
+    {
+      "area": "Nothing connected",
+      "name": "Schedule, Run it now, says to add a key",
+      "ok": true,
+      "detail": "Add your Anthropic API key in Settings, or install Claude Code, first.",
+      "shot": "source-03-nothing-run-now.png"
+    },
+    {
+      "area": "API key",
+      "name": "refuses a key that is empty",
+      "ok": true,
+      "detail": "Paste your Anthropic API key.",
+      "shot": "source-04-key-empty.png"
+    },
+    {
+      "area": "API key",
+      "name": "refuses a key that is too short",
+      "ok": true,
+      "detail": "That does not look like an API key.",
+      "shot": null
+    },
+    {
+      "area": "API key",
+      "name": "refuses a key that is with a space",
+      "ok": true,
+      "detail": "That does not look like an API key.",
+      "shot": null
+    },
+    {
+      "area": "API key",
+      "name": "refuses a key that is bad characters",
+      "ok": true,
+      "detail": "That does not look like an API key.",
+      "shot": null
+    },
+    {
+      "area": "API key",
+      "name": "saves a well-formed key, says so and moves on to Drafts",
+      "ok": true,
+      "detail": "Saved. Pick a brand and add a source to get drafts.",
+      "shot": "source-04-key-saved.png"
+    },
+    {
+      "area": "API key",
+      "name": "records the key as kept in the keychain, with only a hint",
+      "ok": true,
+      "detail": "{\"store\":\"keychain\",\"hint\":\"…0000\"}",
+      "shot": null
+    },
+    {
+      "area": "API key",
+      "name": "the Keychain has the studio's entry",
+      "ok": true,
+      "detail": "",
+      "shot": null
+    },
+    {
+      "area": "API key",
+      "name": "the plain key is in no file in the studio folder",
+      "ok": true,
+      "detail": "",
+      "shot": null
+    },
+    {
+      "area": "API key",
+      "name": "the key is not in the command's output",
+      "ok": true,
+      "detail": "",
+      "shot": null
+    },
+    {
+      "area": "API key",
+      "name": "shows only a masked hint of the saved key",
+      "ok": true,
+      "detail": "A key ending …0000 is saved.",
+      "shot": "source-04-key-page-with-key.png"
+    },
+    {
+      "area": "API key",
+      "name": "says where the key is kept",
+      "ok": true,
+      "detail": "Kept in the macOS Keychain. Drafts use claude-opus-5-5.",
+      "shot": "source-04-key-page-with-key.png"
+    },
+    {
+      "area": "API key",
+      "name": "the page never receives the key itself",
+      "ok": true,
+      "detail": "{\"has\":true,\"hint\":\"…0000\",\"where\":\"keychain\",\"where_label\":\"the macOS Keychain\",\"missing\":null,\"missing_label\":null,\"target\":\"keychain\",\"target_label\":\"the macOS Keychain\",\"engine\":{\"mode\":\"auto\",\"en",
+      "shot": null
+    },
+    {
+      "area": "API key",
+      "name": "Remove key deletes the stored key",
+      "ok": true,
+      "detail": "Removed the key.; keychain entry: false",
+      "shot": "source-04-key-removed.png"
+    },
+    {
+      "area": "API key",
+      "name": "a key can be saved again after removing",
+      "ok": true,
+      "detail": "Saved. Pick a brand and add a source to get drafts.",
+      "shot": null
+    },
+    {
+      "area": "Engine",
+      "name": "choosing API key saves the preference and says it drafts with the key",
+      "ok": true,
+      "detail": "{\"autorun\":false,\"engine\":\"api\"}",
+      "shot": "source-04-engine-api.png"
+    },
+    {
+      "area": "Setup",
+      "name": "Draft it for me returns setup drafts (API key engine, mock API)",
+      "ok": true,
+      "detail": "Working on the setup drafts… / Claude drafted 6 suggestions and 1 source. Keep, edit or drop each one below.",
+      "shot": "source-05-setup-drafts.png"
+    },
+    {
+      "area": "Copy",
+      "name": "setup drafts message is written for the person (WS-102 B3)",
+      "ok": true,
+      "detail": "Working on the setup drafts… / Claude drafted 6 suggestions and 1 source. Keep, edit or drop each one below.",
+      "shot": "source-05-setup-drafts.png"
+    },
+    {
+      "area": "Setup",
+      "name": "the brand name from step 1 is used",
+      "ok": true,
+      "detail": "",
+      "shot": "source-05-setup-drafts.png"
+    },
+    {
+      "area": "Setup",
+      "name": "the last step offers Run on its own, not posting",
+      "ok": true,
+      "detail": "",
+      "shot": "source-05-setup-finish.png"
+    },
+    {
+      "area": "Setup",
+      "name": "Finish setup leaves the wizard",
+      "ok": true,
+      "detail": "",
+      "shot": "source-05-setup-done.png"
+    },
+    {
+      "area": "Personas",
+      "name": "renaming the first brand in setup renames its handle too (WS-102 B10)",
+      "ok": true,
+      "detail": "SA Spoke and Chain @spoke-and-chain",
+      "shot": "source-05-setup-done.png"
+    },
+    {
+      "area": "Draft from a link",
+      "name": "the link is fetched and drafted",
+      "ok": true,
+      "detail": "Kept them. Change any of it later in Settings, Topics and Playbook. / Spoke and Chain is set up. Drafts arrive after the first run. / That link is already queued. / Working on your queued drafts… / Wrote 3 drafts from the queue.",
+      "shot": "source-06-link-sources.png"
+    },
+    {
+      "area": "Draft from a link",
+      "name": "drafts show on the Drafts page",
+      "ok": true,
+      "detail": "",
+      "shot": "source-06-link-drafts.png"
+    },
+    {
+      "area": "Drafts",
+      "name": "\"Use this one\" keeps that take and sets the others aside",
+      "ok": true,
+      "detail": "To review1\nApproved0\nSkipped2",
+      "shot": "source-06-take-picked.png"
+    },
+    {
+      "area": "Drafts",
+      "name": "Approve moves a draft to Approved",
+      "ok": true,
+      "detail": "To review0\nApproved1",
+      "shot": "source-06-draft-approved.png"
+    },
+    {
+      "area": "Copy",
+      "name": "pick and approve messages use the studio's own words (WS-102 B4)",
+      "ok": true,
+      "detail": "Picked take 1. Approve, edit or skip it. / Approved. Copy it from the Approved tab (linkedin, 62 characters).",
+      "shot": "source-06-draft-approved.png"
+    },
+    {
+      "area": "Layout",
+      "name": "the background fills the window when a page is short (WS-102 B8)",
+      "ok": true,
+      "detail": "window 800px, body 889px, html bg rgba(0, 0, 0, 0), body bg rgb(245, 247, 247)",
+      "shot": "source-06-short-page.png"
+    },
+    {
+      "area": "Daily run",
+      "name": "Run it now reads the brand's feed and reports what it did (mock API)",
+      "ok": true,
+      "detail": "Working on the daily run… / Started. New drafts show up here when it finishes. / No feeds yet. Add one under Sources. Triaged 0, wrote 2 drafts.",
+      "shot": "source-06-run-now.png"
+    },
+    {
+      "area": "Copy",
+      "name": "the Run it now message has no doubled full stop (WS-107 W4)",
+      "ok": true,
+      "detail": "Working on the daily run… / Started. New drafts show up here when it finishes. / No feeds yet. Add one under Sources. Triaged 0, wrote 2 drafts.",
+      "shot": "source-06-run-now.png"
+    },
+    {
+      "area": "Draft from a link",
+      "name": "the mock received setup, triage and drafting calls",
+      "ok": true,
+      "detail": "2026-11-12T15:14:35.676Z claude-opus-5-5 voice,playbook,topics,off_limits,audience,sources kit: 0 docs, 0 images; first block: \"Setup drafts for Spoke and Chain. Write a first version of the brand's voice, pl\" / 2026-11-12T15:14:42.289Z claude-opus-5-5 takes kit: 0 docs, 0 images; first block: \"brief_id: 1 · draft_item · LinkedIn\\n\\n# They asked for this story to be drafted (\" / 2026-11-12T15:14:49.251Z claude-opus-5-5 takes kit: 0 docs, 0 images; first block: \"brief_id: 2 · evergreen · X\\n\\n# 2 evergreen posts\\n\\nEverything inside <data-9c068c\" / 2026-11-12T15:14:49.270Z claude-opus-5-5 takes",
+      "shot": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop PDF: added",
+      "ok": true,
+      "detail": "Adding 1 file… / Added 1 file (brand-guidelines.pdf).; files 0 -> 1",
+      "shot": "source-07-kit-01-pdf.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop DOCX: added",
+      "ok": true,
+      "detail": "Adding 1 file… / Added 1 file (tone-of-voice.docx).; files 1 -> 2",
+      "shot": "source-07-kit-02-docx.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop Markdown: added",
+      "ok": true,
+      "detail": "Adding 1 file… / Added 1 file (words-we-use.md).; files 2 -> 3",
+      "shot": "source-07-kit-03-markdown.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop PNG image: added",
+      "ok": true,
+      "detail": "Adding 1 file… / Added 1 file (logo.png).; files 3 -> 4",
+      "shot": "source-07-kit-04-png-image.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop JPEG image: added",
+      "ok": true,
+      "detail": "Adding 1 file… / Added 1 file (shopfront.jpg).; files 4 -> 5",
+      "shot": "source-07-kit-05-jpeg-image.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop too-big PDF (11 MB): refused with a reason",
+      "ok": true,
+      "detail": "Adding 1 file… / huge-guidelines.pdf: Too big: files can be up to 10 MB.; files 5 -> 5",
+      "shot": "source-07-kit-06-too-big-pdf-11-mb.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop too-big image (6 MB PNG): refused with a reason",
+      "ok": true,
+      "detail": "Adding 1 file… / huge-photo.png: Too big: images can be up to 5 MB.; files 5 -> 5",
+      "shot": "source-07-kit-07-too-big-image-6-mb-png.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop text file named .pdf: refused with a reason",
+      "ok": true,
+      "detail": "Adding 1 file… / not-really.pdf: It doesn't look like a real PDF file.; files 5 -> 5",
+      "shot": "source-07-kit-08-text-file-named-pdf.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop text file named .png: refused with a reason",
+      "ok": true,
+      "detail": "Adding 1 file… / not-really.png: It doesn't look like a real Image file.; files 5 -> 5",
+      "shot": "source-07-kit-09-text-file-named-png.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop corrupt DOCX: refused with a reason",
+      "ok": true,
+      "detail": "Adding 1 file… / broken.docx: It doesn't look like a real Word file.; files 5 -> 5",
+      "shot": "source-07-kit-10-corrupt-docx.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop DOCX that unpacks to 70 MB: refused with a reason",
+      "ok": true,
+      "detail": "Adding 1 file… / zip-bomb.docx: This Word file unpacks to more than 64 MB.; files 5 -> 5",
+      "shot": "source-07-kit-11-docx-that-unpacks-to-70-mb.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop scanned PDF with no text: refused with a reason",
+      "ok": true,
+      "detail": "Adding 1 file… / scanned.pdf: There is no text in it to read (a scanned PDF needs to be added as images).; files 5 -> 5",
+      "shot": "source-07-kit-12-scanned-pdf-with-no-text.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop empty file: refused with a reason",
+      "ok": true,
+      "detail": "Adding 1 file… / empty.txt: The file is empty.; files 5 -> 5",
+      "shot": "source-07-kit-13-empty-file.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop GIF (unsupported type): refused with a reason",
+      "ok": true,
+      "detail": "Adding 1 file… / animation.gif: Only .pdf, .docx, .md, .markdown, .txt, .png, .jpg, .jpeg files.; files 5 -> 5",
+      "shot": "source-07-kit-14-gif-unsupported-type.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop .exe (unsupported type): refused with a reason",
+      "ok": true,
+      "detail": "Adding 1 file… / installer.exe: Only .pdf, .docx, .md, .markdown, .txt, .png, .jpg, .jpeg files.; files 5 -> 5",
+      "shot": "source-07-kit-15--exe-unsupported-type.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "the PDF row shows the text it read",
+      "ok": true,
+      "detail": "brand-guidelines.pdf PDF 1 KB · added just now · 89 characters read Spoke and Chain is a neighbourhood bike repair shop. Voice: warm, practical, a little dry Remove brand-guidelines.pdf",
+      "shot": "source-07-kit-full-list.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "the DOCX row shows the text it read",
+      "ok": true,
+      "detail": "tone-of-voice.docx Word 4 KB · added just now · 193 characters read Tone of voice Spoke and Chain is a neighbourhood bike repair shop. Voice: warm, practical, a little dry. We say \"ride\" not \"cycle\". ",
+      "shot": "source-07-kit-full-list.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "a mixed drop (one good, one bad) reports both (WS-102 B2)",
+      "ok": true,
+      "detail": "Adding 2 files… / brand-guidelines.pdf: brand-guidelines.pdf is already in the kit. Remove it first to add a newer version. animation.gif: Only .pdf, .docx, .md, .markdown, .txt, .png, .jpg, .jpeg files.; files now: brand-guidelines.pdf, tone-of-voice.docx, words-we-use.md, logo.png, shopfront.jpg",
+      "shot": "source-07-kit-mixed-drop.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "adding a file already in the kit does not add a second copy (WS-102 B1)",
+      "ok": true,
+      "detail": "brand-guidelines.pdf appears 1 times",
+      "shot": "source-07-kit-mixed-drop.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "Choose files opens the browser's file picker and adds the picked files",
+      "ok": true,
+      "detail": "Adding 2 files… / Added 2 files (posting-checklist.md, shop-hours.txt).; files 5 -> 7",
+      "shot": "source-07-kit-choose-files.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "Remove asks once more, then removes the file",
+      "ok": true,
+      "detail": "Removed shop-hours.txt.",
+      "shot": "source-07-kit-remove-confirm.png"
+    },
+    {
+      "area": "Brand kit",
+      "name": "the next drafting call carries the kit (docs and images)",
+      "ok": true,
+      "detail": "claude-opus-5-5 takes kit: 4 docs, 2 images; first block: \"The brand kit: the brand's own guideline files. Use them for how the brand sound\"",
+      "shot": null
+    },
+    {
+      "area": "Copy",
+      "name": "the redo message says when the new takes come, in the studio's words (WS-107 W5)",
+      "ok": true,
+      "detail": "Redo queued. New takes come with the next run, or click Run it now on Schedule.",
+      "shot": "source-06-redo-queued.png"
+    },
+    {
+      "area": "Caps",
+      "name": "model calls are counted for today in the app folder",
+      "ok": true,
+      "detail": "{\"day\":\"2026-11-12\",\"calls\":6}",
+      "shot": null
+    },
+    {
+      "area": "Caps",
+      "name": "the Claude page shows today's count against 150",
+      "ok": true,
+      "detail": "Today: 6 of 150 model calls. Each run is capped too, whichever engine answers.",
+      "shot": null
+    },
+    {
+      "area": "Caps",
+      "name": "with 150 calls used the Claude page says so",
+      "ok": true,
+      "detail": "",
+      "shot": "source-08-cap-used-up.png"
+    },
+    {
+      "area": "Caps",
+      "name": "at the daily cap a link draft makes no model call and says why",
+      "ok": true,
+      "detail": "Queued \"Example Domain\". It is drafted with the next run, or click Run it now on Schedule. / Working on your queued drafts… / Queued. Today's limit of 150 model calls is used up, so it is drafted tomorrow.; mock calls during: 0",
+      "shot": "source-08-cap-link.png"
+    },
+    {
+      "area": "Copy",
+      "name": "the link draft messages use the studio's own words (WS-107 W3, W5)",
+      "ok": true,
+      "detail": "Queued \"Example Domain\". It is drafted with the next run, or click Run it now on Schedule. / Working on your queued drafts… / Queued. Today's limit of 150 model calls is used up, so it is drafted tomorrow.",
+      "shot": "source-08-cap-link.png"
+    },
+    {
+      "area": "Caps",
+      "name": "at the daily cap Run it now makes no model call and says why",
+      "ok": true,
+      "detail": "Started. New drafts show up here when it finishes. / Working on the daily run… / No feeds yet. Add one under Sources. Triaged 0, wrote 0 drafts. It stopped at today's limit of 150 model calls; the rest waits for tomorrow.; mock calls during: 0",
+      "shot": "source-08-cap-run-now.png"
+    },
+    {
+      "area": "Caps",
+      "name": "a count from an earlier day does not carry over",
+      "ok": true,
+      "detail": "Today: 0 of 150 model calls. Each run is capped too, whichever engine answers.",
+      "shot": null
+    },
+    {
+      "area": "Personas",
+      "name": "Add persona creates and switches to the new brand",
+      "ok": true,
+      "detail": "NM Night Market Bakery @night-market-bakery",
+      "shot": "source-09-persona-second-setup.png"
+    },
+    {
+      "area": "Personas",
+      "name": "the second brand has its own, empty brand kit",
+      "ok": true,
+      "detail": "",
+      "shot": null
+    },
+    {
+      "area": "Personas",
+      "name": "the engine and key are shared across brands",
+      "ok": true,
+      "detail": "",
+      "shot": "source-09-settings.png"
+    },
+    {
+      "area": "Personas",
+      "name": "brand names are not cut off in the brand menu (WS-102 B9)",
+      "ok": true,
+      "detail": "[{\"t\":\"SA Spoke and Chain All clear\",\"clipped\":false},{\"t\":\"NM Night Market Bakery\",\"clipped\":false},{\"t\":\"Add persona\",\"clipped\":false}]",
+      "shot": "source-09-persona-menu-two.png"
+    },
+    {
+      "area": "Personas",
+      "name": "switching back shows the first brand's kit",
+      "ok": true,
+      "detail": "6 files, expected 6",
+      "shot": "source-09-persona-switched-back.png"
+    },
+    {
+      "area": "Personas",
+      "name": "brand names are not cut off in Your brands (WS-102 B9)",
+      "ok": true,
+      "detail": "",
+      "shot": "source-09-your-brands.png"
+    },
+    {
+      "area": "Schedule",
+      "name": "Run on its own saves to the app preferences",
+      "ok": true,
+      "detail": "{\"autorun\":true,\"engine\":\"api\"}; Now working on Spoke and Chain. / It will run on its own while the studio is open.",
+      "shot": "source-10-schedule-autorun-on.png"
+    },
+    {
+      "area": "Topics",
+      "name": "a topic can be added",
+      "ok": true,
+      "detail": "",
+      "shot": "source-10-topics-added.png"
+    },
+    {
+      "area": "Layout",
+      "name": "no sideways scroll at 900x600",
+      "ok": true,
+      "detail": "",
+      "shot": "source-10-narrow-brandkit.png"
+    },
+    {
+      "area": "Layout",
+      "name": "no sideways scroll at 390x844",
+      "ok": true,
+      "detail": "",
+      "shot": "source-10-phone-brandkit.png"
+    },
+    {
+      "area": "Screens",
+      "name": "reloading the page keeps the session (cookie)",
+      "ok": true,
+      "detail": "",
+      "shot": null
+    },
+    {
+      "area": "Second launch",
+      "name": "a second start while it runs hands out a new link to the running studio and exits",
+      "ok": true,
+      "detail": "Fishbowl Studio is already running. Opening it: http://127.0.0.1:52943/?t=…",
+      "shot": null
+    },
+    {
+      "area": "Second launch",
+      "name": "that link opens the same studio, still on the saved brand",
+      "ok": true,
+      "detail": "",
+      "shot": "source-11-second-launch.png"
+    },
+    {
+      "area": "Second launch",
+      "name": "the new link works only once",
+      "ok": true,
+      "detail": "second use: 403",
+      "shot": null
+    },
+    {
+      "area": "Stop",
+      "name": "the lock file is private (600) while it runs",
+      "ok": true,
+      "detail": "mode 600",
+      "shot": null
+    },
+    {
+      "area": "Stop",
+      "name": "Ctrl+C stops it, says so and removes the lock file",
+      "ok": true,
+      "detail": "exit 0",
+      "shot": null
+    },
+    {
+      "area": "Restart",
+      "name": "the start message names where the key is kept",
+      "ok": true,
+      "detail": "Fishbowl Studio is running. | Studio folder: /private/var/folders/vz/2jd6t7d12952xkd0d0vfz1440000gn/T/studio-web-e2e-source-SLDU1n/home | Drafting with your Anthropic API key. | Your API key is kept in: the macOS Keychain.",
+      "shot": null
+    },
+    {
+      "area": "Restart",
+      "name": "opens on Drafts, not the Claude page, once a key is saved",
+      "ok": true,
+      "detail": "",
+      "shot": "source-12-restart.png"
+    },
+    {
+      "area": "Restart",
+      "name": "remembers the active brand",
+      "ok": true,
+      "detail": "SA\nSpoke and Chain\n@spoke-and-chain",
+      "shot": null
+    },
+    {
+      "area": "Restart",
+      "name": "the brand kit is still there",
+      "ok": true,
+      "detail": "",
+      "shot": null
+    },
+    {
+      "area": "Restart",
+      "name": "Run on its own is still on",
+      "ok": true,
+      "detail": "",
+      "shot": null
+    },
+    {
+      "area": "Restart",
+      "name": "the key and the engine choice are still saved",
+      "ok": true,
+      "detail": "",
+      "shot": "source-12-restart-claude.png"
+    },
+    {
+      "area": "Restart",
+      "name": "drafts from before are still there",
+      "ok": true,
+      "detail": "",
+      "shot": "source-12-restart-drafts.png"
+    },
+    {
+      "area": "Claude Code",
+      "name": "with claude on PATH and Automatic, the start message says Claude Code drafts",
+      "ok": true,
+      "detail": "Drafting with Claude Code, on your Claude plan.",
+      "shot": null
+    },
+    {
+      "area": "Claude Code",
+      "name": "when Claude Code fails, Automatic switches to the key and says so",
+      "ok": true,
+      "detail": "Queued \"Example Domain\". It is drafted with the next run, or click Run it now on Schedule. / Working on your queued drafts… / Claude Code stopped (exit 1: Invalid API key. Please run /login). Using your Anthropic API key instead until you restart the studio or change the engine or key. / Wrote 3 drafts from the queue.",
+      "shot": "source-13-fallback.png"
+    },
+    {
+      "area": "Claude Code",
+      "name": "the Claude page says Claude Code failed earlier",
+      "ok": true,
+      "detail": "Claude Code failed earlier: Claude Code stopped (exit 1: Invalid API key. Please run /login).",
+      "shot": "source-13-fallback-claude-page.png"
+    },
+    {
+      "area": "API errors",
+      "name": "a refused (bad) key says so in plain words",
+      "ok": true,
+      "detail": "Queued \"Example Domain\". It is drafted with the next run, or click Run it now on Schedule. / Working on your queued drafts… / Anthropic refused the API key. Check it under Settings.",
+      "shot": "source-15-bad-key.png"
+    },
+    {
+      "area": "API errors",
+      "name": "the bad-key server received the key (the SDK sends it as Authorization: Bearer)",
+      "ok": true,
+      "detail": "[{\"url\":\"/v1/messages\",\"key\":\"authorization\",\"headers\":\"accept,accept-encoding,accept-language,anthropic-beta,anthropic-version,authorization,connection,content-length,content-type,host,sec-fetch-mode,user-agent,x-stainless-arch,x-stainless-lang,x-stainless-os,x-stainless-package-version,x-stainless-retry-count,x-stainless-runtime,x-stainless-runtime-version,x-stainless-timeout\",\"bytes\":10064}]",
+      "shot": null
+    },
+    {
+      "area": "API errors",
+      "name": "no network to the API says so",
+      "ok": true,
+      "detail": "Queued \"Example Domain\". It is drafted with the next run, or click Run it now on Schedule. / Working on your queued drafts… / Couldn't reach Anthropic. Check the connection.",
+      "shot": "source-15-no-network.png"
+    },
+    {
+      "area": "API errors",
+      "name": "the no-network error arrives within 60 seconds",
+      "ok": true,
+      "detail": "4 s",
+      "shot": null
+    },
+    {
+      "area": "API errors",
+      "name": "rate limiting says to try again",
+      "ok": true,
+      "detail": "Queued \"Example Domain\". It is drafted with the next run, or click Run it now on Schedule. / Working on your queued drafts… / Anthropic is rate limiting this key. Try again in a minute.",
+      "shot": "source-15-rate-limit.png"
+    },
+    {
+      "area": "API errors",
+      "name": "the real Anthropic API refuses a made-up key with the bad-key message",
+      "ok": true,
+      "detail": "Queued \"Example Domain\". It is drafted with the next run, or click Run it now on Schedule. / Working on your queued drafts… / Anthropic refused the API key. Check it under Settings.",
+      "shot": "source-15-real-api-fake-key.png"
+    },
+    {
+      "area": "Key store",
+      "name": "a key saved in a second studio folder leaves the first folder's key alone (WS-107 W2)",
+      "ok": true,
+      "detail": "first folder shows \"A key ending …0000\" (key.json hint …0000); its Keychain entry ends 0000, the second folder's ends 1111",
+      "shot": "source-16-shared-keychain.png"
+    },
+    {
+      "area": "Key store",
+      "name": "after Remove in one folder, the other folder keeps its own key (WS-107 W2)",
+      "ok": true,
+      "detail": "key page shows \"A key ending …1111\"; link draft says: Queued \"Example Domain\". It is drafted with the next run, or click Run it now on Schedule. / Working on your queued drafts… / Anthropic refused the API key. Check it under Settings.; other.key.json: {\"store\":\"keychain\",\"hint\":\"…1111\"}",
+      "shot": "source-16-other-folder-after-remove.png"
+    },
+    {
+      "area": "Key store",
+      "name": "a key deleted from the Keychain outside the studio is reported, with what to do (WS-107 W2)",
+      "ok": true,
+      "detail": "The saved key isn't in the macOS Keychain any more. Add it again.",
+      "shot": "source-16-key-deleted-outside.png"
+    },
+    {
+      "area": "Cleanup",
+      "name": "the studio's Keychain entries are gone after the walk",
+      "ok": true,
+      "detail": "",
+      "shot": null
+    }
+  ]
+}

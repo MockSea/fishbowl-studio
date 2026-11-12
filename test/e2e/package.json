@@ -1,0 +1,17 @@
+{
+  "name": "fishbowl-studio-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Playwright scripts that drive the studio's local web app in Chrome. Separate from the app's own package so the app's dependencies stay unchanged.",
+  "scripts": {
+    "qa": "STUDIO_E2E=1 node run-all.mjs",
+    "qa:source": "STUDIO_E2E=1 QA_ONLY=source node run-all.mjs",
+    "qa:npx": "STUDIO_E2E=1 QA_ONLY=npx node run-all.mjs",
+    "qa:standalone": "STUDIO_E2E=1 QA_ONLY=standalone node run-all.mjs",
+    "qa:launch": "STUDIO_E2E=1 QA_ONLY=launch node run-all.mjs",
+    "qa:plugin": "STUDIO_E2E=1 QA_ONLY=plugin node run-all.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.56.1"
+  }
+}
