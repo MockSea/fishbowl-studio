@@ -1,0 +1,816 @@
+{
+  "mode": "built",
+  "at": "2026-11-12T13:48:02.539Z",
+  "results": [
+    {
+      "area": "First run",
+      "name": "opens on the Claude (API key) page when no key is saved",
+      "ok": true,
+      "detail": "",
+      "shot": "built-01-first-run.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "First run",
+      "name": "the sidebar highlights the key page it opened on",
+      "ok": false,
+      "detail": "highlighted nav: []",
+      "shot": "built-01-first-run.png",
+      "bug": "B7",
+      "known": null
+    },
+    {
+      "area": "First run",
+      "name": "the key page has its own sidebar entry",
+      "ok": false,
+      "detail": "",
+      "shot": "built-01-first-run.png",
+      "bug": "B7",
+      "known": null
+    },
+    {
+      "area": "First run",
+      "name": "a default brand exists",
+      "ok": true,
+      "detail": "",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Screens",
+      "name": "drafts opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "built-02-screen-drafts.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Screens",
+      "name": "sources opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "built-02-screen-sources.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Screens",
+      "name": "topics opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "built-02-screen-topics.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Screens",
+      "name": "brandkit opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "built-02-screen-brandkit.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Screens",
+      "name": "schedule opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "built-02-screen-schedule.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Screens",
+      "name": "settings opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "built-02-screen-settings.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Screens",
+      "name": "reads opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "built-02-screen-reads.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Screens",
+      "name": "playbook opens without an error",
+      "ok": true,
+      "detail": "",
+      "shot": "built-02-screen-playbook.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Screens",
+      "name": "no Coach page in the app",
+      "ok": true,
+      "detail": "",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Copy",
+      "name": "Drafts \"how this works\" step 3 describes the desktop app",
+      "ok": false,
+      "detail": "Step 3 reads: \"One click asks Claude to make the scheduled task.\" The app has no scheduled task; it runs while open.",
+      "shot": "built-02-screen-drafts.png",
+      "bug": "B5",
+      "known": null
+    },
+    {
+      "area": "Copy",
+      "name": "Drafts step 1 counts the setup steps the app shows",
+      "ok": false,
+      "detail": "Step 1 says \"Four short steps ... and whether it posts for you\"; the app wizard shows three numbered steps and has no posting.",
+      "shot": "built-02-screen-drafts.png",
+      "bug": "B5",
+      "known": null
+    },
+    {
+      "area": "Copy",
+      "name": "Drafts step 1 does not offer posting",
+      "ok": false,
+      "detail": "Set up the brand\n",
+      "shot": "built-02-screen-drafts.png",
+      "bug": "B5",
+      "known": null
+    },
+    {
+      "area": "Copy",
+      "name": "Topics page does not point to the Coach page the app removed",
+      "ok": false,
+      "detail": "\"Changes to the voice and playbook always wait for your yes on the Coach page.\"",
+      "shot": "built-02-screen-topics.png",
+      "bug": "B6",
+      "known": "WS-106"
+    },
+    {
+      "area": "No key",
+      "name": "Draft from a link, Ask Claude now, says to add a key",
+      "ok": true,
+      "detail": "Queued \"Example Domain\". Claude drafts it on the next run, or ask now: \"do my studio rewrites\". / Add your Anthropic API key under Settings first.",
+      "shot": "built-03-nokey-draft-link.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "No key",
+      "name": "the link is still queued for later",
+      "ok": true,
+      "detail": "",
+      "shot": "built-03-nokey-draft-link.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "No key",
+      "name": "Schedule, Run it now, says to add a key",
+      "ok": true,
+      "detail": "Add your Anthropic API key under Settings first.",
+      "shot": "built-03-nokey-run-now.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API key",
+      "name": "the sidebar highlights the key page when opened from Settings",
+      "ok": false,
+      "detail": "highlighted nav: []",
+      "shot": "built-04-key-page.png",
+      "bug": "B7",
+      "known": null
+    },
+    {
+      "area": "API key",
+      "name": "refuses a key that is empty",
+      "ok": true,
+      "detail": "Paste your Anthropic API key.",
+      "shot": "built-04-key-empty.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API key",
+      "name": "refuses a key that is too short",
+      "ok": true,
+      "detail": "That does not look like an API key.",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API key",
+      "name": "refuses a key that is with a space",
+      "ok": true,
+      "detail": "That does not look like an API key.",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API key",
+      "name": "refuses a key that is bad characters",
+      "ok": true,
+      "detail": "That does not look like an API key.",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API key",
+      "name": "saves a well-formed key and says so",
+      "ok": true,
+      "detail": "Saved. Pick a brand and add a source to get drafts.",
+      "shot": "built-04-key-saved.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API key",
+      "name": "stores the key encrypted in the app folder, mode 600",
+      "ok": true,
+      "detail": "51 bytes, mode 600",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API key",
+      "name": "the plain key is in no file in the studio or app folders",
+      "ok": true,
+      "detail": "",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API key",
+      "name": "shows only a masked hint of the saved key",
+      "ok": true,
+      "detail": "A key ending …0000 is saved.",
+      "shot": "built-04-key-page-with-key.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API key",
+      "name": "the page never receives the key itself",
+      "ok": true,
+      "detail": "",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API key",
+      "name": "Remove key deletes the stored key",
+      "ok": true,
+      "detail": "Removed the key.",
+      "shot": "built-04-key-removed.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API key",
+      "name": "a key can be saved again after removing",
+      "ok": true,
+      "detail": "Saved. Pick a brand and add a source to get drafts.",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Setup",
+      "name": "Draft it for me returns Claude's setup drafts (mock API)",
+      "ok": true,
+      "detail": "Working on the setup drafts… / Saved 6 suggestion(s) and 1 source suggestion(s). They wait on their board, in the setup wizard, for them to keep, edit or drop.",
+      "shot": "built-05-setup-drafts.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Copy",
+      "name": "setup drafts message is written for the person",
+      "ok": false,
+      "detail": "Working on the setup drafts… / Saved 6 suggestion(s) and 1 source suggestion(s). They wait on their board, in the setup wizard, for them to keep, edit or drop.",
+      "shot": "built-05-setup-drafts.png",
+      "bug": "B3",
+      "known": null
+    },
+    {
+      "area": "Setup",
+      "name": "the brand name from step 1 is used",
+      "ok": true,
+      "detail": "Set up Spoke and Chain\n\nOne setup for each brand. Close it any time: your answers are kept.\n\nBrand\nQuestions\n3\nDrafts\nHe",
+      "shot": "built-05-setup-drafts.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Setup",
+      "name": "Finish setup leaves the wizard",
+      "ok": true,
+      "detail": "",
+      "shot": "built-05-setup-done.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Draft from a link",
+      "name": "the link is fetched and queued",
+      "ok": true,
+      "detail": "Kept them. Change any of it later in Settings, Topics and Playbook. / Spoke and Chain is set up. Drafts arrive after the first run. / That link is already queued. / Working on the rewrite queue… / Wrote 3 drafts from the queue.",
+      "shot": "built-06-link-sources.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Draft from a link",
+      "name": "Ask Claude now produces drafts on the Drafts page (mock API)",
+      "ok": true,
+      "detail": "Kept them. Change any of it later in Settings, Topics and Playbook. / Spoke and Chain is set up. Drafts arrive after the first run. / That link is already queued. / Working on the rewrite queue… / Wrote 3 drafts from the queue.",
+      "shot": "built-06-link-drafts.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Layout",
+      "name": "brand names are not cut off in Your brands or the switcher",
+      "ok": false,
+      "detail": "Spoke and Chain (107 of 114px), Spoke and Chain (52 of 114px)",
+      "shot": "built-06-link-drafts.png",
+      "bug": "B9",
+      "known": null
+    },
+    {
+      "area": "Personas",
+      "name": "the renamed first brand's handle follows its name, not @my-brand",
+      "ok": false,
+      "detail": "[\"@my-brand\"]",
+      "shot": "built-06-link-drafts.png",
+      "bug": "B10",
+      "known": null
+    },
+    {
+      "area": "Drafts",
+      "name": "\"Use this one\" keeps that take and sets the others aside",
+      "ok": true,
+      "detail": "To review1\nApproved0\nSkipped2",
+      "shot": "built-06-take-picked.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Drafts",
+      "name": "Approve moves a draft to Approved",
+      "ok": true,
+      "detail": "To review0\nApproved1",
+      "shot": "built-06-draft-approved.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Copy",
+      "name": "pick and approve messages use the app's own words (Approve, Skip, the Approved tab)",
+      "ok": false,
+      "detail": "Picked take 1. It's now waiting for pass, edit or kill. / Passed. Copy it from the Passed tab (linkedin, 62 characters).",
+      "shot": "built-06-draft-approved.png",
+      "bug": "B4",
+      "known": null
+    },
+    {
+      "area": "Layout",
+      "name": "the app background fills the window when a page is short",
+      "ok": false,
+      "detail": "window 828px tall, page 754px",
+      "shot": "built-06-approved-tab.png",
+      "bug": "B8",
+      "known": null
+    },
+    {
+      "area": "Draft from a link",
+      "name": "the mock received one setup call and at least one drafting call",
+      "ok": true,
+      "detail": "2026-11-12T13:46:24.935Z claude-opus-5-5 voice,playbook,topics,off_limits,audience,sources kit: 0 docs, 0 images; first block: \"Setup drafts for Spoke and Chain. Write a first version of the brand's voice, pl\" / 2026-11-12T13:46:31.785Z claude-opus-5-5 takes kit: 0 docs, 0 images; first block: \"brief_id: 1 · draft_item · LinkedIn\\n\\n# They asked for this story to be drafted (\"",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop PDF: added",
+      "ok": true,
+      "detail": "Added 1 file.; files 0 -> 1",
+      "shot": "built-07-kit-01-pdf.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop DOCX: added",
+      "ok": true,
+      "detail": "Added 1 file.; files 1 -> 2",
+      "shot": "built-07-kit-02-docx.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop Markdown: added",
+      "ok": true,
+      "detail": "Added 1 file.; files 2 -> 3",
+      "shot": "built-07-kit-03-markdown.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop PNG image: added",
+      "ok": true,
+      "detail": "Added 1 file.; files 3 -> 4",
+      "shot": "built-07-kit-04-png-image.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop JPEG image: added",
+      "ok": true,
+      "detail": "Added 1 file.; files 4 -> 5",
+      "shot": "built-07-kit-05-jpeg-image.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop too-big PDF (11 MB): refused with a reason",
+      "ok": true,
+      "detail": "huge-guidelines.pdf: Too big: files can be up to 10 MB.; files 5 -> 5",
+      "shot": "built-07-kit-06-too-big-pdf-11-mb.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop too-big image (6 MB PNG): refused with a reason",
+      "ok": true,
+      "detail": "huge-photo.png: Too big: images can be up to 5 MB.; files 5 -> 5",
+      "shot": "built-07-kit-07-too-big-image-6-mb-png.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop text file named .pdf: refused with a reason",
+      "ok": true,
+      "detail": "not-really.pdf: It doesn't look like a real PDF file.; files 5 -> 5",
+      "shot": "built-07-kit-08-text-file-named-pdf.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop text file named .png: refused with a reason",
+      "ok": true,
+      "detail": "not-really.png: It doesn't look like a real Image file.; files 5 -> 5",
+      "shot": "built-07-kit-09-text-file-named-png.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop corrupt DOCX: refused with a reason",
+      "ok": true,
+      "detail": "broken.docx: It doesn't look like a real Word file.; files 5 -> 5",
+      "shot": "built-07-kit-10-corrupt-docx.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop DOCX that unpacks to 70 MB: refused with a reason",
+      "ok": true,
+      "detail": "zip-bomb.docx: This Word file unpacks to more than 64 MB.; files 5 -> 5",
+      "shot": "built-07-kit-11-docx-that-unpacks-to-70-mb.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop scanned PDF with no text: refused with a reason",
+      "ok": true,
+      "detail": "scanned.pdf: There is no text in it to read (a scanned PDF needs to be added as images).; files 5 -> 5",
+      "shot": "built-07-kit-12-scanned-pdf-with-no-text.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop empty file: refused with a reason",
+      "ok": true,
+      "detail": "empty.txt: The file is empty.; files 5 -> 5",
+      "shot": "built-07-kit-13-empty-file.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop GIF (unsupported type): refused with a reason",
+      "ok": true,
+      "detail": "animation.gif: Only .pdf, .docx, .md, .markdown, .txt, .png, .jpg, .jpeg files.; files 5 -> 5",
+      "shot": "built-07-kit-14-gif-unsupported-type.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "drop .exe (unsupported type): refused with a reason",
+      "ok": true,
+      "detail": "installer.exe: Only .pdf, .docx, .md, .markdown, .txt, .png, .jpg, .jpeg files.; files 5 -> 5",
+      "shot": "built-07-kit-15--exe-unsupported-type.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "the PDF row shows the text it read",
+      "ok": true,
+      "detail": "brand-guidelines.pdf PDF 1 KB · added just now · 89 characters read Spoke and Chain is a neighbourhood bike repair shop. Voice: warm, practical, a little dry Remove brand-guidelines.pdf",
+      "shot": "built-07-kit-full-list.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "the DOCX row shows the text it read",
+      "ok": true,
+      "detail": "tone-of-voice.docx Word 4 KB · added just now · 193 characters read Tone of voice Spoke and Chain is a neighbourhood bike repair shop. Voice: warm, practical, a little dry. We say \"ride\" not \"cycle\". ",
+      "shot": "built-07-kit-full-list.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "dropping a file that is already in the kit is refused and says so",
+      "ok": false,
+      "detail": "Added 1 file.; brand-guidelines.pdf appears 2 times",
+      "shot": "built-07-kit-duplicate-drop.png",
+      "bug": "B1",
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "a renamed copy of a file in the kit is refused too",
+      "ok": false,
+      "detail": "Added 1 file.",
+      "shot": null,
+      "bug": "B1",
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "a mixed drop (one good, one bad) reports both",
+      "ok": false,
+      "detail": "animation.gif: Only .pdf, .docx, .md, .markdown, .txt, .png, .jpg, .jpeg files.; files now: brand-guidelines.pdf, tone-of-voice.docx, words-we-use.md, logo.png, shopfront.jpg, brand-guidelines.pdf, brand-guidelines (1).pdf, house-style.txt",
+      "shot": "built-07-kit-mixed-drop.png",
+      "bug": "B2",
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "Choose files adds the picked file",
+      "ok": true,
+      "detail": "Added 1 file.",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "Remove asks once more, then removes the file",
+      "ok": true,
+      "detail": "Removed post-checklist.md.",
+      "shot": "built-07-kit-remove-confirm.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Brand kit",
+      "name": "the next drafting call carries the kit (docs and images)",
+      "ok": true,
+      "detail": "2026-11-12T13:47:28.859Z claude-opus-5-5 takes kit: 6 docs, 2 images; first block: \"The brand kit: the brand's own guideline files. Use them for how the brand sound\"",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Personas",
+      "name": "Add persona creates and switches to the new brand",
+      "ok": true,
+      "detail": "NM Night Market Bakery @night-market-bakery",
+      "shot": "built-08-persona-second-setup.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Personas",
+      "name": "the second brand has its own, empty brand kit",
+      "ok": true,
+      "detail": "",
+      "shot": "built-08-persona-second-kit.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Personas",
+      "name": "the API key is shared across brands",
+      "ok": true,
+      "detail": "",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Personas",
+      "name": "switching back shows the first brand's kit",
+      "ok": true,
+      "detail": "8 files, expected 8",
+      "shot": "built-08-persona-switched-back.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Schedule",
+      "name": "Run on its own switch saves to the app preferences",
+      "ok": true,
+      "detail": "{\"autorun\":true}; Now working on Spoke and Chain. / It will run on its own while the app is open.",
+      "shot": "built-09-schedule-autorun-on.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Topics",
+      "name": "a topic can be added",
+      "ok": true,
+      "detail": "",
+      "shot": "built-09-topics-added.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Layout",
+      "name": "no sideways scroll at the minimum window size (900x600)",
+      "ok": true,
+      "detail": "",
+      "shot": "built-09-min-window-brandkit.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Relaunch",
+      "name": "opens on Drafts (not the key page) once a key is saved",
+      "ok": true,
+      "detail": "",
+      "shot": "built-10-relaunch.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Relaunch",
+      "name": "remembers the active brand",
+      "ok": true,
+      "detail": "SA\nSpoke and Chain\n@my-brand",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Relaunch",
+      "name": "after a restart the switcher still shows the brand's own handle",
+      "ok": false,
+      "detail": "[\"@my-brand\"]",
+      "shot": "built-10-relaunch.png",
+      "bug": "B10",
+      "known": null
+    },
+    {
+      "area": "Relaunch",
+      "name": "the brand kit is still there",
+      "ok": true,
+      "detail": "",
+      "shot": "built-10-relaunch-kit.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Relaunch",
+      "name": "Run on its own is still on",
+      "ok": true,
+      "detail": "",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Relaunch",
+      "name": "the key is still saved",
+      "ok": true,
+      "detail": "",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Relaunch",
+      "name": "drafts from before are still there",
+      "ok": true,
+      "detail": "",
+      "shot": "built-10-relaunch-drafts.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Relaunch",
+      "name": "closing the window keeps the app running",
+      "ok": true,
+      "detail": "windows after close: 0",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "Relaunch",
+      "name": "clicking the Dock icon reopens the window",
+      "ok": true,
+      "detail": "",
+      "shot": "built-10-reopened-window.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API errors",
+      "name": "a refused (bad) key says so in plain words",
+      "ok": true,
+      "detail": "Queued \"Example Domain\". Claude drafts it on the next run, or ask now: \"do my studio rewrites\". / Working on the rewrite queue… / Anthropic refused the API key. Check it under Settings.",
+      "shot": "built-11-bad-key.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API errors",
+      "name": "the bad-key server received the key (as a header)",
+      "ok": true,
+      "detail": "[{\"url\":\"/v1/messages\",\"key\":\"authorization\",\"headers\":\"accept,accept-encoding,accept-language,anthropic-beta,anthropic-version,authorization,connection,content-length,content-type,host,sec-fetch-mode,user-agent,x-stainless-arch,x-stainless-lang,x-stainless-os,x-stainless-package-version,x-stainless-retry-count,x-stainless-runtime,x-stainless-runtime-version,x-stainless-timeout\",\"bytes\":10255}]",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API errors",
+      "name": "no network to the API says so",
+      "ok": true,
+      "detail": "That link is already queued. / Working on the rewrite queue… / Couldn't reach Anthropic. Check the connection.",
+      "shot": "built-11-no-network.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API errors",
+      "name": "the no-network error arrives within 30 seconds",
+      "ok": true,
+      "detail": "4 s",
+      "shot": null,
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API errors",
+      "name": "rate limiting says to try again",
+      "ok": true,
+      "detail": "That link is already queued. / Working on the rewrite queue… / Anthropic is rate limiting this key. Try again in a minute.",
+      "shot": "built-11-rate-limit.png",
+      "bug": null,
+      "known": null
+    },
+    {
+      "area": "API errors",
+      "name": "the real Anthropic API refuses a made-up key with the bad-key message",
+      "ok": true,
+      "detail": "That link is already queued. / Working on the rewrite queue… / Anthropic refused the API key. Check it under Settings.",
+      "shot": "built-11-real-api-fake-key.png",
+      "bug": null,
+      "known": null
+    }
+  ]
+}

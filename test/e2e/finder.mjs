@@ -8,6 +8,7 @@ if (process.env.STUDIO_E2E !== '1') process.exit(0);
 
 const fs = await import('node:fs');
 const path = await import('node:path');
+const os = await import('node:os');
 const { execFileSync } = await import('node:child_process');
 const { chromium } = await import('playwright-core');
 const { tempDirs, settle, shooter, nav, watchFlash, waitFlash, dropFiles, OUT, BUILT_APP } = await import('./lib.mjs');
@@ -66,7 +67,7 @@ try {
   const pid = running().split('\n')[0];
   const envPath = execFileSync('ps', ['eww', '-o', 'command=', '-p', pid]).toString();
   const p = (envPath.match(/ PATH=(\S+)/) || [])[1] || '(not set)';
-  check('Finder launch', 'started by LaunchServices with launchd\'s PATH (no node on it)', !/node|nvm|homebrew|\.volta/i.test(p), `PATH=${p}`);
+  check('Finder launch', 'started by LaunchServices with launchd\'s PATH (no node on it)', !/node|nvm|homebrew|\.volta/i.test(p), `PATH=${p.split(os.homedir()).join('~')}`);
   await shot(page, '01-first-run');
   check('Finder launch', 'opens on the API key page on first run', /Anthropic API key/.test(await text(page)), '', '01-first-run');
   check('Finder launch', 'uses the data folder it was given, not ~/Documents', (await page.innerText('body')).includes(path.basename(dirs.base)), '', '01-first-run');

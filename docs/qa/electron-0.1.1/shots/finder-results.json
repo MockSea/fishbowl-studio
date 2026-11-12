@@ -1,0 +1,195 @@
+{
+  "mode": "finder",
+  "at": "2026-11-12T13:53:30.211Z",
+  "results": [
+    {
+      "area": "Finder launch",
+      "name": "started by LaunchServices with launchd's PATH (no node on it)",
+      "ok": false,
+      "detail": "PATH=~/.local/bin:/opt/homebrew/bin:/usr/local/bin:~/.local/bin:/opt/homebrew/bin:/usr/local/bin:~/.local/bin:~/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/opt/homebrew/bin:/Applications/iTerm.app/Contents/Resourc",
+      "shot": null
+    },
+    {
+      "area": "Finder launch",
+      "name": "opens on the API key page on first run",
+      "ok": true,
+      "detail": "",
+      "shot": "finder-01-first-run.png"
+    },
+    {
+      "area": "Finder launch",
+      "name": "uses the data folder it was given, not ~/Documents",
+      "ok": true,
+      "detail": "",
+      "shot": "finder-01-first-run.png"
+    },
+    {
+      "area": "Finder launch",
+      "name": "saves the API key (system keychain encryption works from the .app)",
+      "ok": true,
+      "detail": "Saved. Pick a brand and add a source to get drafts.",
+      "shot": null
+    },
+    {
+      "area": "Finder launch",
+      "name": "drafts opens",
+      "ok": true,
+      "detail": "",
+      "shot": "finder-02-screen-drafts.png"
+    },
+    {
+      "area": "Finder launch",
+      "name": "sources opens",
+      "ok": true,
+      "detail": "",
+      "shot": "finder-02-screen-sources.png"
+    },
+    {
+      "area": "Finder launch",
+      "name": "topics opens",
+      "ok": true,
+      "detail": "",
+      "shot": "finder-02-screen-topics.png"
+    },
+    {
+      "area": "Finder launch",
+      "name": "brandkit opens",
+      "ok": true,
+      "detail": "",
+      "shot": "finder-02-screen-brandkit.png"
+    },
+    {
+      "area": "Finder launch",
+      "name": "schedule opens",
+      "ok": true,
+      "detail": "",
+      "shot": "finder-02-screen-schedule.png"
+    },
+    {
+      "area": "Finder launch",
+      "name": "settings opens",
+      "ok": true,
+      "detail": "",
+      "shot": "finder-02-screen-settings.png"
+    },
+    {
+      "area": "Finder launch",
+      "name": "reads opens",
+      "ok": true,
+      "detail": "",
+      "shot": "finder-02-screen-reads.png"
+    },
+    {
+      "area": "Finder launch",
+      "name": "playbook opens",
+      "ok": true,
+      "detail": "",
+      "shot": "finder-02-screen-playbook.png"
+    },
+    {
+      "area": "Finder launch",
+      "name": "Brand kit drop: PDF",
+      "ok": true,
+      "detail": "Added 1 file (brand-guidelines.pdf).",
+      "shot": null
+    },
+    {
+      "area": "Finder launch",
+      "name": "Brand kit drop: DOCX",
+      "ok": true,
+      "detail": "Added 1 file (tone-of-voice.docx).",
+      "shot": null
+    },
+    {
+      "area": "Finder launch",
+      "name": "Brand kit drop: PNG",
+      "ok": true,
+      "detail": "Added 1 file (logo.png).",
+      "shot": null
+    },
+    {
+      "area": "Finder launch",
+      "name": "Brand kit drop: JPEG",
+      "ok": true,
+      "detail": "Added 1 file (shopfront.jpg).",
+      "shot": null
+    },
+    {
+      "area": "Finder launch",
+      "name": "Brand kit drop: too-big PDF",
+      "ok": true,
+      "detail": "huge-guidelines.pdf: Too big: files can be up to 10 MB.",
+      "shot": null
+    },
+    {
+      "area": "Finder launch",
+      "name": "Brand kit drop: fake PDF",
+      "ok": true,
+      "detail": "not-really.pdf: It doesn't look like a real PDF file.",
+      "shot": null
+    },
+    {
+      "area": "Finder launch",
+      "name": "Brand kit drop: 70 MB DOCX",
+      "ok": true,
+      "detail": "zip-bomb.docx: This Word file unpacks to more than 64 MB.",
+      "shot": null
+    },
+    {
+      "area": "Finder launch",
+      "name": "Brand kit drop: GIF",
+      "ok": true,
+      "detail": "animation.gif: Only .pdf, .docx, .md, .markdown, .txt, .png, .jpg, .jpeg files.",
+      "shot": null
+    },
+    {
+      "area": "Finder launch",
+      "name": "PDF and DOCX text is read in the packaged app (the extraction helper runs without node on PATH)",
+      "ok": true,
+      "detail": "tone-of-voice.docx Word 4 KB · added just now · 193 characters read Tone of voice Spoke and Chain is a neighbourhood bike repair shop. Voice: warm, practical, a",
+      "shot": "finder-03-brandkit.png"
+    },
+    {
+      "area": "Finder launch",
+      "name": "draft from a link reaches the API (mock) and returns drafts",
+      "ok": true,
+      "detail": "Queued \"Example Domain\". Claude drafts it on the next run, or ask now: \"do my studio rewrites\". / Working on the rewrite queue… / Wrote 3 drafts from the queue.",
+      "shot": "finder-04-drafts.png"
+    },
+    {
+      "area": "Finder launch",
+      "name": "a second persona can be added",
+      "ok": true,
+      "detail": "",
+      "shot": "finder-05-second-persona.png"
+    },
+    {
+      "area": "Finder launch",
+      "name": "quits cleanly",
+      "ok": true,
+      "detail": "",
+      "shot": null
+    },
+    {
+      "area": "Finder relaunch",
+      "name": "opens on Drafts with the key still saved",
+      "ok": true,
+      "detail": "",
+      "shot": "finder-06-relaunch.png"
+    },
+    {
+      "area": "Finder relaunch",
+      "name": "brand kit is still there",
+      "ok": true,
+      "detail": "",
+      "shot": null
+    },
+    {
+      "area": "Finder relaunch",
+      "name": "both personas are listed",
+      "ok": true,
+      "detail": "",
+      "shot": "finder-06-relaunch-personas.png"
+    }
+  ]
+}

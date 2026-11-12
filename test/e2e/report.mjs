@@ -37,15 +37,17 @@ export default async function report() {
   const counts = countRows(runs, hasBefore ? 'After: ' : '') + (hasBefore ? countRows(before, 'Before: ') : '');
 
   // One bug's checks in every run: a row per check, a column per run.
-  const cols = [...before.filter((r) => r.results).map((r) => ['Before', r]), ...runs.filter((r) => r.results).map((r) => ['After', r])];
+  // Only runs that carry tagged checks get a column (finder.mjs checks the launch, not the bugs).
+  const tagged = (r) => r.results && r.results.some((x) => x.bug);
+  const cols = [...before.filter(tagged).map((r) => ['Before', r]), ...runs.filter(tagged).map((r) => ['After', r])];
   const mark = (x) => !x ? '<td class="na">-</td>' : `<td class="${x.ok ? 'ok' : 'no'}" title="${esc(x.detail)}">${x.ok ? 'Pass' : 'Fail'}</td>`;
   const checkTable = (id) => {
     const names = [...new Set(cols.flatMap(([, r]) => r.results.filter((x) => x.bug === id).map((x) => `${x.area}\u0000${x.name}`)))];
     if (!names.length) return '<p class="miss">No check is tagged with this bug.</p>';
-    return `<table class="bugchecks"><tr><th>Check</th>${cols.map(([w, r]) => `<th>${esc(w)}<br>${esc(r.mode)}</th>`).join('')}</tr>${names.map((k) => {
+    return `<div class="table-wrap"><table class="bugchecks"><tr><th>Check</th>${cols.map(([w, r]) => `<th>${esc(w)}<br>${esc(r.mode)}</th>`).join('')}</tr>${names.map((k) => {
       const [area, name] = k.split('\u0000');
       return `<tr><td>${esc(name)}</td>${cols.map(([, r]) => mark(r.results.find((x) => x.bug === id && x.area === area && x.name === name))).join('')}</tr>`;
-    }).join('')}</table>`;
+    }).join('')}</table></div>`;
   };
   const firstShot = (r, id) => r.results && (r.results.find((x) => x.bug === id && x.shot && x.mode !== 'finder') || {}).shot;
   const pair = (b) => {
@@ -128,7 +130,7 @@ details { background:var(--card); border:1px solid var(--line); border-radius:10
 <p class="lead">${esc(f.method)}</p>
 ${fixed.length ? `
 <h2>Fixed (${fixed.length})</h2>
-${fixHtml.replace(/<table class="bugchecks">/g, '<div class="table-wrap"><table class="bugchecks">').replace(/<\/table>/g, '</table></div>')}
+${fixHtml}
 ` : ''}
 <h2>${fixed.length ? 'Still open' : 'Bugs'} (${bugs.length})</h2>
 ${bugHtml}
