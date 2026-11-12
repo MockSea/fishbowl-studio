@@ -4,10 +4,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { tempHome } from './helpers.js';
+import { tempHome } from '../core/test/helpers.js';
 import { KEY, everything, app, setUpBrand } from './host-helpers.js';
-import { makeKeystore, osStore, checkKey, KEY_FILE, MARK_FILE, DPAPI_FILE } from '../server/lib/keystore.js';
-import { makeModel } from '../server/lib/engines/api.js';
+import { makeKeystore, osStore, checkKey, keyAccount, KEY_FILE, MARK_FILE, DPAPI_FILE } from '../server/lib/keystore.js';
+import { MISSING_KEY } from '#core/engines/index.js';
+import { makeModel } from '#core/engines/api.js';
 
 test('checkKey trims and rejects junk', () => {
   assert.equal(checkKey(`  ${KEY}\n`).key, KEY);
@@ -142,4 +143,66 @@ test('through the app: the key stays out of the studio folder, the page and the 
     assert.ok(!everything(appDir).includes(KEY.slice(0, -4)), 'not in plaintext in the app folder');
     assert.ok(!logs.join('\n').includes(KEY.slice(0, -4)), 'not logged');
   } finally { Object.assign(console, orig); }
+});
+
+// One shared Keychain and Secret Service, with an entry per account, like the real ones.
+function sharedStore() {
+  const entries = new Map();
+  const run = async (cmd, args, input = '') => {
+    if (cmd === '/usr/bin/security') {
+      if (args[0] === '-i') { const [, a, w] = input.match(/-a (\S+) -w (\S+)/); entries.set(a, w); return { code: 0, stdout: '' }; }
+      const a = args[args.indexOf('-a') + 1];
+      if (args[0] === 'find-generic-password') return entries.has(a) ? { code: 0, stdout: `${entries.get(a)}\n` } : { code: 44, stdout: '' };
+      if (args[0] === 'delete-generic-password') { entries.delete(a); return { code: 0, stdout: '' }; }
+    }
+    if (cmd === 'secret-tool') {
+      const a = args[args.indexOf('account') + 1];
+      if (args[0] === 'store') { entries.set(a, input); return { code: 0, stdout: '' }; }
+      if (args[0] === 'lookup') return entries.has(a) ? { code: 0, stdout: entries.get(a) } : { code: 1, stdout: '' };
+      if (args[0] === 'clear') { entries.delete(a); return { code: 0, stdout: '' }; }
+    }
+    return { code: 127, stdout: '' };
+  };
+  return { run, entries };
+}
+
+test('two studio folders keep separate keys: removing one leaves the other (W2)', async () => {
+  const OTHER = 'sk-ant-api03-OTHERKEY_abcdefghijklmnopqrstuvwxyz0123456789-QRST';
+  const bin = tempHome();
+  fs.writeFileSync(path.join(bin, 'secret-tool'), '');
+  for (const platform of ['darwin', 'linux']) {
+    const shared = sharedStore();
+    const one = tempHome(), two = tempHome();
+    const ks = (dir) => makeKeystore({ dir, os: osStore({ platform, run: shared.run, dir, env: { PATH: bin } }), env: {} });
+    assert.notEqual(keyAccount(one), keyAccount(two));
+    assert.equal(keyAccount(one), keyAccount(path.join(one, '.')), 'the same folder, however it is written');
+    assert.match(keyAccount(one), /^anthropic-api-key-[0-9a-f]{16}$/);
+    await ks(one).set(KEY);
+    await ks(two).set(OTHER);
+    assert.equal(shared.entries.size, 2, platform);
+    assert.equal(await ks(one).get(), KEY, platform);
+    assert.equal(await ks(two).get(), OTHER, platform);
+    await ks(two).clear();
+    assert.equal(await ks(one).get(), KEY, `${platform}: the other folder's key is untouched`);
+    assert.equal(ks(two).has(), false);
+  }
+});
+
+test('a saved key deleted from the Keychain behind the studio\'s back: the page says so, and a run says what to do (W2)', async () => {
+  const shared = sharedStore();
+  const t = await app({ os: osStore({ platform: 'darwin', run: shared.run, dir: tempHome() }) });
+  const { host } = t;
+  assert.equal((await host.keySet(KEY)).has, true);
+  await setUpBrand(host);
+  shared.entries.clear();
+  const s = await host.keyStatus();
+  assert.equal(s.has, false);
+  assert.equal(s.missing, 'keychain');
+  assert.equal(s.missing_label, 'the macOS Keychain');
+  const r = await host.ask('Run the Fishbowl Studio daily run now.').done;
+  assert.equal(r.ok, false);
+  assert.equal(r.message, MISSING_KEY);
+  assert.doesNotMatch(r.message, /null|undefined|reading/);
+  assert.equal((await host.keySet(KEY)).has, true, 'saving it again fixes it');
+  assert.equal((await host.keyStatus()).missing, null);
 });

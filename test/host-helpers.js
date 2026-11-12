@@ -3,10 +3,10 @@
 // unless a test says otherwise.
 import fs from 'node:fs';
 import path from 'node:path';
-import { tempHome, rss, at, setSources } from './helpers.js';
+import { tempHome, rss, at, setSources } from '../core/test/helpers.js';
 import { makeHost } from '../server/lib/host.js';
-import { makeModel, SCHEMAS } from '../server/lib/engines/api.js';
-import { callTool } from '../server/lib/tools.js';
+import { makeModel, SCHEMAS } from '#core/engines/api.js';
+import { callTool } from '#core/tools.js';
 
 export const KEY = 'sk-ant-api03-TESTKEY_abcdefghijklmnopqrstuvwxyz0123456789-WXYZ';
 
@@ -32,8 +32,9 @@ const LINES = ['Lanes beat paint every time.', 'Ask any courier where the hills 
 
 // Answers like Claude would, by which schema the request asks for. counts: how many takes each
 // takes request gets back, in order (after that, all three). answer(task, n): takes to send
-// instead, or undefined for the usual ones.
-export function fakeApi({ counts = [], answer } = {}) {
+// instead, or undefined for the usual ones. weekly: {playbook, report} answers to send instead,
+// and refuse: true to decline the report call (read on each call, so a test can flip it).
+export function fakeApi({ counts = [], answer, weekly } = {}) {
   const requests = [];
   let n = 0;
   const create = async (p) => {
@@ -53,15 +54,24 @@ export function fakeApi({ counts = [], answer } = {}) {
       // A search source is outside the desktop schema; it is here to check it gets dropped.
       out = { voice: '## Who we are\nA bike shop.\n\n## Voice\nPlain.\n\n## Never\nHype.', playbook: ['Lead with the detail'], topics: ['city cycling'], off_limits: [], audience: ['Commuters'],
         sources: [{ kind: 'site', url: 'https://cycling-news.example.org/feed', topic: 'city cycling', reason: 'local news' }, { kind: 'reddit', sub: 'r/bikecommuting', topic: 'city cycling', reason: 'riders talk' }, { kind: 'search', q: 'bike lanes', topic: 'city cycling', reason: 'news' }] };
+    } else if (schema === SCHEMAS.weeklyPlaybook) {
+      out = weekly?.playbook ?? { playbook: [{ op: 'add', text: 'Lead with the repair detail', old: '', reason: 'Kept drafts opened with it.' }] };
+    } else if (schema === SCHEMAS.weeklyReport) {
+      if (weekly?.refuse) return { stop_reason: 'refusal', content: [] };
+      // The second working line carries a link; the studio drops it.
+      out = weekly?.report ?? { summary: 'A steady week.', working: ['Repair posts got kept.', 'See https://example.org/x for more'], not_working: ['Long openers got cut.'], try: ['Shorter first lines.'],
+        audience: [{ op: 'add', section: 'who', text: 'Weekend riders', old: '', reason: 'They reply most.', refs: [] }],
+        positions: [{ op: 'add', text: 'Bike lanes pay for themselves', old: '', reason: 'Drafts kept arguing it.' }] };
     } else throw new Error('unexpected schema');
     return { stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(out) }] };
   };
   return { requests, create };
 }
 
-export async function app({ createModel, counts, answer, fetch = fetchImpl, os = null, claudePath = () => null, createCli, dailyCap } = {}) {
-  const home = tempHome(), appDir = tempHome();
-  const api = fakeApi({ counts, answer });
+// dirs: {home, appDir} of an earlier app(), to start the app again on the same data.
+export async function app({ createModel, counts, answer, weekly, fetch = fetchImpl, os = null, claudePath = () => null, createCli, dailyCap, dirs } = {}) {
+  const home = dirs?.home ?? tempHome(), appDir = dirs?.appDir ?? tempHome();
+  const api = fakeApi({ counts, answer, weekly });
   const events = [];
   const clock = { t: NOW };
   const host = makeHost({ home, appDir, os, claudePath, createCli, dailyCap, now: () => clock.t, fetchImpl: fetch, emit: (e) => events.push(e), createModel: createModel || (() => makeModel({ create: api.create })) });

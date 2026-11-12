@@ -4,12 +4,12 @@
 // makes none.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rss, at, setSources } from './helpers.js';
+import { rss, at, setSources } from '../core/test/helpers.js';
 import { KEY, app, setUpBrand, fetchImpl } from './host-helpers.js';
-import { makeModel, SCHEMAS } from '../server/lib/engines/api.js';
-import { MAX_CALLS_PER_RUN } from '../server/lib/runner.js';
+import { makeModel, SCHEMAS } from '#core/engines/api.js';
+import { MAX_CALLS_PER_RUN } from '#core/runner.js';
 import { MAX_CALLS_PER_TICK } from '../server/lib/host.js';
-import { callTool } from '../server/lib/tools.js';
+import { callTool } from '#core/tools.js';
 
 const FIVE_MIN = 5 * 60e3;
 const tooLong = (n = 3) => [...Array(n)].map(() => ({ text: 'Far too long. '.repeat(600), thinking: 'x', topic: 'infrastructure', cites: [] }));

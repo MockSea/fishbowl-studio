@@ -7,12 +7,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { tempHome } from './helpers.js';
+import { tempHome } from '../core/test/helpers.js';
 import { KEY, app, setUpBrand } from './host-helpers.js';
-import { cliArgs, cliInput, parseCliOutput, makeCliModel, MAX_TURNS } from '../server/lib/engines/claude-cli.js';
-import { findOnPath, makeEngine } from '../server/lib/engines/index.js';
-import { ModelError, SCHEMAS, SYSTEM, makeModel } from '../server/lib/engines/api.js';
-import { makeBudget, makeDailyCap } from '../server/lib/runner.js';
+import { cliArgs, cliInput, parseCliOutput, makeCliModel, MAX_TURNS } from '#core/engines/claude-cli.js';
+import { findOnPath, makeEngine } from '#core/engines/index.js';
+import { ModelError, SCHEMAS, SYSTEM, makeModel } from '#core/engines/api.js';
+import { makeBudget, makeDailyCap } from '#core/runner.js';
 
 test('the claude -p call: no tools, no MCP, no setting sources (no CLAUDE.md), no session, schema and system prompt set', () => {
   const a = cliArgs({ schema: SCHEMAS.triage, model: null });

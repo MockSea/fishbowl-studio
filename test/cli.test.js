@@ -5,12 +5,14 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseArgs, browserCommand, main, askRunning, LOCK_FILE } from '../server/cli.js';
+import { parseArgs, browserCommand, main, askRunning, LOCK_FILE, LINK_FILE } from '../server/cli.js';
+import { startedAt } from '../server/lib/heal.js';
 import { app } from './host-helpers.js';
-import { tempHome } from './helpers.js';
+import { tempHome } from '../core/test/helpers.js';
 
 test('options', () => {
-  assert.deepEqual(parseArgs([]), { open: true, port: 0, home: null, help: false, version: false });
+  assert.deepEqual(parseArgs([]), { open: true, port: 0, home: null, help: false, version: false, linkFile: false });
+  assert.equal(parseArgs(['--link-file']).linkFile, true);
   const o = parseArgs(['--no-open', '--port', '4100', '--home', 'x']);
   assert.equal(o.open, false);
   assert.equal(o.port, 4100);
@@ -51,6 +53,7 @@ test('starts, prints a one-time link, writes a private lock, and a second run re
   const lockFile = path.join(home, 'app', LOCK_FILE);
   const lock = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
   assert.equal(lock.pid, process.pid);
+  if (process.platform !== 'win32') assert.equal(lock.started, startedAt(process.pid), 'the lock records when this process started');
   assert.equal(`http://127.0.0.1:${lock.port}`, first.origin);
   if (process.platform !== 'win32') assert.equal(fs.statSync(lockFile).mode & 0o777, 0o600);
 
@@ -63,6 +66,50 @@ test('starts, prints a one-time link, writes a private lock, and a second run re
 
   await first.close();
   assert.equal(fs.existsSync(lockFile), false, 'removed on the way out');
+});
+
+test('--link-file: the link goes to a file only this user can read, never to the output', async (t) => {
+  const home = tempHome();
+  const linkFile = path.join(home, 'app', LINK_FILE);
+  const a = await app();
+  const one = quiet();
+  const opened = [];
+  const old = process.umask(0o022);
+  let first;
+  try { first = await main(['--home', home, '--no-open', '--link-file'], { out: one.out, open: (u) => opened.push(u), signals: false, makeHostImpl: () => a.host }); }
+  finally { process.umask(old); }
+  t.after(() => first.close());
+  const link = fs.readFileSync(linkFile, 'utf8').trim();
+  assert.match(link, /^http:\/\/127\.0\.0\.1:\d+\/\?t=[0-9a-f]{64}$/);
+  assert.ok(link.startsWith(`${first.origin}/?t=`));
+  if (process.platform !== 'win32') assert.equal(fs.statSync(linkFile).mode & 0o777, 0o600, 'private even under umask 022');
+  assert.ok(!one.text().includes('?t='), 'no link in the output');
+  assert.ok(one.text().includes(`The link is in (it works once): ${linkFile}`));
+  assert.equal(opened.length, 0);
+
+  const two = quiet();
+  const second = await main(['--home', home, '--no-open', '--link-file'], { out: two.out, signals: false, makeHostImpl: () => { throw new Error('should not start a second'); } });
+  const fresh = fs.readFileSync(linkFile, 'utf8').trim();
+  assert.equal(fresh, second.reused);
+  assert.notEqual(fresh, link, 'a fresh link');
+  assert.ok(!two.text().includes('?t='), 'no link in the output');
+  assert.match(two.text(), /already running\. Its new link is in: /);
+
+  await first.close();
+  assert.equal(fs.existsSync(linkFile), false, 'removed on the way out');
+});
+
+test('a link file planted as a symlink is replaced, not written through', { skip: process.platform === 'win32' }, async (t) => {
+  const home = tempHome();
+  fs.mkdirSync(path.join(home, 'app'), { recursive: true });
+  const target = path.join(tempHome(), 'elsewhere.txt');
+  fs.writeFileSync(target, 'untouched');
+  fs.symlinkSync(target, path.join(home, 'app', LINK_FILE));
+  const a = await app();
+  const r = await main(['--home', home, '--no-open', '--link-file'], { out: quiet().out, signals: false, makeHostImpl: () => a.host });
+  t.after(() => r.close());
+  assert.equal(fs.readFileSync(target, 'utf8'), 'untouched');
+  assert.equal(fs.lstatSync(path.join(home, 'app', LINK_FILE)).isSymbolicLink(), false);
 });
 
 test('a stale lock from a copy that is gone does not stop a new start', async (t) => {

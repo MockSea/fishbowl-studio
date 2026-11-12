@@ -1,11 +1,12 @@
 #!/bin/sh
 # Installs the standalone Fishbowl Studio for macOS or Linux and starts it.
 #
-#   curl -fsSL https://raw.githubusercontent.com/MockSea/fishbowl-studio/main/scripts/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/MockSea/fishbowl-studio/v0.2.0/scripts/install.sh | sh
 #
-# Downloads the latest release's executable for this computer and SHA256SUMS, refuses to install
-# if the checksum doesn't match, puts it in ~/.local/bin (or $FISHBOWL_BIN_DIR) and runs it.
-# Set FISHBOWL_VERSION=v1.2.3 for a particular release, FISHBOWL_NO_START=1 to only install.
+# Downloads this release's executable for this computer and SHA256SUMS (the release is the
+# `release=` line below, so the script fetched from a tag installs that tag's build), refuses to
+# install if the checksum doesn't match, puts it in ~/.local/bin (or $FISHBOWL_BIN_DIR) and runs it.
+# Set FISHBOWL_VERSION=v1.2.3 for another release, FISHBOWL_NO_START=1 to only install.
 set -eu
 
 repo="MockSea/fishbowl-studio"
@@ -25,8 +26,8 @@ if [ "$os" = linux ] && [ "$arch" = arm64 ]; then
   exit 1
 fi
 
-if [ -n "${FISHBOWL_VERSION:-}" ]; then base="https://github.com/$repo/releases/download/$FISHBOWL_VERSION"
-else base="https://github.com/$repo/releases/latest/download"; fi
+release=v0.2.0
+base="https://github.com/$repo/releases/download/${FISHBOWL_VERSION:-$release}"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT

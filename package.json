@@ -1,9 +1,12 @@
 {
   "name": "fishbowl-studio",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A social-post drafting studio that runs on your computer and opens in your browser.",
   "private": true,
   "type": "module",
+  "imports": {
+    "#core/*": "./core/lib/*"
+  },
   "license": "MIT",
   "engines": {
     "node": ">=20"
@@ -30,10 +33,13 @@
   "files": [
     "bin",
     "server",
-    "platforms",
-    "shapes",
-    "accounts",
-    "defaults",
+    "core/lib",
+    "core/platforms",
+    "core/shapes",
+    "core/accounts",
+    "core/defaults",
+    "core/package.json",
+    "core/README.md",
     "README.md",
     "LICENSE"
   ],
