@@ -103,3 +103,30 @@ test('hearts toggle; draft-this queues work for Claude; mark posted wants https'
   const b = draftingBrief(ctx);
   assert.equal(b.kind, 'draft_item');
 });
+
+test('messages use the words on the board: Approve, Skip and the Approved tab (B4)', () => {
+  const { ctx } = seeded([1, 2].map((n) => ({ id: n, set_id: 7, take_n: n, status: 'option', text: `take ${n}` }))
+    .concat([{ id: 3, status: 'pending', text: 'a line' }, { id: 4, status: 'pending', text: 'another line' }], [5, 6].map((n) => ({ id: n, set_id: 8, take_n: n - 4, status: 'option', text: `t${n}` }))));
+  const said = [
+    act(ctx, { action: 'pick', id: 1 }).message,
+    act(ctx, { action: 'pass', id: 1, hash: fingerprint(get(ctx, 1)) }).message,
+    act(ctx, { action: 'edit', id: 3, hash: fingerprint(get(ctx, 3)), text: 'a better line' }).message,
+    act(ctx, { action: 'edit', id: 4, hash: fingerprint(get(ctx, 4)), text: 'a better line too', and_pass: true }).message,
+    act(ctx, { action: 'kill', id: 3 }).message,
+    act(ctx, { action: 'none', set_id: 8 }).message,
+  ];
+  for (const m of said) assert.doesNotMatch(m, /\bpass(ed)?\b|\bkill(ed)?\b|Passed tab/i, m);
+  assert.match(said[1], /Approved tab/);
+  assert.match(said[4], /^Skipped/);
+});
+
+test('queueing a redo or a story says what happens next in the studio\'s words (W5)', () => {
+  const { ctx } = seeded([1, 2].map((n) => ({ id: n, set_id: 7, take_n: n, status: 'option', text: `take ${n}` })));
+  const redo = act(ctx, { action: 'redo', set_id: 7, note: 'too generic' });
+  const later = act(ctx, { action: 'draft_this', item_id: 1 });
+  for (const r of [redo, later]) {
+    assert.equal(r.ok, true, r.message);
+    assert.doesNotMatch(r.message, /do my studio|rewrites/i, r.message);
+    assert.match(r.message, /Run it now on Schedule/, r.message);
+  }
+});

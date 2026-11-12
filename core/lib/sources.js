@@ -311,6 +311,6 @@ export async function draftLink(ctx, { url }) {
     if (db.jobs.some((j) => j.kind === 'draft_item' && j.item_id === item.id && j.status === 'queued')) return { ok: true, message: 'That link is already queued.', item_id: item.id, title: item.title };
     db.jobs.push({ id: ctx.id('job'), kind: 'draft_item', item_id: item.id, status: 'queued', created_at: new Date(now).toISOString(), from_link: true });
     ctx.store.event('draft_link', { host: hostOf(safe.url), item_id: item.id }, now);
-    return { ok: true, needs_claude: true, item_id: item.id, title: item.title, message: `Queued "${item.title}". Claude drafts it on the next run, or ask now: "do my studio rewrites".` };
+    return { ok: true, needs_claude: true, item_id: item.id, title: item.title, message: `Queued "${item.title}". It is drafted with the next run, or click Run it now on Schedule.` };
   });
 }

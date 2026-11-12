@@ -18,6 +18,7 @@
 .drop.over { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
 .kit-file .preview { color: var(--ink-3); font-size: var(--t-sm); white-space: pre-wrap; overflow: hidden; max-height: 4.5em; }
 .key-field input { font-family: var(--mono, ui-monospace, monospace); }
+html[data-host="web"] .shell { min-height: 100vh; }
 `;
   document.head.appendChild(css);
 
@@ -26,6 +27,10 @@
   const kitBtn = h('button', { class: 'navbtn', 'data-view': 'brandkit', 'data-icon': 'briefcase' }, icon('briefcase'), h('span', { class: 'lbl' }, 'Brand kit'));
   kitBtn.addEventListener('click', () => { Object.assign(B.state, { open: {}, why: null, menu: false, wnew: false, wstep: null, arming: null }); B.setDrawer(false); B.load({ view: 'brandkit' }); });
   topics.after(kitBtn);
+  // The Claude page (engine and API key) has its own entry, so the sidebar marks it when it is open.
+  const keyBtn = h('button', { class: 'navbtn', 'data-view': 'apikey', 'data-icon': 'spark' }, icon('spark'), h('span', { class: 'lbl' }, 'Claude'));
+  keyBtn.addEventListener('click', () => { Object.assign(B.state, { open: {}, why: null, menu: false, wnew: false, wstep: null, arming: null }); B.setDrawer(false); B.load({ view: 'apikey' }); });
+  document.querySelector('.navbtn[data-view="settings"]').after(keyBtn);
 
   const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
@@ -35,8 +40,11 @@
     B.flash(`Adding ${plural(files.length, 'file')}…`, 'info');
     const r = await S.kit.add(files);
     const ok = r.results.filter((x) => x.ok), bad = r.results.filter((x) => !x.ok);
-    if (bad.length) B.flash(bad.map((x) => `${x.name}: ${x.reason}`).join(' '), 'bad');
-    else if (ok.length) B.flash(`Added ${plural(ok.length, 'file')}.`, 'good');
+    // Added and refused files are both reported, so a mixed drop doesn't hide what went in.
+    const names = ok.map((x) => x.file && x.file.name).filter(Boolean);
+    const added = ok.length ? `Added ${plural(ok.length, 'file')}${ok.length < 4 && names.length ? ` (${names.join(', ')})` : ''}.` : '';
+    const msg = [added, ...bad.map((x) => `${x.name}: ${x.reason}`)].filter(Boolean).join(' ');
+    if (msg) B.flash(msg, bad.length ? (ok.length ? 'warn' : 'bad') : 'good');
     B.load({ view: 'brandkit' });
   }
 
@@ -111,7 +119,9 @@
       B.load({ view: k.has ? 'apikey' : 'drafts' });
     } }, k.has ? 'Replace key' : 'Save key');
     const remove = k.has && k.where !== 'env' ? h('button', { class: 'btn ghost', onclick: async () => { keyState = await S.key.clear(); B.flash('Removed the key.', 'good'); B.load({ view: 'apikey' }); } }, 'Remove key') : null;
-    const keyCard = card({ icon: 'settings', title: 'Anthropic API key', sub: k.has ? `A key ending ${k.hint || ''} is saved.` : 'Optional when Claude Code is installed. Usage is billed to your Anthropic account.' },
+    const keyCard = card({ icon: 'settings', title: 'Anthropic API key', sub: k.has ? `A key ending ${k.hint || ''} is saved.`
+      : k.missing ? `The saved key isn't in ${k.missing_label} any more. Add it again.`
+      : 'Optional when Claude Code is installed. Usage is billed to your Anthropic account.' },
       h('div', { class: 'field key-field' }, input, save, remove),
       h('p', { class: 'hint', text: k.has ? `Kept in ${k.where_label}. Drafts use ${d.model}.` : `It will be kept in ${k.target_label}. Drafts use ${d.model}.` }));
 
@@ -145,6 +155,13 @@
     ],
     noPosting: () => true,
     sourceKinds: () => ['site', 'reddit'],
+    firstRunSteps: () => ({
+      setup: { text: 'Three short steps: the brand, a few questions, and Claude’s drafts for you to keep or change.' },
+      schedule: { text: 'Pick when drafts arrive. The studio reads and drafts on that schedule while it is open.' },
+    }),
+    // The handle follows the brand's name (the folder keeps its first slug).
+    handle: (p) => String(p.name || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/^[^a-z]+/, '').slice(0, 32).replace(/-+$/, '') || null,
     finishBody: () => ({ sub: 'The studio runs it while it is open. Turn this on to have it read and draft by itself.', body: [autorunRow()] }),
   };
 
@@ -159,5 +176,5 @@
 
   // ---------- boot: nothing to draft with yet, start on the Claude page ----------
   S.prefs.get().then((p) => { prefs = p; });
-  S.key.status().then((k) => { keyState = k; if (!k.engine.engine) { B.state.view = 'apikey'; B.load({ view: 'apikey' }); } });
+  S.key.status().then((k) => { keyState = k; if (!k.engine.engine || k.missing) { B.state.view = 'apikey'; B.load({ view: 'apikey' }); } });
 })();
