@@ -4,11 +4,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { at } from './helpers.js';
+import { at } from '../core/test/helpers.js';
 import { KEY, app, setUpBrand } from './host-helpers.js';
-import { SCHEMAS } from '../server/lib/engines/api.js';
-import { makeCliModel } from '../server/lib/engines/claude-cli.js';
-import { WEEKLY_CALLS } from '../server/lib/runner.js';
+import { SCHEMAS } from '#core/engines/api.js';
+import { makeCliModel } from '#core/engines/claude-cli.js';
+import { WEEKLY_CALLS } from '#core/runner.js';
 
 const WEEKLY = 'Run the Fishbowl Studio weekly report.';
 const weeklyRequests = (api) => api.requests.filter((p) => [SCHEMAS.weeklyPlaybook, SCHEMAS.weeklyReport].includes(p.output_config.format.schema));

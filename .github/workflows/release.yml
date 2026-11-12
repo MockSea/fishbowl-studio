@@ -91,10 +91,13 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
       - uses: actions/download-artifact@v5
         with:
           path: assets
           merge-multiple: true
+      - name: Skill
+        run: cd skills && zip -r ../assets/fishbowl-studio-skill.zip fishbowl-studio
       - name: Checksums
         working-directory: assets
         run: sha256sum fishbowl-studio-* > SHA256SUMS && cat SHA256SUMS
@@ -102,4 +105,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" assets/* --repo "$GITHUB_REPOSITORY" --title "$TAG" --notes "Standalone builds of Fishbowl Studio $TAG. Check a download against SHA256SUMS, or use scripts/install.sh or scripts/install.ps1, which check it for you."
+        run: gh release create "$TAG" assets/* --repo "$GITHUB_REPOSITORY" --title "$TAG" --notes "Standalone builds of Fishbowl Studio $TAG, and fishbowl-studio-skill.zip, the skill that has Claude install and start it. Check a download against SHA256SUMS, or use scripts/install.sh or scripts/install.ps1, which check it for you."

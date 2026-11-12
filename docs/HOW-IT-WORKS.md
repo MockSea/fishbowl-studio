@@ -2,8 +2,8 @@
 
 Fishbowl Studio is one Node program the person starts on their own computer. It has three parts:
 
-1. **The studio** (`server/lib/`). It does the bookkeeping: reading feeds, dedupe, ranking, release times, verdicts, caps and learning, as small functions with tests. The board reaches it through the `studio_*` operations listed under [Tools](#tools); the runner calls the same modules directly.
-2. **The runner and the engines** (`server/lib/runner.js`, `server/lib/engines/`). The runner drives a run (fetch, triage, draft, release) and hands each writing step to Claude: through `claude -p` on the person's Claude plan, or the Anthropic API with their key. The studio builds each brief (the story, the brand's voice and rules, the chosen shapes, the brand kit) and validates the answer before saving it.
+1. **The studio** (`core/`, the drafting core). It does the bookkeeping: reading feeds, dedupe, ranking, release times, verdicts, caps and learning, as small functions with tests. The board reaches it through the `studio_*` operations listed under [Tools](#tools); the runner calls the same modules directly.
+2. **The runner and the engines** (`core/lib/runner.js`, `core/lib/engines/`). The runner drives a run (fetch, triage, draft, release) and hands each writing step to Claude: through `claude -p` on the person's Claude plan, or the Anthropic API with their key. The studio builds each brief (the story, the brand's voice and rules, the chosen shapes, the brand kit) and validates the answer before saving it.
 3. **The board** (`server/ui/`), one HTML page served by the local web server (`server/lib/web.js`) to the person's browser, assembled at read time from small files (no build step): the skin (`skins/*.css`), the component CSS (`board.css`), the bridge and the page scripts. The board's actions go to the server's JSON API, which calls the studio operations.
 
 The server selects and formats context, Claude generates drafts, and the server validates and saves them.
@@ -98,11 +98,11 @@ The Topics page explains learning with the same numbers the ranker uses. For eac
 
 For each piece of work the server decides, before Claude writes anything:
 
-- **Platform.** Each set targets one platform, chosen as the enabled platform furthest below its share of today's sets. Rewrites and redos keep their platform. Platform rules are data (`platforms/*.json`: `linkedin` 3,000 characters, `x` 280, `threads` 500, `bluesky` 300): limits, target length, register and formatting. Adding a platform means adding a file (and tagging the shapes that suit it). Threads and Bluesky are off until they switch them on in Settings.
-- **Shapes, one per take.** Shapes are structural mechanisms (`shapes/*.json`, 13 seeds, each tagged with the platforms it suits). Each shape's weight is
+- **Platform.** Each set targets one platform, chosen as the enabled platform furthest below its share of today's sets. Rewrites and redos keep their platform. Platform rules are data (`core/platforms/*.json`: `linkedin` 3,000 characters, `x` 280, `threads` 500, `bluesky` 300): limits, target length, register and formatting. Adding a platform means adding a file (and tagging the shapes that suit it). Threads and Bluesky are off until they switch them on in Settings.
+- **Shapes, one per take.** Shapes are structural mechanisms (`core/shapes/*.json`, 13 seeds, each tagged with the platforms it suits). Each shape's weight is
   `w = (1 + passes + edits + posted + hearts) / (1 + kills) × results multiplier × 2 if it's the HOME shape`.
   With probability 0.25 the pick is uniform instead (exploration). Takes in a set get distinct shapes, and shapes tied to an overused form are avoided. The results multiplier comes from the numbers you enter: `clamp(mean(post score / platform mean) for the shape ÷ the same over all posts, 0.25, 4)`, where post score = `(likes + 2·reposts + 2·quotes + replies) / views`.
-- **Experiment.** With probability 0.2 take 1 becomes an experiment: a hybrid of two shapes plus one off-playbook note (`defaults/experiments.json`).
+- **Experiment.** With probability 0.2 take 1 becomes an experiment: a hybrid of two shapes plus one off-playbook note (`core/defaults/experiments.json`).
 - **Context**, in this order: the brand voice, fenced voice samples, the playbook, their recent verdicts (6 passed, 6 killed), kills they restored with their reasons, their recent notes, lines and thoughts they hearted, the brand's top positions, the safety guard, the audience and buttons, platform rules, the writing instruction, the story and the triage reaction, the shapes, and the "overused lately" list.
 
 ## Checking the takes
@@ -163,13 +163,13 @@ The server listens on 127.0.0.1 only and checks the `Host` header on every reque
 
 The command opens that link with the system's opener (`open`, `xdg-open`, or `rundll32` on Windows), so for a moment the token sits in that process's command line, where other accounts on the same computer can list it. This is an accepted risk for a single-person app: the token is single-use, expires in five minutes, and is usually spent by the browser within a second. On a shared computer, run with `--no-open` and paste the printed link yourself.
 
-A second copy of the command doesn't trust the address in the lock file on its word. It sends a fresh nonce with an HMAC made from the control secret in the 0600 lock file, and only uses the answer if it carries a matching HMAC over the nonce and the address. The secret itself never crosses the wire, a nonce is accepted once, and a process that can't be signalled (EPERM) counts as gone, so a stale lock pointing at someone else's server starts a new studio instead.
+A second copy of the command doesn't trust the address in the lock file on its word. It sends a fresh nonce with an HMAC made from the control secret in the 0600 lock file, and only uses the answer if it carries a matching HMAC over the nonce and the address. The secret itself never crosses the wire, a nonce is accepted once, and a process that can't be signalled (EPERM) counts as gone, so a stale lock pointing at someone else's server starts a new studio instead. When the lock's process is still alive, was started as `fishbowl-studio` and still doesn't answer after a second try, it is a stuck studio for this folder: the command stops it (SIGTERM, then SIGKILL) before starting a new one, so two studios never draft into the same folder. A process with any other command line is never signalled; its lock is just cleared.
 
 With the Claude Code engine, each drafting step runs `claude -p` with `--setting-sources ''` (no user, project or local settings, so no `CLAUDE.md` from any parent folder) in a fresh empty folder under `app/claude-runs/`, created 0700, and removed afterwards. It doesn't run under the system's shared temporary folder, where another account could plant settings in a parent folder.
 
 ## Tools
 
-The studio's operations are named tools (`server/lib/tools.js`). The board calls them through the server's API (`/api/call`), and the runner calls the ones a run needs. The main ones:
+The studio's operations are named tools (`core/lib/tools.js`). The board calls them through the server's API (`/api/call`), and the runner calls the ones a run needs. The main ones:
 
 | Tool | Purpose |
 |---|---|

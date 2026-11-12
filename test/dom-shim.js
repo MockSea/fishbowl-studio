@@ -15,9 +15,11 @@ export function makeDom() {
     }
     setAttribute(k, v) { this.attrs[k] = String(v); if (k === 'class') this.className = v; if (k === 'id') this.id = v; if (k === 'value') this.value = String(v); if (k === 'checked') this.checked = true; if (k === 'disabled') this.disabled = true; if (k.startsWith('data-')) this.dataset[k.slice(5)] = String(v); }
     getAttribute(k) { return this.attrs[k] ?? null; }
+    appendChild(n) { this.append(n); return n; }
     append(...ns) { for (const n of ns) { const node = typeof n === 'string' ? new Text(n) : n; node.parent = this; this.children.push(node); } }
     prepend(...ns) { for (const n of ns) n.parent = this; this.children.unshift(...ns); }
     replaceChildren(...ns) { this.children = []; this.append(...ns); }
+    after(...ns) { const sib = this.parent.children; const at = sib.indexOf(this) + 1; for (const n of ns) n.parent = this.parent; sib.splice(at, 0, ...ns); }
     remove() { if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this); }
     get textContent() { return this.children.map((c) => c.textContent).join(''); }
     set textContent(v) { this.children = [new Text(v)]; }
@@ -30,7 +32,12 @@ export function makeDom() {
     select() {}
     getBoundingClientRect() { return { height: 500, width: 640 }; }
     *walk() { yield this; for (const c of this.children) if (c.nodeType === 1) yield* c.walk(); }
-    querySelectorAll(sel) { const cls = sel.replace(/^\./, ''); return [...this.walk()].filter((e) => e.classList.contains(cls)); }
+    // Only '.class' and '.class[data-key="value"]'.
+    querySelectorAll(sel) {
+      const m = sel.match(/^\.([\w-]+)(?:\[data-([\w-]+)="([^"]*)"\])?$/);
+      return [...this.walk()].filter((e) => e.classList.contains(m[1]) && (!m[2] || e.dataset[m[2]] === m[3]));
+    }
+    querySelector(sel) { return this.querySelectorAll(sel)[0] || null; }
     find(pred) { return [...this.walk()].find(pred); }
     findAll(pred) { return [...this.walk()].filter(pred); }
   }
@@ -47,6 +54,7 @@ export function makeDom() {
     createElement: (t) => new El(t), createTextNode: (t) => new Text(t),
     getElementById: (id) => html.find((e) => e.id === id || e.attrs.id === id) || null,
     querySelectorAll: (s) => html.querySelectorAll(s),
+    querySelector: (s) => html.querySelector(s),
     addEventListener: (t, f) => { (docListeners[t] ??= []).push(f); },
     execCommand: () => true,
   };

@@ -57,6 +57,8 @@
   // A host can swap a few cards for its own (the desktop app's schedule and key cards), and
   // noPosting hides what only applies where the studio can post for them.
   const hook = (name, ...a) => { const f = window.BoardHooks && window.BoardHooks[name]; return f ? f(...a) : null; };
+  // The @handle shown for a brand. The plugin shows the slug chat tools take; a host may differ.
+  const handle = (p) => hook('handle', p) || p.slug;
 
   // ---------- server calls ----------
   async function load(params) {
@@ -137,7 +139,7 @@
     if (!head || !head.persona) return box.replaceChildren();
     const me = head.persona;
     const btn = h('button', { class: 'persona-btn', 'aria-haspopup': 'true', 'aria-expanded': String(state.menu), title: me.name, onclick: () => { state.menu = !state.menu; state.adding = false; renderPersona(); S.reportSize(); } },
-      avatar(me, 'sm'), h('span', { class: 'who' }, h('span', { class: 'nm', text: me.name }), h('span', { class: 'hd', text: `@${me.slug}` })), h('span', { class: 'chev' }, icon('chevron')));
+      avatar(me, 'sm'), h('span', { class: 'who' }, h('span', { class: 'nm', text: me.name }), h('span', { class: 'hd', text: `@${handle(me)}` })), h('span', { class: 'chev' }, icon('chevron')));
     let menu = null;
     if (state.menu) {
       const items = (head.personas || []).map((p) => h('button', { class: 'item', role: 'menuitem', onclick: () => switchTo(p.slug) },
@@ -272,22 +274,25 @@
     schedule: { title: 'Set it to run', text: 'One click asks Claude to make the scheduled task. Drafts arrive here after its first run.', go: 'schedule', cta: 'Set the schedule' },
   };
   const WIZ_STEP_N = { brand: 1, questions: 2, drafting: 3, review: 3, posting: 4 };
+  // A host without posting has a three-step wizard and may word the steps for itself.
+  const wizTotal = () => (hook('noPosting') ? 3 : 4);
+  const stepCopy = (key) => ({ ...STEPS[key], ...((hook('firstRunSteps') || {})[key] || {}) });
   function firstRunCard(head) {
     const fr = head.first_run;
     const w = head.wizard;
     // A half-finished setup is offered again, wherever they left it.
-    if (w && (!fr || !fr.show || fr.setup)) return card({ icon: 'spark', title: `Finish setting up ${head.brand}`, sub: `You stopped at step ${WIZ_STEP_N[w.step] || 1} of 4. Everything you answered is saved.` },
+    if (w && (!fr || !fr.show || fr.setup)) return card({ icon: 'spark', title: `Finish setting up ${head.brand}`, sub: `You stopped at step ${WIZ_STEP_N[w.step] || 1} of ${wizTotal()}. Everything you answered is saved.` },
       h('div', { class: 'chips' }, h('button', { class: 'btn sm primary', onclick: () => openWizard() }, 'Pick up where you left off')));
     if (!fr || !fr.show) return null;
     return card({ icon: 'spark', title: `Here's how this works`, sub: `Three steps and ${head.brand} gets drafts every day. You approve the good ones.` },
-      h('ol', { class: 'steps' }, fr.steps.map((s, i) => { const d = STEPS[s.key]; const go = s.key === 'setup' ? () => openWizard() : () => load({ view: d.go });
-        const cta = s.key === 'setup' && !s.done && s.step ? `Continue (step ${WIZ_STEP_N[s.step] || 1} of 4)` : d.cta;
+      h('ol', { class: 'steps' }, fr.steps.map((s, i) => { const d = stepCopy(s.key); const go = s.key === 'setup' ? () => openWizard() : () => load({ view: d.go });
+        const cta = s.key === 'setup' && !s.done && s.step ? `Continue (step ${WIZ_STEP_N[s.step] || 1} of ${wizTotal()})` : d.cta;
         return h('li', { class: `step ${s.done ? 'done' : ''}` },
           h('span', { class: 'num' }, s.done ? icon('check') : String(i + 1)), h('h3', { text: d.title }), h('p', { text: d.text }),
           h('button', { class: `btn sm ${s.done ? 'ghost' : 'primary'}`, onclick: go }, s.done ? 'Done · change' : cta)); })));
   }
 
-  window.Board = { state, hook, h, icon, load, call, act, setting, flash, render, ago, since, hm, plural, meter, page, card, empty, seg, switchCtl, stepper, confirmButton, copyButton, askClaudeButton, avatar, todayCard, profilesCard, firstRunCard, switchTo, proposalRow, postingControl, openWizard, setDrawer, KIND_LABEL, OP_LABEL };
+  window.Board = { state, hook, handle, h, icon, load, call, act, setting, flash, render, ago, since, hm, plural, meter, page, card, empty, seg, switchCtl, stepper, confirmButton, copyButton, askClaudeButton, avatar, todayCard, profilesCard, firstRunCard, switchTo, proposalRow, postingControl, openWizard, setDrawer, KIND_LABEL, OP_LABEL };
   window.BoardPages = window.BoardPages || {};
 
   // ---------- boot ----------

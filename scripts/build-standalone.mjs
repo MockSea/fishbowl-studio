@@ -6,18 +6,20 @@
 //   node scripts/build-standalone.mjs            -> dist/fishbowl-studio-<os>-<arch>[.exe]
 //   node scripts/build-standalone.mjs --out FILE
 //
-// The studio's own files (the board, platforms, shapes, accounts, defaults, package.json) go into
-// the bundle as globalThis.__FISHBOWL_FILES__ (see server/lib/files.js), so nothing is read from
-// next to the executable. The release workflow (.github/workflows/release.yml) runs this on one
+// The studio's own files (the board, package.json, and the core's platforms, shapes, accounts and
+// defaults) go into the bundle as globalThis.__FISHBOWL_FILES__ (see core/lib/files.js), so
+// nothing is read from next to the executable. The release workflow (.github/workflows/release.yml) runs this on one
 // runner per platform.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { OWN_DIRS as CORE_DIRS } from '../core/lib/files.js';
+import { OWN_DIRS as APP_DIRS } from '../server/lib/files.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OWN_DIRS = ['server/ui', 'server/ui/skins', 'platforms', 'shapes', 'accounts', 'defaults'];
+const OWN_DIRS = [...APP_DIRS, ...CORE_DIRS.map((d) => `core/${d}`)];
 const EXTRA = ['package.json'];
 
 const [major, minor] = process.versions.node.split('.').map(Number);

@@ -81,7 +81,7 @@
       B.seg([{ value: 'next', label: 'With the next run' }, { value: 'now', label: 'Ask Claude now' }], linkWhen, (v) => { linkWhen = v; B.render(); }, 'When to draft it'),
       h('div', { class: 'card-foot' }, inline({ type: 'url', placeholder: 'https://example.com/article', aria: 'Article address', button: 'Draft it', onsubmit: async (url) => {
         const r = await call('studio_draft_link', { url });
-        if (r && r.ok && linkWhen === 'now') { const sent = await S.askClaude('Draft the link I just sent to Fishbowl Studio (do my studio rewrites).'); if (sent !== true) B.flash(typeof sent === 'string' ? sent : 'Queued. Ask Claude in the chat: "do my studio rewrites".', typeof sent === 'string' ? 'warn' : 'good'); }
+        if (r && r.ok && linkWhen === 'now') { const sent = await S.askClaude('Draft the link I just sent to Fishbowl Studio.'); if (sent !== true) B.flash(typeof sent === 'string' ? sent : 'Queued. It is drafted with the next run, or click Run it now on Schedule.', typeof sent === 'string' ? 'warn' : 'good'); }
       } })),
       d.links.length ? h('div', { class: 'rows card-foot' }, d.links.map((l) => h('div', { class: 'row-item' },
         h('span', { class: 'who' }, h('span', { class: 'nm', text: l.title || l.url }), h('span', { class: 'sub', text: `${l.host} · ${since(l.at)}` })),

@@ -3,10 +3,10 @@
 // unless a test says otherwise.
 import fs from 'node:fs';
 import path from 'node:path';
-import { tempHome, rss, at, setSources } from './helpers.js';
+import { tempHome, rss, at, setSources } from '../core/test/helpers.js';
 import { makeHost } from '../server/lib/host.js';
-import { makeModel, SCHEMAS } from '../server/lib/engines/api.js';
-import { callTool } from '../server/lib/tools.js';
+import { makeModel, SCHEMAS } from '#core/engines/api.js';
+import { callTool } from '#core/tools.js';
 
 export const KEY = 'sk-ant-api03-TESTKEY_abcdefghijklmnopqrstuvwxyz0123456789-WXYZ';
 
