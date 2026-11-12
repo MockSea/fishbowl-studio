@@ -13,7 +13,7 @@ const pkg = JSON.parse(read('package.json'));
 
 test('every npx command names the release tag for this version', () => {
   const want = `github:MockSea/fishbowl-studio#v${pkg.version}`;
-  for (const f of ['README.md', 'commands/fishbowl.md', '.claude-plugin/plugin.json', 'docs/DEVELOPING.md', 'bin/fishbowl-studio.js']) {
+  for (const f of ['README.md', 'skills/fishbowl-studio/SKILL.md', 'docs/DEVELOPING.md', 'bin/fishbowl-studio.js']) {
     const refs = read(f).match(/github:MockSea\/fishbowl-studio[^\s`'"):,]*/g) || [];
     assert.ok(refs.length, `${f} has the command`);
     for (const r of refs) assert.equal(r.replace(/\.$/, ''), want, `${f}: ${r}`);

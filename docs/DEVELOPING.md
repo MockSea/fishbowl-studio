@@ -83,9 +83,15 @@ On the Claude page, choose **API key** as the engine (so a `claude` command on t
 
 ## Releasing
 
-The `npx` command in the README and in `commands/fishbowl.md` names a release tag (`#v0.1.0`), so people run a tagged release, not whatever is on `main`. `test/release.test.js` fails when those commands don't match `package.json`'s version. To release: bump the version, update the commands to the new tag, merge, then push the tag `v<version>`. Between the merge and the tag, the command points at a tag that doesn't exist yet.
+The `npx` command in the README and in the skill (`skills/fishbowl-studio/SKILL.md`) names a release tag (`#v0.1.0`), so people run a tagged release, not whatever is on `main`. `test/release.test.js` fails when those commands don't match `package.json`'s version. To release: bump the version, update the commands to the new tag, merge, then push the tag `v<version>`. Between the merge and the tag, the command points at a tag that doesn't exist yet. The release also carries `fishbowl-studio-skill.zip`, the skill folder zipped, for people to add to Claude.
 
 An install from GitHub carries the versions in `package-lock.json`: `package.json` lists every runtime dependency under `bundleDependencies`, and the `prepare` script (it does nothing itself) makes npm install its clone from the lock file before packing it. npm ignores a lock file or `npm-shrinkwrap.json` in a package installed from git, so without this each person would get a fresh dependency tree.
+
+## The skill
+
+`skills/fishbowl-studio/SKILL.md` is for people who would rather have Claude (in Cowork or Claude Code) set the studio up than run a command. It tells Claude to check Node.js (or install the standalone build), pick a studio folder that lasts between sessions, run `npx --yes github:MockSea/fishbowl-studio#v0.1.0 --no-open --home <folder>` in the background, and hand the person the one-time link. It never has Claude build an interface, call the studio's API, read the studio folder or open the link. `test/skill.test.js` checks its frontmatter and that every option it passes is one the command accepts.
+
+To try it as Claude would on a fresh computer, run its steps with a new empty `HOME` and a new studio folder, using a local `npm pack` tarball in place of the GitHub address.
 
 ## The board
 

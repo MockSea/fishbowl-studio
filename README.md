@@ -17,6 +17,19 @@ Fishbowl Studio is for the person who writes a brand's LinkedIn, X, Threads and 
   <img src="docs/screenshots/drafts.png" alt="The Drafts page: a feed of post drafts for a bicycle shop, with today's counts and a list of brands on the right" width="100%">
 </p>
 
+## Two ways in
+
+Both run the same app on your computer, with the same files. Pick by who starts it.
+
+| Way in | Pick it if | How to start |
+| --- | --- | --- |
+| **Run it yourself** | You're fine typing one command, or you'd rather not involve Claude in setup. | The `npx` command above, or a [standalone build](#standalone-builds) if you don't have Node.js. |
+| **Have Claude set it up** | You use Claude (in Cowork or Claude Code) and would rather ask than type commands. | Add the Fishbowl Studio skill to Claude once, then ask Claude to start Fishbowl Studio. |
+
+**Adding the skill.** Download `fishbowl-studio-skill.zip` from the [latest release](https://github.com/MockSea/fishbowl-studio/releases/latest). In the Claude app, add it under **Settings → Capabilities → Skills**. In Claude Code, unzip it into `~/.claude/skills/` instead. After that, "start Fishbowl Studio" is enough: Claude checks Node.js, starts the studio in the background and gives you the link to open. The skill only installs and starts the app; you use the studio itself in your browser, the same as when you run it yourself.
+
+If Claude works in a sandbox your browser can't reach, the link won't open. Claude says so and gives you the command to run yourself instead.
+
 ## Starting it
 
 The command prints a link and opens it in your default browser. The link works once; after that the browser keeps a cookie for this session. It runs while the terminal window is open. **Ctrl+C** stops it. Running the command again while it's already running opens a fresh link to the same studio instead of starting a second.
@@ -28,13 +41,6 @@ The command prints a link and opens it in your default browser. The link works o
 | `--home <folder>` | Keep the studio's files in this folder. |
 
 Its brand files and its own settings live in **Documents → Fishbowl Studio** in your home folder. Two things can sit elsewhere: your API key, in the system's secret store (below), and files it is working on for a moment (an upload being checked, a document being read), in the system's temporary folder. On a Mac, the first start may ask whether your terminal can use the Documents folder; allow it, or start with `--home` and another folder.
-
-**From Claude Code.** Add the marketplace and install the plugin, then type `/fishbowl`. It runs the same `npx` command for you.
-
-```
-/plugin marketplace add MockSea/fishbowl-studio
-/plugin install studio@fishbowl-studio
-```
 
 ## Connecting Claude
 
