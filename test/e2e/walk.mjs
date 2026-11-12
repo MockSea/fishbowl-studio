@@ -33,8 +33,9 @@ const REAL_CLAUDE = process.env.QA_REAL_CLAUDE !== '0';
 const outputs = [];
 
 function check(area, name, ok, detail = '', shotName = null) {
-  results.push({ area, name, ok: !!ok, detail: String(detail).slice(0, 600), shot: shotName ? `${mode}-${shotName}.png` : null });
-  console.log(`${ok ? 'PASS' : 'FAIL'} [${area}] ${name}${detail ? ` :: ${String(detail).slice(0, 200)}` : ''}`);
+  detail = L.scrub(detail);
+  results.push({ area, name, ok: !!ok, detail: detail.slice(0, 600), shot: shotName ? `${mode}-${shotName}.png` : null });
+  console.log(`${ok ? 'PASS' : 'FAIL'} [${area}] ${name}${detail ? ` :: ${detail.slice(0, 200)}` : ''}`);
 }
 const text = (page, sel = 'main') => page.evaluate((s) => (document.querySelector(s) || document.body).innerText, sel);
 const has = async (page, s) => (await text(page)).includes(s);
@@ -614,6 +615,6 @@ keychainDelete(dirs.app);
 keychainDelete(other.app);
 check('Cleanup', 'the studio\'s Keychain entries are gone after the walk', keychainHas(dirs.app) !== true && keychainHas(other.app) !== true);
 await L.closeBrowser();
-fs.writeFileSync(path.join(OUT, `${mode}-cli-output.log`), outputs.join('\n').replace(/t=[0-9a-f]{64}/g, 't=<token>').replace(new RegExp(dirs.base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '<tmp>') + '\n');
+fs.writeFileSync(path.join(OUT, `${mode}-cli-output.log`), L.scrub(outputs.join('\n')) + '\n');
 fs.writeFileSync(path.join(OUT, `${mode}-results.json`), JSON.stringify({ mode, at: new Date().toISOString(), results }, null, 2) + '\n');
 console.log(`\n${results.filter((r) => r.ok).length} passed, ${results.filter((r) => !r.ok).length} failed. Data folder: ${dirs.base}`);

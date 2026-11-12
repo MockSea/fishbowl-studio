@@ -24,6 +24,15 @@ const REAL_CLAUDE = process.env.QA_CLAUDE || path.join(os.homedir(), '.local', '
 
 export const enabled = () => process.env.STUDIO_E2E === '1';
 
+// Strips what is particular to this machine and run from text the walk keeps: the per-user
+// temp root (and the os.tmpdir() spelling of it) and link tokens.
+const TMP_ROOTS = [...new Set([fs.realpathSync(os.tmpdir()), os.tmpdir()])].map((r) => r.replace(/\/+$/, ''));
+export function scrub(text) {
+  let out = String(text).replace(/t=[0-9a-f]{64}/g, 't=<token>');
+  for (const r of TMP_ROOTS) out = out.split(r).join('<tmp>');
+  return out;
+}
+
 export function tempDirs(label) {
   // The real path: on macOS os.tmpdir() runs through the /var symlink, and npm 11 then builds
   // the git package without its bundled dependencies (see the report's W6).

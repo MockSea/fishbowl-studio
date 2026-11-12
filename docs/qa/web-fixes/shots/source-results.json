@@ -6,7 +6,7 @@
       "area": "Start",
       "name": "prints the folder, the engine and a one-time link",
       "ok": true,
-      "detail": "Fishbowl Studio is running. | Studio folder: /private/var/folders/vz/2jd6t7d12952xkd0d0vfz1440000gn/T/studio-web-e2e-source-SLDU1n/home | Not connected to Claude yet: the studio will walk you through it. | ",
+      "detail": "Fishbowl Studio is running. | Studio folder: <tmp>/studio-web-e2e-source-SLDU1n/home | Not connected to Claude yet: the studio will walk you through it. | ",
       "shot": null
     },
     {
@@ -699,7 +699,7 @@
       "area": "Restart",
       "name": "the start message names where the key is kept",
       "ok": true,
-      "detail": "Fishbowl Studio is running. | Studio folder: /private/var/folders/vz/2jd6t7d12952xkd0d0vfz1440000gn/T/studio-web-e2e-source-SLDU1n/home | Drafting with your Anthropic API key. | Your API key is kept in: the macOS Keychain.",
+      "detail": "Fishbowl Studio is running. | Studio folder: <tmp>/studio-web-e2e-source-SLDU1n/home | Drafting with your Anthropic API key. | Your API key is kept in: the macOS Keychain.",
       "shot": null
     },
     {
