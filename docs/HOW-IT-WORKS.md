@@ -59,7 +59,7 @@ One setup flow for every brand: the board's **Add persona**, a new brand's first
 4. **Drafting**, one brief at a time, each checked by `saveTakes`. The work queue is: queued rewrites, redos and "draft this" requests, then stories with interest ≥ 6 (after their topic weights and what it has learned, below; up to `drafts_per_run`, 12 by default), then evergreen posts (2 a day by default).
 5. **Release**: rank and release the due batch.
 
-The whole run shares one budget of 40 drafting steps and the day's cap of 150, whichever engine answers. A step is one request the runner hands to an engine; underneath it can be more than one (retries, Claude Code turns, a fallback to the API), so the caps aren't exact limits on requests or charges. Running twice is harmless: fetched items dedupe, triaged items aren't re-queued, drafted stories aren't drafted again, and each batch releases once.
+The whole run shares one budget of 40 drafting steps and the day's cap of 150, whichever engine answers. On a Friday the timer's run also writes the weekly coach report (two steps) from the same budget. A step is one request the runner hands to an engine; underneath it can be more than one (retries, Claude Code turns, a fallback to the API), so the caps aren't exact limits on requests or charges. Running twice is harmless: fetched items dedupe, triaged items aren't re-queued, drafted stories aren't drafted again, and each batch releases once.
 
 ## How often it reads the news
 
@@ -146,6 +146,7 @@ Drafts land **held**. At each release hour (8, 12, 16, 20 by default) the held p
 - **Redo** writes a new set for a story you passed on (at most 2 per story). The new set inherits the old set's daily slot and goes straight to Waiting.
 - **Fingerprints**: pass and edit carry a hash of the text you saw. If a rewrite landed while the board was open, the action is refused and you see the new text.
 - **Proposals from the numbers.** Playbook changes are proposed from the numbers alone (skip reasons, edit patterns, how each source does), never from free text, so a single grumpy note can't rewrite the rules. Every change is a proposal you accept or reject on the Playbook page.
+- **The weekly coach.** The Coach page's **Write this week's report** button, and the timer on Fridays when **Run on its own** is on (at most once in six days), run `runner.weekly`: two steps through the same engine and caps as a run, without the brand kit. The first brief is the week's numbers only and may propose playbook changes. The second adds their notes and undone skips from the week, the audience profile and the positions, and returns the report (a summary, what's working, what isn't, what to try) and any audience or position changes. Each answer is checked by `saveWeekly`: report lines with a link, a handle or an instruction are dropped, and every change is a proposal they accept or reject on the Coach page. A first answer that fails (a refusal, running out of room) is skipped and the report still runs.
 - **Taste log**: every triaged story is logged (seen, drafted, topic, source).
 
 ## Untrusted text
@@ -185,7 +186,7 @@ The studio's operations are named tools (`server/lib/tools.js`). The board calls
 | `studio_proposal_decide` | accept (as is, or their edited text) or reject a proposal, including a suggested source |
 | `studio_metrics` | enter post numbers or import a CSV |
 
-Every tool except `studio_personas` also takes `persona`. The source also holds tools for posting through Claude's browser and a weekly coach report; the web app hides them (the `noPosting` and `noCoach` board hooks) and never calls them.
+Every tool except `studio_personas` also takes `persona`. The source also holds tools for posting through Claude's browser; the web app hides them (the `noPosting` board hook) and never calls them. The weekly coach report runs in the app through the runner (below), not as a tool call.
 
 ## The board
 

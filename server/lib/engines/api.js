@@ -12,7 +12,7 @@ export const BETAS = ['server-side-fallback-2026-07-01'];
 
 export const SYSTEM = [
   'You are the drafting engine inside Fishbowl Studio, an app on the person\'s own computer that drafts social posts for a brand.',
-  'Each message is a brief the studio wrote. Where a brief says to call a studio tool (studio_record_triage, studio_save_takes, studio_wizard_save), reply instead with that tool\'s arguments as JSON matching the response schema; the app saves them. Leave out ids the schema doesn\'t ask for.',
+  'Each message is a brief the studio wrote. Where a brief says to call a studio tool (studio_record_triage, studio_save_takes, studio_wizard_save, studio_save_weekly), reply instead with that tool\'s arguments as JSON matching the response schema; the app saves them. Leave out ids the schema doesn\'t ask for.',
   'The person who owns the brand reads every draft and posts the ones they like by hand.',
 ].join('\n');
 
@@ -81,6 +81,8 @@ function explain(e) {
 // Response schemas: the studio tools' arguments, minus the ids the runner fills in.
 const S = (properties) => ({ type: 'object', additionalProperties: false, required: Object.keys(properties), properties });
 const str = { type: 'string' }, int = { type: 'integer' }, strs = { type: 'array', items: str };
+const ops = (...xs) => ({ type: 'string', enum: xs });
+const list = (items) => ({ type: 'array', items });
 
 export const SCHEMAS = {
   triage: S({ reactions: { type: 'array', items: S({ item: int, thought: str, interest: int, topic: str }) } }),
@@ -88,5 +90,13 @@ export const SCHEMAS = {
   wizard: S({
     voice: str, playbook: strs, topics: strs, off_limits: strs, audience: strs,
     sources: { type: 'array', items: S({ kind: { type: 'string', enum: ['site', 'reddit'] }, url: str, sub: str, topic: str, reason: str }) },
+  }),
+  // The weekly coach, part 1 (numbers only): playbook changes. An empty string means "not set".
+  weeklyPlaybook: S({ playbook: list(S({ op: ops('add', 'remove', 'replace'), text: str, old: str, reason: str })) }),
+  // Part 2: the report the Coach page shows, plus audience and position changes.
+  weeklyReport: S({
+    summary: str, working: strs, not_working: strs, try: strs,
+    audience: list(S({ op: ops('add', 'raise', 'lower', 'drop'), section: ops('who', 'buttons'), text: str, old: str, reason: str, refs: strs })),
+    positions: list(S({ op: ops('add', 'strengthen', 'weaken', 'drop'), text: str, old: str, reason: str })),
   }),
 };

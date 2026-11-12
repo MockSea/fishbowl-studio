@@ -47,7 +47,7 @@ Use `--home` while developing, so nothing touches your real `Documents/Fishbowl 
 
 **Reading brand kit files.** PDF and DOCX files are read in a child process (`isolatedExtract`) with a heap cap (through `NODE_OPTIONS`), a memory watchdog and a time limit. A DOCX that claims to unpack to more than `LIMITS.docx_unzipped_bytes` is refused before it is opened. Uploads arrive as raw bytes in a random temporary file; the person's file name is only ever shown.
 
-**Hooks.** `web-pages.js` sets `window.BoardHooks` so shared pages fit the web app: `noPosting` (no Posting step or accounts), `noCoach` (no Coach page), `sourceKinds` (only sites and subreddits on the Sources page), `scheduleCard`, `settingsRail` and `finishBody`.
+**Hooks.** `web-pages.js` sets `window.BoardHooks` so shared pages fit the web app: `noPosting` (no Posting step or accounts), `noCoach` (no Coach page; the web app shows Coach, so it doesn't set this), `sourceKinds` (only sites and subreddits on the Sources page), `scheduleCard`, `settingsRail` and `finishBody`.
 
 **Security tests.** `test/web.test.js` covers the server's rules (token, cookie, Host, Origin, methods, body types, uploads, the control proof), `test/cli.test.js` the command and its lock file (including a stale lock pointing at a listener that isn't the studio), `test/keystore.test.js` each secret store.
 

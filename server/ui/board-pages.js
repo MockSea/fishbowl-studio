@@ -103,6 +103,14 @@
   // ---------- Topics ----------
   const WEIGHTS = [{ value: 1, label: 'Less' }, { value: 2, label: 'Normal' }, { value: 3, label: 'More' }];
 
+  // The Coach page through its nav button, so the page lands the same way a nav click does.
+  // Null on a host with no Coach page.
+  const coachLink = (label, cls = 'btn sm') => {
+    if (B.hook('noCoach')) return null;
+    const nav = Array.from(document.querySelectorAll('.navbtn')).find((b) => b.dataset.view === 'coach');
+    return nav ? h('button', { class: cls, onclick: () => nav.click() }, label) : null;
+  };
+
   function topics(d) {
     const rows = d.topics.map((t) => h('div', { class: 'row-item' },
       h('span', { class: 'letter', text: '#' }),
@@ -124,7 +132,7 @@
         h('div', {}, h('div', {}, h('span', { class: 'nm', text: b.label }), h('span', { class: 'sub-inline', text: ` ${b.points > 0 ? '+' : ''}${b.points} interest` })),
           b.why.map((w) => h('div', { class: 'why', text: `Because: ${w}` }))))))
         : B.empty({ icon: 'trend', title: 'Nothing moved yet', text: 'Once you approve, skip or heart a few, the stories it picks first follow your taste.' }));
-    const edits = d.edits.patterns.length || d.edits.phrases.length ? card({ icon: 'edit', title: 'From your edits', sub: `What you change before approving (${plural(d.edits.n, 'edit')} in the last two months). Each one is a suggestion on the Coach page; nothing changes until you accept it.` },
+    const edits = d.edits.patterns.length || d.edits.phrases.length ? card({ icon: 'edit', title: 'From your edits', sub: `What you change before approving (${plural(d.edits.n, 'edit')} in the last two months). Each one is a suggestion on the ${B.hook('noCoach') ? 'Playbook' : 'Coach'} page; nothing changes until you accept it.`, end: coachLink('Open Coach') },
       h('ul', { class: 'list small' }, [...d.edits.patterns.map((p) => h('li', { text: `${p.why} Suggests: “${p.line}”.` })), ...d.edits.phrases.map((p) => h('li', { text: p.why }))])) : null;
     const ranking = d.ranking.length ? card({ icon: 'settings', title: 'How it picks your drafts', sub: 'What counts most when it chooses which drafts reach you. It adjusts a little each day.' },
       h('div', { class: 'bars' }, d.ranking.map((r) => h('div', { class: 'bar-row' },
@@ -133,7 +141,7 @@
     return page('Topics', 'What it pays attention to, and what it has learned from you.', null,
       h('div', { class: 'cols' }, h('div', { class: 'stack' }, list, learned, boosts, edits), h('aside', { class: 'rail' }, ranking,
         card({ icon: 'bulb', title: 'How learning works', cls: 'soft' }, h('ul', { class: 'list small muted' },
-          h('li', { text: 'Every approve, skip and edit is a vote. Your edits are compared with the draft to see what you change.' }), h('li', { text: 'Hearts count double: “more like this”. Hearting a read moves similar stories up.' }), h('li', { text: 'A reason when you skip (“wrong topic”, “too salesy”) tells it what to fix.' }), h('li', { text: 'Changes to the voice and playbook always wait for your yes on the Coach page.' }))))));
+          h('li', { text: 'Every approve, skip and edit is a vote. Your edits are compared with the draft to see what you change.' }), h('li', { text: 'Hearts count double: “more like this”. Hearting a read moves similar stories up.' }), h('li', { text: 'A reason when you skip (“wrong topic”, “too salesy”) tells it what to fix.' }), h('li', { text: `Changes to the voice and playbook always wait for your yes on the ${B.hook('noCoach') ? 'Playbook' : 'Coach'} page.` })), coachLink('Open Coach')))));
   }
 
   // ---------- Schedule ----------

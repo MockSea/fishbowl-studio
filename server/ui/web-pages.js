@@ -1,5 +1,6 @@
 // The app's own pages and cards: Brand kit, Claude (which engine drafts, and the API key), the
-// schedule (runs while the studio is open), and run progress and notices. Loaded after the shared board scripts; uses window.Board for every
+// schedule (runs while the studio is open, the weekly coach report on Fridays), and run progress
+// and notices. Loaded after the shared board scripts; uses window.Board for every
 // control so it looks like the rest of the board. Text from files and the server only reaches
 // the DOM through textContent.
 (function () {
@@ -25,9 +26,6 @@
   const kitBtn = h('button', { class: 'navbtn', 'data-view': 'brandkit', 'data-icon': 'briefcase' }, icon('briefcase'), h('span', { class: 'lbl' }, 'Brand kit'));
   kitBtn.addEventListener('click', () => { Object.assign(B.state, { open: {}, why: null, menu: false, wnew: false, wstep: null, arming: null }); B.setDrawer(false); B.load({ view: 'brandkit' }); });
   topics.after(kitBtn);
-  // The studio has no weekly coach, so no Coach page. Proposals from
-  // edits wait on the Playbook page.
-  document.querySelector('.navbtn[data-view="coach"]')?.remove();
 
   const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
@@ -146,13 +144,12 @@
         h('button', { class: 'btn sm', onclick: () => B.load({ view: 'brandkit' }) }, 'Open the brand kit')),
     ],
     noPosting: () => true,
-    noCoach: () => true,
     sourceKinds: () => ['site', 'reddit'],
     finishBody: () => ({ sub: 'The studio runs it while it is open. Turn this on to have it read and draft by itself.', body: [autorunRow()] }),
   };
 
   // ---------- runs ----------
-  const KIND = { daily: 'the daily run', jobs: 'the rewrite queue', wizard: 'the setup drafts' };
+  const KIND = { daily: 'the daily run', jobs: 'the rewrite queue', wizard: 'the setup drafts', weekly: 'the weekly report' };
   S.onRun((ev) => {
     if (ev.state === 'start') B.flash(`Working on ${KIND[ev.kind] || 'it'}…`, 'info');
     else if (ev.state === 'done') { B.flash(ev.message || 'Done.', 'good'); B.load(); }

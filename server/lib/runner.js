@@ -10,7 +10,7 @@ import { draftingBrief } from './briefs.js';
 import { saveTakes, abandonBrief } from './save.js';
 import { releaseTool } from './run.js';
 import { wizardBrief, wizardSave } from './wizard.js';
-import { editProposals } from './weekly.js';
+import { editProposals, weeklyBrief, saveWeekly } from './weekly.js';
 import { SCHEMAS, ModelError } from './engines/api.js';
 
 const MAX_TRIAGE_ROUNDS = 10;
@@ -23,6 +23,19 @@ export const CALLS_PER_BRIEF = 3;
 // the batch is closed at interest 0, and the run moves on. Anything else (auth, network, rate
 // limits) ends the run with the brief or batch left open.
 const BRIEF_ERRORS = new Set(['refusal', 'max_tokens', 'parse']);
+
+// The weekly coach report: one call for playbook changes, one for the report.
+export const WEEKLY_CALLS = 2;
+// What each weekly brief ends with in the app, in place of the plugin's tool calls.
+const WEEKLY_REPLY = {
+  numbers: '## Reply\nReply with the playbook changes as JSON matching the response schema, an empty list if nothing should change. Use an empty string for a field that does not apply. The app saves them and sends part 2.',
+  full: '## Reply\nReply with the coach report and any audience or position changes as JSON matching the response schema. Use an empty string for a field that does not apply. The app saves it for the Coach page.',
+};
+
+// A structured answer's proposal rows as the plugin's tool would get them: empty strings left out.
+function proposalRows(rows) {
+  return (Array.isArray(rows) ? rows : []).map((r) => Object.fromEntries(Object.entries(r || {}).filter(([, v]) => v !== '' && v != null)));
+}
 
 // The most model calls in one calendar day (local time), across every run and brand.
 export const MAX_CALLS_PER_DAY = 150;
@@ -153,8 +166,8 @@ export function makeRunner({ ctx, model, kit, progress = () => {}, daily = null 
       if (!c.settings().setup_complete) return { message: 'Finish setting up this brand first.' };
       const f = await fetchAll(c, { force });
       const queued = c.tx((db) => db.jobs.some((j) => j.status === 'queued'));
-      // Patterns in their edits become playbook proposals (no model call). The plugin does this
-      // in its weekly report; the app has none, so it happens on every run.
+      // Patterns in their edits become playbook proposals (no model call), on every run as well
+      // as in the weekly report, so they don't wait for Friday.
       c.tx((db) => editProposals(c, db));
       if (!force && (f.skipped || !f.feeds) && !queued) {
         releaseTool(c);
@@ -188,5 +201,31 @@ export function makeRunner({ ctx, model, kit, progress = () => {}, daily = null 
       if (!r.ok) throw new Error(r.message);
       return { message: r.message };
     }),
+
+    // The weekly coach. Part 1 sees only the numbers and proposes playbook changes; part 2 adds
+    // their notes, taste, audience and positions and writes the report for the Coach page.
+    // Everything goes through saveWeekly, so nothing changes until they accept it. The brand
+    // kit is not sent: the report works from the studio's own numbers.
+    weekly: (slug, { budget } = {}) => once(slug, 'weekly', async (c, k, bud) => {
+      if (!c.settings().setup_complete) return { message: 'Finish setting up this brand first.' };
+      if (!bud.can(WEEKLY_CALLS)) {
+        return { message: daily && daily.left() < WEEKLY_CALLS ? `Today's ${daily.cap} model calls are used up. The report can run again tomorrow.` : 'Not enough model calls left in this run for the weekly report.', calls: 0 };
+      }
+      let changes = 0;
+      const nums = weeklyBrief(c, { part: 'numbers' });
+      try {
+        const out = await bud.ask({ task: `${nums.text}\n\n${WEEKLY_REPLY.numbers}`, schema: SCHEMAS.weeklyPlaybook, kit: null, effort: 'medium' });
+        const playbook = proposalRows(out.playbook);
+        if (playbook.length) changes += saveWeekly(c, { playbook }).added.length;
+      } catch (e) {
+        // A playbook answer the model got wrong is dropped; the report still gets written.
+        if (!(e instanceof ModelError && BRIEF_ERRORS.has(e.kind))) throw e;
+      }
+      const full = weeklyBrief(c, { part: 'full' });
+      const out = await bud.ask({ task: `${full.text}\n\n${WEEKLY_REPLY.full}`, schema: SCHEMAS.weeklyReport, kit: null, effort: 'medium' });
+      const r = saveWeekly(c, { summary: out.summary, working: out.working, not_working: out.not_working, try: out.try, audience: proposalRows(out.audience), positions: proposalRows(out.positions) });
+      changes += r.added.length;
+      return { message: `This week's report is on the Coach page${changes ? `, with ${plural(changes, 'change')} waiting for your yes` : ''}.`, changes, calls: bud.used };
+    }, budget),
   };
 }

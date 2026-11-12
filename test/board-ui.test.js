@@ -198,6 +198,19 @@ test('Topics: add, weight and remove topics; learned interests explain themselve
   assert.doesNotMatch(b.ctx.store.readFile('beat.json'), /e-bike-batteries/);
 });
 
+test('Topics links to the Coach page, and lands on it the way the nav does', async () => {
+  const b = await boot();
+  await b.nav('topics');
+  assert.match(b.view().textContent, /wait for your yes on the Coach page/);
+  await button(b.view(), 'Open Coach').click(); await settle();
+  assert.match(b.view().textContent, /Week of \d{4}-\d{2}-\d{2}/);
+  assert.match(b.view().textContent, /Waiting for your yes \(4\)/);
+  const off = await boot({ hooks: { noCoach: () => true } });
+  await off.nav('topics');
+  assert.equal(button(off.view(), 'Open Coach'), undefined);
+  assert.doesNotMatch(off.view().textContent, /Coach page/);
+});
+
 test('Schedule: presets and release times are one click; the Cowork text is honest and copyable', async () => {
   const b = await boot();
   await b.nav('schedule');

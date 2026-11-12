@@ -72,6 +72,7 @@ The studio counts its work in **drafting steps**: one step is one request it han
 | **Run it now** | Up to 40: reading the stories, then one to three for each story it drafts |
 | A rewrite, a redo, or a link to draft | Up to 3 each, and up to 40 for the whole queue |
 | **Run on its own**, each check | Up to 40, and none when nothing is due |
+| The weekly report on **Coach** (by hand, or on Fridays when it runs on its own) | 2 |
 
 It takes at most 150 steps a day in all. These limits count steps, not what each step costs: one step can turn into more than one request underneath (the API client retries a failed request, Claude Code can take a few turns, and a step that Claude Code couldn't run is sent again with your key), so they aren't a hard cap on requests or charges. Your brand kit goes with every step, so a big kit makes each one cost more. A story the model can't write well (it refuses, or every take is too long even after one redraft) is closed after those steps and never asked for again.
 

@@ -11,7 +11,7 @@ import { makeKeystore, osStore, STORE_LABELS } from './keystore.js';
 import { makeClient, makeModel, MODEL } from './engines/api.js';
 import { makeEngine, findOnPath, ENGINES } from './engines/index.js';
 import { makeCliModel } from './engines/claude-cli.js';
-import { makeRunner, makeDailyCap, MAX_CALLS_PER_RUN, MAX_CALLS_PER_DAY, CALLS_PER_BRIEF } from './runner.js';
+import { makeRunner, makeDailyCap, MAX_CALLS_PER_RUN, MAX_CALLS_PER_DAY, CALLS_PER_BRIEF, WEEKLY_CALLS } from './runner.js';
 import { loadSettings } from './config.js';
 
 const DEFAULT_PREFS = { autorun: false, engine: 'auto' };
@@ -19,6 +19,17 @@ const DEFAULT_PREFS = { autorun: false, engine: 'auto' };
 export const MAX_CALLS_PER_TICK = MAX_CALLS_PER_RUN;
 // After an automatic run fails, that brand is left alone this long.
 const RETRY_AFTER_MS = 60 * 60 * 1000;
+// The weekly coach report runs on its own on this weekday (0 is Sunday), once a week.
+export const WEEKLY_DAY = 5;
+const DAY_MS = 24 * 3600e3;
+
+// Whether a brand's weekly report is due: it's the report day, and no report was written (or
+// run without error, at `ranAt`) in the last six days.
+export function weeklyDue(c, now, ranAt = 0) {
+  if (new Date(now).getDay() !== WEEKLY_DAY) return false;
+  const last = Math.max(ranAt, ...c.store.read('coach', []).map((r) => Date.parse(r.at) || 0));
+  return now - last >= 6 * DAY_MS;
+}
 // Kit files one upload request may carry.
 export const MAX_KIT_FILES_PER_ADD = 20;
 
@@ -47,6 +58,7 @@ export function makeHost({
   const runner = makeRunner({ ctx, model: engine, kit: (slug) => kitFor(ctx, slug).content(), progress: emit, daily });
   const active = () => ctx.personas.active();
   const failedAt = new Map();
+  const weeklyAt = new Map();
 
   // The app's own pages ride on the settings view for the header the shell needs.
   async function appView(view) {
@@ -76,6 +88,7 @@ export function makeHost({
     if (setup) return { kind: 'wizard', slug: setup[1], go: () => runner.wizard(setup[1]) };
     if (t === 'Run the Fishbowl Studio daily run now.') return { kind: 'daily', slug: active(), go: () => runner.daily(active(), { force: true }) };
     if (/^Run my Fishbowl Studio rewrites and redos now\.$|^Draft the link I just sent to Fishbowl Studio/.test(t)) return { kind: 'jobs', slug: active(), go: () => runner.jobs(active()) };
+    if (t === 'Run the Fishbowl Studio weekly report.') return { kind: 'weekly', slug: active(), go: () => runner.weekly(active()) };
     return null;
   }
 
@@ -89,7 +102,10 @@ export function makeHost({
       if (ctx.now() - (failedAt.get(p.slug) ?? -Infinity) < RETRY_AFTER_MS) continue;
       if (!budget.can(CALLS_PER_BRIEF)) break;
       const r = await runner.daily(p.slug, { budget });
-      if (r.ok) failedAt.delete(p.slug); else failedAt.set(p.slug, ctx.now());
+      if (r.ok) failedAt.delete(p.slug); else { failedAt.set(p.slug, ctx.now()); continue; }
+      if (!weeklyDue(c, ctx.now(), weeklyAt.get(p.slug)) || !budget.can(WEEKLY_CALLS)) continue;
+      const w = await runner.weekly(p.slug, { budget });
+      if (w.ok) weeklyAt.set(p.slug, ctx.now()); else failedAt.set(p.slug, ctx.now());
     }
     return { calls: budget.used };
   }
@@ -122,7 +138,7 @@ export function makeHost({
     // Starts the run and returns at once; progress arrives through emit().
     ask(text) {
       const r = route(text);
-      if (!r) return { ok: false, message: 'The studio does this from its own buttons only: setup drafts, Run it now and the rewrite queue.' };
+      if (!r) return { ok: false, message: 'The studio does this from its own buttons only: setup drafts, Run it now, the rewrite queue and the weekly report.' };
       if (!engine.ready()) return { ok: false, message: prefs().engine === 'claude' ? 'Claude Code isn\'t installed on this computer. Install it, or choose your API key in Settings.' : 'Add your Anthropic API key in Settings, or install Claude Code, first.' };
       if (runner.busy(r.slug)) return { ok: false, message: 'A run for this brand is already going.' };
       const done = r.go();
@@ -162,8 +178,9 @@ export function makeHost({
     catchUp,
     // Every few minutes while the app is running: release due batches for every brand and, if
     // autorun is on, run the daily run. That run calls the model only when its news setting says
-    // it's time to read, or a rewrite is queued. The whole tick shares one call budget, and a
-    // brand whose last automatic run failed sits out for an hour.
+    // it's time to read, or a rewrite is queued. On the report day (WEEKLY_DAY) a brand with no
+    // report in six days also gets the weekly coach report (two calls). The whole tick shares one
+    // call budget, and a brand whose last automatic run failed sits out for an hour.
     async tick() {
       if (ticking) return { calls: 0, skipped: true };
       ticking = true;
