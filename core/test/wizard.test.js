@@ -3,9 +3,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { testContext, at } from './helpers.js';
-import { callTool, TOOLS } from '../server/lib/tools.js';
-import { makeContext } from '../server/lib/state.js';
-import { loadSources } from '../server/lib/config.js';
+import { callTool, TOOLS } from '../lib/tools.js';
+import { makeContext } from '../lib/state.js';
+import { loadSources } from '../lib/config.js';
 
 const NOW = at(2026, 10, 22, 10, 0);
 const SITE = 'https://acme-rockets.example.com/';

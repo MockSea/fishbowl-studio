@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { tooOld } from '../server/lib/old-node.js';
-import { PLUGIN_ROOT } from '../server/lib/config.js';
+import { APP_DIR } from '../server/lib/files.js';
 
 test('on too old a Node, the command prints one plain fix and exits non-zero', () => {
   let text = '';
@@ -15,7 +15,7 @@ test('on too old a Node, the command prints one plain fix and exits non-zero', (
   assert.match(text, /^Fishbowl Studio needs a newer Node\.js \(version 20 or later; this computer has 18\.2\.0\)\./);
   assert.doesNotMatch(text, /at .*\.js:\d+|Error:/);
   // The entry point checks the version before it loads anything else.
-  const entry = fs.readFileSync(path.join(PLUGIN_ROOT, 'bin', 'fishbowl-studio.js'), 'utf8');
+  const entry = fs.readFileSync(path.join(APP_DIR, 'bin', 'fishbowl-studio.js'), 'utf8');
   assert.doesNotMatch(entry, /^import /m, 'no static imports: an old Node must reach the check');
-  assert.equal(JSON.parse(fs.readFileSync(path.join(PLUGIN_ROOT, 'package.json'), 'utf8')).engines.node, '>=20');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(APP_DIR, 'package.json'), 'utf8')).engines.node, '>=20');
 });

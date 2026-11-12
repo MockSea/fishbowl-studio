@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { testContext, rss, at, tempHome, setSources } from './helpers.js';
-import { makeContext } from '../server/lib/state.js';
-import { callTool } from '../server/lib/tools.js';
-import { fetchAll } from '../server/lib/ingest.js';
-import { draftingBrief, nextItem } from '../server/lib/briefs.js';
-import { parsePage, feedLinkIn, sourceName } from '../server/lib/sources.js';
-import { fetchDue, scheduleTasks, nextFetchAt, FETCH_KEYS } from '../server/lib/schedule.js';
-import { loadSources, loadBeat } from '../server/lib/config.js';
+import { makeContext } from '../lib/state.js';
+import { callTool } from '../lib/tools.js';
+import { fetchAll } from '../lib/ingest.js';
+import { draftingBrief, nextItem } from '../lib/briefs.js';
+import { parsePage, feedLinkIn, sourceName } from '../lib/sources.js';
+import { fetchDue, scheduleTasks, nextFetchAt, FETCH_KEYS } from '../lib/schedule.js';
+import { loadSources, loadBeat } from '../lib/config.js';
 
 const NOW = at(2026, 10, 21, 7, 0); // a Wednesday
 const FEED = 'https://feeds.example.com/cycling.xml';

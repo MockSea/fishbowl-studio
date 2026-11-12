@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { parseFeed, decodeEntities, stripHtml, fetchText } from '../server/lib/feeds.js';
+import { parseFeed, decodeEntities, stripHtml, fetchText } from '../lib/feeds.js';
 import { rss } from './helpers.js';
 
 const atom = fs.readFileSync(new URL('./fixtures/atom.xml', import.meta.url), 'utf8');

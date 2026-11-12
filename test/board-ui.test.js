@@ -5,11 +5,11 @@ import vm from 'node:vm';
 import fs from 'node:fs';
 import path from 'node:path';
 import { makeDom } from './dom-shim.js';
-import { tempHome } from './helpers.js';
+import { tempHome } from '../core/test/helpers.js';
 import { seed } from '../dev/seed.mjs';
-import { makeContext } from '../server/lib/state.js';
-import { callTool } from '../server/lib/tools.js';
-import { PLUGIN_ROOT } from '../server/lib/config.js';
+import { makeContext } from '#core/state.js';
+import { callTool } from '#core/tools.js';
+import { APP_DIR } from '../server/lib/files.js';
 import { BOARD_SCRIPTS, boardHtml } from '../server/lib/page.js';
 
 const tick = () => new Promise((r) => setTimeout(r, 5));
@@ -42,7 +42,7 @@ async function boot({ fetchImpl, hooks } = {}) {
   };
   if (hooks) win.BoardHooks = hooks;
   vm.createContext(win);
-  const ui = (f) => fs.readFileSync(path.join(PLUGIN_ROOT, 'server', 'ui', f), 'utf8');
+  const ui = (f) => fs.readFileSync(path.join(APP_DIR, 'server', 'ui', f), 'utf8');
   for (const f of BOARD_SCRIPTS) vm.runInContext(ui(f), win, { filename: f });
   await settle();
   const nav = async (v) => { await document.querySelectorAll('.navbtn').find((x) => x.dataset.view === v).click(); await settle(); };
@@ -256,7 +256,7 @@ test('Settings: switches, steppers and segmented choices save on click; Reads an
 });
 
 test('component CSS takes every colour from the skin; the board ships every skin file', () => {
-  const css = fs.readFileSync(path.join(PLUGIN_ROOT, 'server', 'ui', 'board.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const css = fs.readFileSync(path.join(APP_DIR, 'server', 'ui', 'board.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const literal = css.match(/#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(|\b(white|black|red|green|blue|gray|grey)\b(?![-\w])/gi);
   assert.equal(literal, null, `literal colours in board.css: ${literal}`);
   const html = boardHtml();
@@ -264,7 +264,7 @@ test('component CSS takes every colour from the skin; the board ships every skin
   assert.match(html, /window\.STUDIO_SKINS = \["light","dark"\]/);
   assert.match(html, /:root\[data-skin="dark"\]/);
   // Dark mode must not leave a light colour behind: every colour token in light.css is redefined in dark.css.
-  const skin = (f) => fs.readFileSync(path.join(PLUGIN_ROOT, 'server', 'ui', 'skins', f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const skin = (f) => fs.readFileSync(path.join(APP_DIR, 'server', 'ui', 'skins', f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const colourTokens = (css) => new Set([...css.matchAll(/(--[\w-]+):\s*([^;]+);/g)].filter(([, , v]) => /#|rgba?\(|shadow/.test(v) || /^--shadow/.test(v)).map(([, k]) => k));
   const dark = colourTokens(skin('dark.css'));
   const missing = [...colourTokens(skin('light.css'))].filter((k) => !dark.has(k));

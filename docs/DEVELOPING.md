@@ -16,21 +16,27 @@ Use `--home` while developing, so nothing touches your real `Documents/Fishbowl 
 
 ## How it fits together
 
+The repository holds two things: the **drafting core** (`core/`), a package with no server and no UI, and the **web app** (`bin/`, `server/`), which serves the board on 127.0.0.1 and imports the core. The web app reaches core modules as `#core/<file>.js`, a subpath import declared in the root `package.json` that maps to `core/lib/`. The core never imports from `server/`. [core/README.md](../core/README.md) lists what the core holds and how a host uses it.
+
 | File | What it does |
 | --- | --- |
+| `core/lib/` | The studio itself: sources, triage, ranking, drafting briefs, voice and playbook, proposals, release batches, learning, the brand kit and Coach. [How it works](HOW-IT-WORKS.md) covers them. |
+| `core/lib/runner.js` | The daily run, the rewrite queue, the setup drafts and the weekly report, under the per-run and per-day caps on drafting steps. |
+| `core/lib/engines/` | Who answers a drafting step: `claude-cli.js` (`claude -p`), `api.js` (the Anthropic SDK) and `index.js`, which picks one. |
+| `core/lib/brandkit.js`, `extract-child.js` | Brand kit files: limits, reading PDF and DOCX in a child process, and what goes with each step. |
+| `core/lib/files.js` | Reads files shipped inside a package (the core's platforms, shapes, accounts and defaults; the web app's board). In the standalone build they come from the bundle instead of the disk. |
+| `core/platforms/`, `core/shapes/`, `core/accounts/`, `core/defaults/` | Data: one file per platform, post shape and account type, and the default settings. |
+| `core/test/` | The core's own tests. `cd core && npm test` runs only these; `npm test` at the root runs them with the web app's. |
 | `bin/fishbowl-studio.js` | The command. Checks the Node version, then runs `server/cli.js`. With `--extract-child` it runs the brand kit reader instead (the standalone build starts itself that way). |
 | `server/cli.js` | Options, the lock file a second copy reads, catching up missed release times on start, opening the browser, and the five-minute timer. |
 | `server/lib/web.js` | The HTTP server: launch token, session cookie, Host and Origin checks, the JSON API, the event stream and kit uploads. Its header says what keeps other people and other pages out. |
 | `server/lib/control.js` | How a second copy of the command and the running studio prove to each other that they hold the lock file's control secret, without sending it. |
-| `server/lib/host.js` | Everything the page can ask for, as plain functions: studio tools, the engine, the key, the brand kit, preferences, the timer tick. |
-| `server/lib/runner.js` | The daily run, the rewrite queue and the setup drafts, under the per-run and per-day caps on drafting steps. |
-| `server/lib/engines/` | Who answers a drafting step: `claude-cli.js` (`claude -p`), `api.js` (the Anthropic SDK) and `index.js`, which picks one. |
+| `server/lib/host.js` | Everything the page can ask for, as plain functions over the core: studio tools, the engine, the key, the brand kit, preferences, the timer tick. |
 | `server/lib/keystore.js` | The API key in the system's secret store (`security`, `secret-tool`, DPAPI through PowerShell) or a 0600 file. |
-| `server/lib/brandkit.js`, `extract-child.js` | Brand kit files: limits, reading PDF and DOCX in a child process, and what goes with each step. |
-| `server/lib/files.js` | Reads the studio's own files (board, platforms, defaults). In the standalone build they come from the bundle instead of the disk. |
-| `server/lib/` (the rest) | The studio itself: sources, triage, ranking, drafting briefs, release batches, learning. [How it works](HOW-IT-WORKS.md) covers them. |
+| `server/lib/files.js`, `page.js` | The web app's own files, and the board page assembled from them. |
 | `server/ui/` | The board. `board-*.js` are the shared pages; `web-bridge.js` talks to the server and `web-pages.js` adds the Claude and Brand kit pages and the `BoardHooks` below. |
-| `commands/fishbowl.md`, `.claude-plugin/` | The Claude Code plugin: one command that runs `npx github:MockSea/fishbowl-studio#v0.1.0`. |
+| `test/` | The web app's tests: the server, the command, the host, the engines against a fake `claude`, the board, the caps and the release pins. |
+| `skills/fishbowl-studio/` | The skill for Claude (Cowork or Claude Code): it installs and starts this web app for the person. See [The skill](#the-skill). |
 
 **Settings for development:**
 
@@ -43,7 +49,7 @@ Use `--home` while developing, so nothing touches your real `Documents/Fishbowl 
 
 **Engines.** `engines/index.js` decides who answers: Claude Code when the `claude` command is on `PATH` (on Windows only `claude.exe` counts), otherwise the saved key. In Automatic, if `claude -p` can't start or can't finish a call (a `ModelError` of kind `cli`) and a key is saved, that call and later ones go to the API until the studio restarts or the engine or key changes, and the page is told once. An answer that isn't valid JSON or a refusal fails that step without switching. `claude-cli.js` is the only file that knows the `claude -p` call shape: no tools, no MCP servers, no setting sources (`--setting-sources ''`, so no settings files and no `CLAUDE.md` from any folder), no saved session, a new empty folder under the studio's `app/claude-runs/`, and the answer as structured output. `test/engines.test.js` runs that adapter against a fake `claude`.
 
-**Drafting-step limits.** The caps count budgeted drafting steps: each `engine.ask()` the runner makes. `MAX_CALLS_PER_RUN` in `runner.js` caps the steps in one run (40), `MAX_CALLS_PER_DAY` caps a day (150, kept in `app/usage.json`), and `MAX_CALLS_PER_TICK` in `host.js` caps one timer tick across every brand. Both engines count against the same caps. One step can be more than one request underneath (SDK retries, several Claude Code turns, or a failed Claude Code attempt followed by the API), so these are not hard limits on requests or charges. A brief the model can't finish (refused, cut off, unreadable, or every take dropped after its redraft) is closed with `abandonBrief` and its story counts as used for the day. After a failed automatic daily run a brand waits an hour before the timer tries it again. The automatic weekly report is tried once per Friday, recorded in `app/weekly.json` whether it works or not, and its failure never holds back the daily run. `test/cost.test.js` holds these bounds.
+**Drafting-step limits.** The caps count budgeted drafting steps: each `engine.ask()` the runner makes. `MAX_CALLS_PER_RUN` in `core/lib/runner.js` caps the steps in one run (40), `MAX_CALLS_PER_DAY` caps a day (150, kept in `app/usage.json`), and `MAX_CALLS_PER_TICK` in `server/lib/host.js` caps one timer tick across every brand. Both engines count against the same caps. One step can be more than one request underneath (SDK retries, several Claude Code turns, or a failed Claude Code attempt followed by the API), so these are not hard limits on requests or charges. A brief the model can't finish (refused, cut off, unreadable, or every take dropped after its redraft) is closed with `abandonBrief` and its story counts as used for the day. After a failed automatic daily run a brand waits an hour before the timer tries it again. The automatic weekly report is tried once per Friday, recorded in `app/weekly.json` whether it works or not, and its failure never holds back the daily run. `test/cost.test.js` holds these bounds.
 
 **Reading brand kit files.** PDF and DOCX files are read in a child process (`isolatedExtract`) with a heap cap (through `NODE_OPTIONS`), a memory watchdog and a time limit. A DOCX that claims to unpack to more than `LIMITS.docx_unzipped_bytes` is refused before it is opened. Uploads arrive as raw bytes in a random temporary file; the person's file name is only ever shown.
 

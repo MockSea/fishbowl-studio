@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lint, numbersIn, quotesIn, nameCandidates, unknownNames, copiesExample } from '../server/lib/lint.js';
+import { lint, numbersIn, quotesIn, nameCandidates, unknownNames, copiesExample } from '../lib/lint.js';
 
 const x = { name: 'X', long_over: 220, hashtags_max: 0 };
 const codes = (fl) => fl.map((f) => f.code).sort();

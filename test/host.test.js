@@ -4,13 +4,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { tempHome, at } from './helpers.js';
-import { writeKitFiles, png } from './kit-files.js';
+import { tempHome, at } from '../core/test/helpers.js';
+import { writeKitFiles, png } from '../core/test/kit-files.js';
 import { KEY, NOW, fetchImpl, app, setUpBrand } from './host-helpers.js';
 import { makeHost } from '../server/lib/host.js';
 import Anthropic from '@anthropic-ai/sdk';
-import { makeModel, MODEL } from '../server/lib/engines/api.js';
-import { editDiff } from '../server/lib/learn.js';
+import { makeModel, MODEL } from '#core/engines/api.js';
+import { editDiff } from '#core/learn.js';
 
 test('add a key, set up a brand, add a source and a brand kit, run: drafts land, written with the kit', async () => {
   const { host, api, events, clock } = await app();

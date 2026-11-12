@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { testContext, at } from './helpers.js';
-import { proposalsTool, decideProposal, validateProposal } from '../server/lib/proposals.js';
-import { weeklyBrief, saveWeekly } from '../server/lib/weekly.js';
-import { loadPlaybook, loadPositions, loadAudience, loadShapes, writePlaybook } from '../server/lib/config.js';
+import { proposalsTool, decideProposal, validateProposal } from '../lib/proposals.js';
+import { weeklyBrief, saveWeekly } from '../lib/weekly.js';
+import { loadPlaybook, loadPositions, loadAudience, loadShapes, writePlaybook } from '../lib/config.js';
 
 test('proposals are validated: own words, no instructions, known kinds', () => {
   assert.throws(() => validateProposal({ kind: 'mood', op: 'add', text: 'x' }), /Unknown proposal kind/);

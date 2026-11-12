@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { testContext, at } from './helpers.js';
-import { act, fingerprint } from '../server/lib/act.js';
-import { draftingBrief } from '../server/lib/briefs.js';
-import { saveTakes } from '../server/lib/save.js';
+import { act, fingerprint } from '../lib/act.js';
+import { draftingBrief } from '../lib/briefs.js';
+import { saveTakes } from '../lib/save.js';
 
 const NOW = at(2026, 10, 21, 9, 0);
 

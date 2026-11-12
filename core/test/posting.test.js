@@ -4,10 +4,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { testContext, at } from './helpers.js';
-import { callTool, TOOLS } from '../server/lib/tools.js';
-import { setAccount, accountsView, validateAccountType } from '../server/lib/accounts.js';
-import { nextSlot, textHash, GRACE_MIN } from '../server/lib/posting.js';
-import { fingerprint } from '../server/lib/act.js';
+import { callTool, TOOLS } from '../lib/tools.js';
+import { setAccount, accountsView, validateAccountType } from '../lib/accounts.js';
+import { nextSlot, textHash, GRACE_MIN } from '../lib/posting.js';
+import { fingerprint } from '../lib/act.js';
 
 const NOW = at(2026, 10, 22, 9, 30); // a Thursday; release hours 8, 12, 16, 20
 const MIN = 60e3;

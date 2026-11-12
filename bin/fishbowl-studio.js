@@ -3,7 +3,7 @@
 // Written in plain, old syntax with no static imports, so a Node that is too old still gets as
 // far as the version check and prints one plain fix instead of a stack trace.
 // --extract-child is internal: the brand kit reads a PDF or Word file in a separate process
-// started with it (see isolatedExtract in server/lib/brandkit.js).
+// started with it (see isolatedExtract in core/lib/brandkit.js).
 var MIN_NODE = 20;
 var major = Number(String(process.versions.node).split('.')[0]);
 
@@ -13,7 +13,7 @@ function fail(e) {
 }
 
 if (process.argv[2] === '--extract-child') {
-  import('../server/lib/extract-child.js').catch(fail);
+  import('../core/lib/extract-child.js').catch(fail);
 } else if (major >= MIN_NODE) {
   import('../server/cli.js').then(function (m) { return m.main(process.argv.slice(2)); }).catch(fail);
 } else {

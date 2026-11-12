@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { freshness, trending, combine, featureWorth, estimate, novelty, interest, rankUnits, velocity } from '../server/lib/rank.js';
+import { freshness, trending, combine, featureWorth, estimate, novelty, interest, rankUnits, velocity } from '../lib/rank.js';
 
 const H = 3600e3;
 const now = Date.parse('2026-10-21T12:00:00Z');

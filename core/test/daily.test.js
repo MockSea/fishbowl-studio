@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { batchQuota, dueBatches, nextBatchAt, release, unitsOf } from '../server/lib/daily.js';
+import { batchQuota, dueBatches, nextBatchAt, release, unitsOf } from '../lib/daily.js';
 import { at } from './helpers.js';
 
 const settings = { release_hours: [8, 12, 16, 20], daily_cap: 10, held_max_hours: 16, explore_budget: 0, explore_budget_stalled: 3 };

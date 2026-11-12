@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normaliseTitle, titleSimilarity, sameStory, mergeItems } from '../server/lib/dedupe.js';
-import { normaliseUrl } from '../server/lib/urls.js';
+import { normaliseTitle, titleSimilarity, sameStory, mergeItems } from '../lib/dedupe.js';
+import { normaliseUrl } from '../lib/urls.js';
 
 test('title normalisation drops outlet suffixes and punctuation', () => {
   assert.equal(normaliseTitle('City Opens New Bike Lanes - The Daily Example'), 'city opens new bike lanes');

@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs, browserCommand, main, askRunning, LOCK_FILE } from '../server/cli.js';
 import { app } from './host-helpers.js';
-import { tempHome } from './helpers.js';
+import { tempHome } from '../core/test/helpers.js';
 
 test('options', () => {
   assert.deepEqual(parseArgs([]), { open: true, port: 0, home: null, help: false, version: false });

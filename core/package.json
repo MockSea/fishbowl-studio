@@ -1,0 +1,22 @@
+{
+  "name": "@fishbowl-studio/core",
+  "version": "0.1.0",
+  "description": "Fishbowl Studio's drafting core: sources, triage, drafting briefs, voice and playbook, proposals, the brand kit, Coach and the engines that call Claude. No server and no UI.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    "./*": "./lib/*"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
+    "mammoth": "^1.13.0",
+    "unpdf": "^2.1.0"
+  }
+}

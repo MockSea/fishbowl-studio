@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createFencer, cleanField, neutralise, ownWords, INSTRUCTION_RE, FIELD_CAP } from '../server/lib/fence.js';
+import { createFencer, cleanField, neutralise, ownWords, INSTRUCTION_RE, FIELD_CAP } from '../lib/fence.js';
 
 test('fencer wraps entries in nonce tags with the guard', () => {
   const fz = createFencer('abc123');

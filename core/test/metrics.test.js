@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCsv, mapColumns, metricsTool } from '../server/lib/metrics.js';
+import { parseCsv, mapColumns, metricsTool } from '../lib/metrics.js';
 import { testContext } from './helpers.js';
 
 test('CSV parsing handles quotes, commas, semicolons and BOM', () => {

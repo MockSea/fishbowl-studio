@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { tempHome } from './helpers.js';
-import { makeContext } from '../server/lib/state.js';
-import { callTool } from '../server/lib/tools.js';
-import { slugify } from '../server/lib/personas.js';
+import { makeContext } from '../lib/state.js';
+import { callTool } from '../lib/tools.js';
+import { slugify } from '../lib/personas.js';
 
 const read = (p) => fs.readFileSync(p, 'utf8');
 

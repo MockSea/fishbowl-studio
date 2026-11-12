@@ -2,13 +2,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { testContext, rss, at, setSources } from './helpers.js';
-import { callTool } from '../server/lib/tools.js';
-import { triageQueue, recordTriage } from '../server/lib/triage.js';
-import { draftingBrief } from '../server/lib/briefs.js';
-import { saveTakes } from '../server/lib/save.js';
-import { act } from '../server/lib/act.js';
-import { releaseTool } from '../server/lib/run.js';
-import { fetchAll } from '../server/lib/ingest.js';
+import { callTool } from '../lib/tools.js';
+import { triageQueue, recordTriage } from '../lib/triage.js';
+import { draftingBrief } from '../lib/briefs.js';
+import { saveTakes } from '../lib/save.js';
+import { act } from '../lib/act.js';
+import { releaseTool } from '../lib/run.js';
+import { fetchAll } from '../lib/ingest.js';
 
 const FEED = 'https://feeds.example.com/cycling.xml';
 const NOW = at(2026, 10, 21, 7, 0);

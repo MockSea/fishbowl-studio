@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formOf, opener, overuse, collapsed, compileCrutches, crutchesIn } from '../server/lib/forms.js';
+import { formOf, opener, overuse, collapsed, compileCrutches, crutchesIn } from '../lib/forms.js';
 
 test('observed forms', () => {
   assert.equal(formOf('THIS IS ALL SHOUTING TEXT'), 'caps');

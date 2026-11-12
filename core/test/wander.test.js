@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chooseSource, topicScores, wander, recordWander } from '../server/lib/ingest.js';
+import { chooseSource, topicScores, wander, recordWander } from '../lib/ingest.js';
 import { testContext, rss, at, setSources } from './helpers.js';
-import { callTool } from '../server/lib/tools.js';
+import { callTool } from '../lib/tools.js';
 
 const H = 3600e3;
 const now = at(2026, 10, 21, 10);

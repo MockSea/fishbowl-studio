@@ -2,8 +2,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { makeContext } from '../server/lib/state.js';
-import { validateConfig } from '../server/lib/config.js';
+import { makeContext } from '../lib/state.js';
+import { validateConfig } from '../lib/config.js';
 
 export function tempHome() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'studio-test-'));

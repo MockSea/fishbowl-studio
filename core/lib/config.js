@@ -1,4 +1,4 @@
-// Loading and validating the files in the data folder, plus the plugin's own data
+// Loading and validating the files in the data folder, plus the core's own data
 // (platforms/, shapes/, defaults/). Platforms and shapes are data: a new one is one file.
 import { ROOT, readOwn, listOwn } from './files.js';
 import { safeHttpsUrl, normaliseUrl } from './urls.js';
@@ -8,7 +8,7 @@ import { FETCH_KEYS } from './schedule.js';
 import { parseSubreddit, parseWatch, parseSearch, feedKey, watchKey, searchKey, TRENDS_KEY } from './handles.js';
 import { canRead } from './accounts.js';
 
-export const PLUGIN_ROOT = ROOT;
+export const CORE_ROOT = ROOT;
 
 const readJson = (rel) => JSON.parse(readOwn(rel));
 const dirJson = (dir) => listOwn(dir).filter((f) => f.endsWith('.json')).map((f) => readJson(`${dir}/${f}`));

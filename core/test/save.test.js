@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { testContext, at } from './helpers.js';
-import { draftingBrief } from '../server/lib/briefs.js';
-import { saveTakes, abandonBrief } from '../server/lib/save.js';
-import { callTool } from '../server/lib/tools.js';
+import { draftingBrief } from '../lib/briefs.js';
+import { saveTakes, abandonBrief } from '../lib/save.js';
+import { callTool } from '../lib/tools.js';
 
 const NOW = at(2026, 10, 21, 9, 0);
 const iso = new Date(NOW).toISOString();

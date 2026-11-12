@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { shapeVotes, shapeWeight, pickShapes, resultsMultipliers, engagementScore } from '../server/lib/shapes.js';
-import { makeRng, weightedPick } from '../server/lib/rng.js';
-import { seedShapes } from '../server/lib/config.js';
+import { shapeVotes, shapeWeight, pickShapes, resultsMultipliers, engagementScore } from '../lib/shapes.js';
+import { makeRng, weightedPick } from '../lib/rng.js';
+import { seedShapes } from '../lib/config.js';
 
 const shapes = [
   { id: 'home', name: 'home', home: true, platforms: ['x', 'linkedin'] },

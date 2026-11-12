@@ -3,16 +3,16 @@
 // go straight to callTool.
 import fs from 'node:fs';
 import path from 'node:path';
-import { makeContext } from './state.js';
-import { callTool } from './tools.js';
-import { releaseTool } from './run.js';
-import { kitFor } from './brandkit.js';
+import { makeContext } from '#core/state.js';
+import { callTool } from '#core/tools.js';
+import { releaseTool } from '#core/run.js';
+import { kitFor } from '#core/brandkit.js';
 import { makeKeystore, osStore, STORE_LABELS } from './keystore.js';
-import { makeClient, makeModel, MODEL } from './engines/api.js';
-import { makeEngine, findOnPath, ENGINES } from './engines/index.js';
-import { makeCliModel } from './engines/claude-cli.js';
-import { makeRunner, makeDailyCap, MAX_CALLS_PER_RUN, MAX_CALLS_PER_DAY, CALLS_PER_BRIEF, WEEKLY_CALLS } from './runner.js';
-import { loadSettings } from './config.js';
+import { makeClient, makeModel, MODEL } from '#core/engines/api.js';
+import { makeEngine, findOnPath, ENGINES } from '#core/engines/index.js';
+import { makeCliModel } from '#core/engines/claude-cli.js';
+import { makeRunner, makeDailyCap, MAX_CALLS_PER_RUN, MAX_CALLS_PER_DAY, CALLS_PER_BRIEF, WEEKLY_CALLS } from '#core/runner.js';
+import { loadSettings } from '#core/config.js';
 
 const DEFAULT_PREFS = { autorun: false, engine: 'auto' };
 // The most model calls one tick of the timer may make, across every brand.

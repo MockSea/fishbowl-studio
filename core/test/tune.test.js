@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tune, nudge, stalled, verdictLabels, outcomeOf, interactions } from '../server/lib/tune.js';
+import { tune, nudge, stalled, verdictLabels, outcomeOf, interactions } from '../lib/tune.js';
 
 const now = Date.parse('2026-10-21T12:00:00Z');
 const H = 3600e3;

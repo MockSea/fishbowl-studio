@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { tempHome } from './helpers.js';
 import { writeKitFiles, png, docx, pdf } from './kit-files.js';
-import { openKit, LIMITS, sniff, zipTooBig, isolatedExtract } from '../server/lib/brandkit.js';
+import { openKit, LIMITS, sniff, zipTooBig, isolatedExtract } from '../lib/brandkit.js';
 
 const setup = () => {
   const home = tempHome();
@@ -137,7 +137,7 @@ test('an upload keeps the name the person gave it for display only', async () =>
 });
 
 test('Windows tasklist output parses to MB', async () => {
-  const { parseTasklist } = await import('../server/lib/brandkit.js');
+  const { parseTasklist } = await import('../lib/brandkit.js');
   assert.equal(parseTasklist('"node.exe","4242","Console","1","51,200 K"\r\n'), 50);
   assert.equal(parseTasklist('INFO: No tasks are running'), null);
 });

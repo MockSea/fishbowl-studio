@@ -25,7 +25,7 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { same, requestValid, answerProof } from './control.js';
 import { boardHtml } from './page.js';
-import { LIMITS } from './brandkit.js';
+import { LIMITS } from '#core/brandkit.js';
 
 export const TOKEN_TTL_MS = 5 * 60 * 1000;
 export const MAX_JSON_BYTES = 1024 * 1024;

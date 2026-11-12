@@ -5,19 +5,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { testContext, at } from './helpers.js';
-import { allPlatforms, PLUGIN_ROOT, validateConfig, seedShapes, defaults } from '../server/lib/config.js';
-import { eligible } from '../server/lib/shapes.js';
-import { accountTypes } from '../server/lib/accounts.js';
-import { draftingBrief } from '../server/lib/briefs.js';
-import { saveTakes } from '../server/lib/save.js';
+import { allPlatforms, CORE_ROOT, validateConfig, seedShapes, defaults } from '../lib/config.js';
+import { eligible } from '../lib/shapes.js';
+import { accountTypes } from '../lib/accounts.js';
+import { draftingBrief } from '../lib/briefs.js';
+import { saveTakes } from '../lib/save.js';
 
 const NEW = { threads: { name: 'Threads', max: 500 }, bluesky: { name: 'Bluesky', max: 300 } };
 
 test('Threads and Bluesky are one file each, with the same fields as the others', () => {
   const all = allPlatforms();
-  const keys = Object.keys(JSON.parse(fs.readFileSync(path.join(PLUGIN_ROOT, 'platforms', 'x.json'), 'utf8'))).sort();
+  const keys = Object.keys(JSON.parse(fs.readFileSync(path.join(CORE_ROOT, 'platforms', 'x.json'), 'utf8'))).sort();
   for (const [id, want] of Object.entries(NEW)) {
-    const file = JSON.parse(fs.readFileSync(path.join(PLUGIN_ROOT, 'platforms', `${id}.json`), 'utf8'));
+    const file = JSON.parse(fs.readFileSync(path.join(CORE_ROOT, 'platforms', `${id}.json`), 'utf8'));
     assert.deepEqual(Object.keys(file).sort(), keys, `${id}.json has every field x.json has`);
     assert.equal(all[id].name, want.name);
     assert.equal(all[id].max_chars, want.max);

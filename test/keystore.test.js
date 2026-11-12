@@ -4,10 +4,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { tempHome } from './helpers.js';
+import { tempHome } from '../core/test/helpers.js';
 import { KEY, everything, app, setUpBrand } from './host-helpers.js';
 import { makeKeystore, osStore, checkKey, KEY_FILE, MARK_FILE, DPAPI_FILE } from '../server/lib/keystore.js';
-import { makeModel } from '../server/lib/engines/api.js';
+import { makeModel } from '#core/engines/api.js';
 
 test('checkKey trims and rejects junk', () => {
   assert.equal(checkKey(`  ${KEY}\n`).key, KEY);

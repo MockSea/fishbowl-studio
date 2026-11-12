@@ -5,10 +5,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { resolveHome } from './lib/store.js';
+import { resolveHome } from '#core/store.js';
 import { makeHost } from './lib/host.js';
 import { makeServer } from './lib/web.js';
-import { setExtractArgs } from './lib/brandkit.js';
+import { setExtractArgs } from '#core/brandkit.js';
 import { STORE_LABELS } from './lib/keystore.js';
 import { controlRequest, answerValid } from './lib/control.js';
 

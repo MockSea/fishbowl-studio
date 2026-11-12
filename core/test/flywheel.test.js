@@ -2,15 +2,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { testContext, at, setSources } from './helpers.js';
-import { callTool } from '../server/lib/tools.js';
-import { act, fingerprint } from '../server/lib/act.js';
-import { editDiff, removedPhrases, editPatterns, sourceRecords, interestBoosts, boostFor, killReasons, reasonsLine } from '../server/lib/learn.js';
-import { weeklyBrief, saveWeekly, editProposals } from '../server/lib/weekly.js';
-import { nextItem, draftingBrief } from '../server/lib/briefs.js';
-import { triageQueue } from '../server/lib/triage.js';
-import { decideProposal } from '../server/lib/proposals.js';
-import { loadPlaybook, loadSources } from '../server/lib/config.js';
-import { byId } from '../server/lib/state.js';
+import { callTool } from '../lib/tools.js';
+import { act, fingerprint } from '../lib/act.js';
+import { editDiff, removedPhrases, editPatterns, sourceRecords, interestBoosts, boostFor, killReasons, reasonsLine } from '../lib/learn.js';
+import { weeklyBrief, saveWeekly, editProposals } from '../lib/weekly.js';
+import { nextItem, draftingBrief } from '../lib/briefs.js';
+import { triageQueue } from '../lib/triage.js';
+import { decideProposal } from '../lib/proposals.js';
+import { loadPlaybook, loadSources } from '../lib/config.js';
+import { byId } from '../lib/state.js';
 
 const NOW = at(2026, 10, 21, 9, 0);
 const iso = (hAgo = 0) => new Date(NOW - hAgo * 3600e3).toISOString();
