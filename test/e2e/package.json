@@ -1,0 +1,15 @@
+{
+  "name": "fishbowl-studio-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Playwright scripts that drive the Electron desktop app. Separate from the app's own package so the app's dependencies stay unchanged.",
+  "scripts": {
+    "qa": "STUDIO_E2E=1 node run-all.mjs",
+    "qa:source": "STUDIO_E2E=1 QA_ONLY=source node run-all.mjs",
+    "qa:built": "STUDIO_E2E=1 QA_ONLY=built node run-all.mjs",
+    "qa:finder": "STUDIO_E2E=1 QA_ONLY=finder node run-all.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.56.1"
+  }
+}

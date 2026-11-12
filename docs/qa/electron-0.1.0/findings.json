@@ -1,0 +1,225 @@
+{
+  "summary": "Fishbowl Studio 0.1.0 is the Electron desktop app that drafts social posts for a brand with Claude, using the owner's own Anthropic API key. This report walks every screen and flow on main at 10857ce, from source and from the packaged macOS app. The core works in both: key storage, setup, drafting from a link, the brand kit's file checks, a second persona, and state surviving a restart. The bugs are a brand kit that accepts the same file twice and says nothing about the good file in a mixed drop, and leftover wording from the Claude plugin that does not match the desktop app.",
+  "method": "Each run gets its own empty data and app folders, so the owner's real data is never touched. No real API key was used: a local mock (dev/mock-anthropic.mjs) answers drafting calls, a local server that refuses every request stands in for a bad key and for rate limiting, a closed port stands in for no network, and one call goes to the real Anthropic API with a made-up key. Brand kit files are dropped through Chromium's own drag and drop events, so the page receives real files with paths, the way a Finder drag delivers them. Fixtures are generated at run time and describe a fictional bike shop.",
+  "bugs": [
+    {
+      "id": "B1",
+      "title": "The brand kit accepts the same file twice, and both copies go to Claude",
+      "severity": "medium",
+      "area": "Brand kit",
+      "steps": [
+        "Open Brand kit.",
+        "Drop brand-guidelines.pdf.",
+        "Drop brand-guidelines.pdf again (alone or with other files)."
+      ],
+      "expected": "The second drop is refused or replaces the first, with a message such as \"brand-guidelines.pdf is already in the kit\".",
+      "actual": "The kit lists brand-guidelines.pdf twice, and the next drafting request carries both copies (the mock logged 4 documents for 3 distinct files), so every draft pays for the duplicate text.",
+      "where": "desktop/brandkit.js add(): no check against the names or contents already in manifest.json",
+      "seen_in": [
+        "source",
+        "built"
+      ],
+      "shots": [
+        "source-07-kit-mixed-drop.png"
+      ]
+    },
+    {
+      "id": "B2",
+      "title": "A drop with one good and one bad file reports only the bad one",
+      "severity": "medium",
+      "area": "Brand kit",
+      "steps": [
+        "Open Brand kit.",
+        "Drop a PDF and a GIF together."
+      ],
+      "expected": "One message that says the PDF was added and the GIF was not, with the reason.",
+      "actual": "The only message is \"animation.gif: Only .pdf, .docx, ... files.\" The PDF is added silently. Someone who reads the error and drops the PDF again gets a duplicate (B1).",
+      "where": "desktop/ui/desktop-pages.js addFiles(): the success message is shown only when nothing failed",
+      "seen_in": [
+        "source",
+        "built"
+      ],
+      "shots": [
+        "source-07-kit-mixed-drop.png"
+      ]
+    },
+    {
+      "id": "B3",
+      "title": "The setup message after \"Draft it for me\" is written for a tool, not a person",
+      "severity": "medium",
+      "area": "Setup",
+      "steps": [
+        "Save an API key.",
+        "Drafts, Start setup, enter a brand name, Next.",
+        "Answer the questions and click Draft it for me."
+      ],
+      "expected": "A short message for the person, for example \"Here are Claude's first drafts. Keep, edit or drop each one.\"",
+      "actual": "\"Saved 6 suggestion(s) and 1 source suggestion(s). They wait on their board, in the setup wizard, for them to keep, edit or drop.\" It counts with \"(s)\" and speaks about the reader in the third person.",
+      "where": "The text returned by the setup-drafts tool, shown as the flash by the desktop host",
+      "seen_in": [
+        "source",
+        "built"
+      ],
+      "shots": [
+        "source-05-setup-drafts.png"
+      ]
+    },
+    {
+      "id": "B4",
+      "title": "Pick and approve messages use words the app does not show (pass, kill, Passed tab)",
+      "severity": "low",
+      "area": "Drafts",
+      "steps": [
+        "Draft from a link with Ask Claude now, so a draft with three takes arrives.",
+        "Click Use this one on a take.",
+        "Click Approve on the kept draft."
+      ],
+      "expected": "Messages that use the buttons and tabs on screen: Approve, Edit, Skip, and the Approved tab.",
+      "actual": "\"Picked take 1. It's now waiting for pass, edit or kill.\" then \"Passed. Copy it from the Passed tab (linkedin, 62 characters).\" The tab is labelled Approved and the buttons are Approve and Skip.",
+      "seen_in": [
+        "source",
+        "built"
+      ],
+      "shots": [
+        "source-06-draft-approved.png"
+      ]
+    },
+    {
+      "id": "B5",
+      "title": "\"How this works\" on Drafts describes the plugin: a scheduled task, four steps and posting",
+      "severity": "low",
+      "area": "Drafts",
+      "steps": [
+        "Start with an empty data folder and open Drafts."
+      ],
+      "expected": "Steps that match the desktop app: three setup steps, runs while the app is open, no posting.",
+      "actual": "Step 1 says \"Four short steps: the brand, a few questions, Claude's drafts for you to keep or change, and whether it posts for you.\" Step 3 says \"One click asks Claude to make the scheduled task.\" The app's setup has three steps, cannot post, and has no scheduled task.",
+      "where": "server/ui/board-views.js onboarding steps; the desktop hooks (noPosting) are not consulted there",
+      "seen_in": [
+        "source",
+        "built"
+      ],
+      "shots": [
+        "source-02-screen-drafts.png"
+      ]
+    },
+    {
+      "id": "B6",
+      "title": "Topics points to a Coach page the desktop app removed",
+      "severity": "low",
+      "area": "Topics",
+      "steps": [
+        "Open Topics."
+      ],
+      "expected": "Wording that names a page the app has (proposals wait on Playbook in the desktop app).",
+      "actual": "\"Changes to the voice and playbook always wait for your yes on the Coach page.\" There is no Coach page in the app.",
+      "seen_in": [
+        "source",
+        "built"
+      ],
+      "shots": [
+        "source-02-screen-topics.png"
+      ]
+    },
+    {
+      "id": "B7",
+      "title": "On first run the sidebar shows no current page",
+      "severity": "low",
+      "area": "First run",
+      "steps": [
+        "Open the app with no API key saved."
+      ],
+      "expected": "The sidebar marks where the person is, or the key page sits under Settings with Settings highlighted.",
+      "actual": "The app opens on the Claude (API key) page, and no sidebar item is highlighted. The page has no sidebar entry; the only way back to it later is Settings, Add key or Change key.",
+      "seen_in": [
+        "source",
+        "built"
+      ],
+      "shots": [
+        "source-01-first-run.png"
+      ]
+    },
+    {
+      "id": "B8",
+      "title": "The app background stops short of the window bottom on short pages",
+      "severity": "low",
+      "area": "Layout",
+      "steps": [
+        "Approve the only draft so Drafts shows \"You're all caught up\" (any page shorter than the window does it)."
+      ],
+      "expected": "The sidebar and page background fill the window.",
+      "actual": "The layout is 754 px tall in an 828 px window, leaving a grey band across the bottom under the sidebar and the page.",
+      "seen_in": [
+        "source",
+        "built"
+      ],
+      "shots": [
+        "source-06-approved-tab.png"
+      ]
+    },
+    {
+      "id": "B9",
+      "title": "Brand names are cut to a few letters in Your brands",
+      "severity": "low",
+      "area": "Drafts",
+      "steps": [
+        "Set up a brand called Spoke and Chain.",
+        "Open Drafts and look at the Your brands card."
+      ],
+      "expected": "The name fits, or wraps, in a card this wide.",
+      "actual": "The card shows \"Spok...\" while the counts beside it take most of the row. The switcher at the top shows \"Spoke and Ch...\".",
+      "seen_in": [
+        "source",
+        "built"
+      ],
+      "shots": [
+        "source-06-link-drafts.png"
+      ]
+    },
+    {
+      "id": "B10",
+      "title": "A renamed first brand keeps the handle @my-brand",
+      "severity": "low",
+      "area": "Personas",
+      "steps": [
+        "On a fresh install, run setup and name the brand Spoke and Chain.",
+        "Look at the switcher and the draft cards."
+      ],
+      "expected": "The handle follows the brand name, or the handle is not shown as if it were a social account.",
+      "actual": "Every draft and the switcher show \"Spoke and Chain @my-brand\". A second brand made with Add persona gets @night-market-bakery.",
+      "seen_in": [
+        "source",
+        "built"
+      ],
+      "shots": [
+        "source-10-relaunch.png"
+      ]
+    }
+  ],
+  "passed": [
+    "Both launch modes start and show every screen: Drafts, Sources, Topics, Brand kit, Schedule, Settings, Reads, Playbook. The Coach page is gone, as intended.",
+    "The packaged app runs from its own binary with launchd's PATH (/usr/bin:/bin:/usr/sbin:/sbin), so it needs no node. PDF and DOCX text extraction works there too.",
+    "API key: empty, short, spaced and odd-character keys are refused with a plain message. A good key is saved encrypted (mode 600) in the app folder, the plain key appears in no file, the page only ever sees a masked hint, and Remove key deletes it.",
+    "No key: Ask Claude now, Run it now and Draft it for me each say to add the key under Settings; a link is still queued for later.",
+    "Bad key (401), rate limit (429), no network, and the real Anthropic API with a made-up key each give a plain message. No network fails in about 4 seconds.",
+    "Setup with the mock API: Draft it for me, Keep everything and Finish setup work and use the brand name from step 1.",
+    "Draft from a link with Ask Claude now produces three takes; Use this one and Approve work.",
+    "Brand kit: PDF, DOCX, Markdown, PNG and JPEG are added and their text previewed. Refused with a clear reason: a PDF over 10 MB, an image over 5 MB, a text file named .pdf or .png, a broken DOCX, a DOCX that unpacks to 70 MB, a scanned PDF, an empty file, a GIF and an .exe. Choose files works. Remove asks once more, then removes. The next drafting call carries the kit's documents and images.",
+    "A second persona gets its own empty brand kit, shares the API key, and switching back shows the first brand's kit.",
+    "The Run on its own switch is saved to the app's preferences and survives a restart. A topic can be added. No sideways scroll at the 900 x 600 minimum window.",
+    "Quit and relaunch keep the key, the active brand, the kit, the switch and the drafts. Closing the window keeps the app running, and the Dock icon brings the window back."
+  ],
+  "not_run": {
+    "finder": "finder.mjs opens the .app through LaunchServices with a debugging port. It is written and ready, but it was not run in this pass."
+  },
+  "not_tested": [
+    "A double-click in Finder by hand. The built-app run uses the packaged binary with Finder's PATH, which covers the no-node case; finder.mjs (opened through LaunchServices) is written but was not run in this pass.",
+    "The keychain prompt a signed or notarised build would show, and Gatekeeper on another Mac. The build is unsigned (identity null), so another Mac will refuse to open it without a right-click Open.",
+    "Real drafting quality. Every successful drafting call went to the mock, whose drafts all mention \"Draft 1\", which is why the drafts carry a \"Check the number\" flag.",
+    "The timed run while the app stays open (the switch was checked, a real scheduled batch was not waited for).",
+    "Windows and Linux builds."
+  ],
+  "rerun": "npm ci and npm run make at the repo root (the built-app runs need dist/), then cd test/e2e, npm ci, npm run qa. npm run qa:source, qa:built and qa:finder run one part. QA_REAL_API=0 skips the single call to the real Anthropic API. The scripts exit at once unless STUDIO_E2E=1, so the repo's own npm test never launches the app.",
+  "ux_notes_intro": "No outside UX read was done in this pass.",
+  "ux_notes": []
+}
