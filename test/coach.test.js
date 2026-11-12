@@ -119,3 +119,68 @@ test('autorun writes the weekly report once on a Friday, and not on other days',
   await fri.host.tick();
   assert.equal(weeklyRequests(fri.api).length, WEEKLY_CALLS, 'not again the same week');
 });
+
+// A Friday with autorun on and the brand set up; weekly: the fake API's weekly answers.
+async function friday({ weekly, dirs } = {}) {
+  const a = await app({ weekly, dirs });
+  a.clock.t = at(2026, 10, 23, 9, 0);
+  if (!dirs) {
+    await a.host.keySet(KEY);
+    await setUpBrand(a.host);
+    a.host.prefsSet({ autorun: true });
+  }
+  return a;
+}
+const dailyStarts = (events) => events.filter((e) => e.kind === 'daily' && e.state === 'start').length;
+
+test('a failed automatic weekly report is not tried again that Friday', async () => {
+  const fri = await friday({ weekly: { refuse: true } });
+  await fri.host.tick();
+  assert.equal(weeklyRequests(fri.api).length, WEEKLY_CALLS, 'one attempt');
+  fri.clock.t = at(2026, 10, 23, 10, 30);
+  await fri.host.tick();
+  fri.clock.t = at(2026, 10, 23, 16, 0);
+  await fri.host.tick();
+  assert.equal(weeklyRequests(fri.api).length, WEEKLY_CALLS, 'no second attempt the same Friday');
+});
+
+test('a failed weekly report does not keep the daily run out', async () => {
+  const fri = await friday({ weekly: { refuse: true } });
+  await fri.host.tick();
+  assert.equal(dailyStarts(fri.events), 1);
+  fri.clock.t = at(2026, 10, 23, 9, 10);
+  await fri.host.tick();
+  assert.equal(dailyStarts(fri.events), 2, 'the next tick still runs the daily run');
+});
+
+test('the Friday attempt is kept on disk: a restart does not run it again', async () => {
+  // A report with nothing the studio keeps writes no coach row, so only the attempt record stops a repeat.
+  const empty = { summary: '', working: [], not_working: [], try: [], audience: [], positions: [] };
+  const first = await friday({ weekly: { report: empty } });
+  await first.host.tick();
+  assert.equal(weeklyRequests(first.api).length, WEEKLY_CALLS);
+  assert.equal((await coach(first.host)).report, null, 'no coach row written');
+  const again = await friday({ weekly: { report: empty }, dirs: { home: first.home, appDir: first.appDir } });
+  again.clock.t = at(2026, 10, 23, 11, 0);
+  await again.host.tick();
+  assert.equal(weeklyRequests(again.api).length, 0, 'the restarted app does not try again that Friday');
+
+  const failed = await friday({ weekly: { refuse: true } });
+  await failed.host.tick();
+  const restarted = await friday({ weekly: { refuse: true }, dirs: { home: failed.home, appDir: failed.appDir } });
+  restarted.clock.t = at(2026, 10, 23, 11, 0);
+  await restarted.host.tick();
+  assert.equal(weeklyRequests(restarted.api).length, 0, 'nor after a failed attempt');
+
+  restarted.clock.t = at(2026, 10, 30, 9, 0);
+  await restarted.host.tick();
+  assert.equal(weeklyRequests(restarted.api).length, WEEKLY_CALLS, 'the next Friday gets its attempt');
+});
+
+test('the Coach button still runs after the automatic attempt', async () => {
+  const fri = await friday({ weekly: { refuse: true } });
+  await fri.host.tick();
+  const done = await fri.host.ask(WEEKLY).done;
+  assert.equal(done.ok, false);
+  assert.equal(weeklyRequests(fri.api).length, 2 * WEEKLY_CALLS, 'the button is not held back by the automatic record');
+});

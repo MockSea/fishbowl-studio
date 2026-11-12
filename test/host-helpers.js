@@ -32,7 +32,8 @@ const LINES = ['Lanes beat paint every time.', 'Ask any courier where the hills 
 
 // Answers like Claude would, by which schema the request asks for. counts: how many takes each
 // takes request gets back, in order (after that, all three). answer(task, n): takes to send
-// instead, or undefined for the usual ones.
+// instead, or undefined for the usual ones. weekly: {playbook, report} answers to send instead,
+// and refuse: true to decline the report call (read on each call, so a test can flip it).
 export function fakeApi({ counts = [], answer, weekly } = {}) {
   const requests = [];
   let n = 0;
@@ -56,6 +57,7 @@ export function fakeApi({ counts = [], answer, weekly } = {}) {
     } else if (schema === SCHEMAS.weeklyPlaybook) {
       out = weekly?.playbook ?? { playbook: [{ op: 'add', text: 'Lead with the repair detail', old: '', reason: 'Kept drafts opened with it.' }] };
     } else if (schema === SCHEMAS.weeklyReport) {
+      if (weekly?.refuse) return { stop_reason: 'refusal', content: [] };
       // The second working line carries a link; the studio drops it.
       out = weekly?.report ?? { summary: 'A steady week.', working: ['Repair posts got kept.', 'See https://example.org/x for more'], not_working: ['Long openers got cut.'], try: ['Shorter first lines.'],
         audience: [{ op: 'add', section: 'who', text: 'Weekend riders', old: '', reason: 'They reply most.', refs: [] }],
@@ -66,8 +68,9 @@ export function fakeApi({ counts = [], answer, weekly } = {}) {
   return { requests, create };
 }
 
-export async function app({ createModel, counts, answer, weekly, fetch = fetchImpl, os = null, claudePath = () => null, createCli, dailyCap } = {}) {
-  const home = tempHome(), appDir = tempHome();
+// dirs: {home, appDir} of an earlier app(), to start the app again on the same data.
+export async function app({ createModel, counts, answer, weekly, fetch = fetchImpl, os = null, claudePath = () => null, createCli, dailyCap, dirs } = {}) {
+  const home = dirs?.home ?? tempHome(), appDir = dirs?.appDir ?? tempHome();
   const api = fakeApi({ counts, answer, weekly });
   const events = [];
   const clock = { t: NOW };

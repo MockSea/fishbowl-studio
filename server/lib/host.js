@@ -24,7 +24,7 @@ export const WEEKLY_DAY = 5;
 const DAY_MS = 24 * 3600e3;
 
 // Whether a brand's weekly report is due: it's the report day, and no report was written (or
-// run without error, at `ranAt`) in the last six days.
+// tried automatically, at `ranAt`) in the last six days.
 export function weeklyDue(c, now, ranAt = 0) {
   if (new Date(now).getDay() !== WEEKLY_DAY) return false;
   const last = Math.max(ranAt, ...c.store.read('coach', []).map((r) => Date.parse(r.at) || 0));
@@ -34,7 +34,7 @@ export function weeklyDue(c, now, ranAt = 0) {
 export const MAX_KIT_FILES_PER_ADD = 20;
 
 // home: the studio data folder. appDir: the app's own folder inside it (key marker, preferences,
-// the daily call count). Tests pass fakes for the OS key store (os: null means the 0600 file),
+// the daily call count, the automatic weekly attempts). Tests pass fakes for the OS key store (os: null means the 0600 file),
 // the claude command (claudePath) and both engines.
 export function makeHost({
   home, appDir, os = undefined, claudePath = () => findOnPath('claude'),
@@ -58,7 +58,16 @@ export function makeHost({
   const runner = makeRunner({ ctx, model: engine, kit: (slug) => kitFor(ctx, slug).content(), progress: emit, daily });
   const active = () => ctx.personas.active();
   const failedAt = new Map();
-  const weeklyAt = new Map();
+  // When each brand's automatic weekly report was last tried, success or not: {slug: ms}. On disk
+  // so a restart on a Friday doesn't try it again.
+  const weeklyFile = path.join(appDir, 'weekly.json');
+  const weeklyTried = () => {
+    try { const w = JSON.parse(fs.readFileSync(weeklyFile, 'utf8')); return w && typeof w === 'object' && !Array.isArray(w) ? w : {}; } catch { return {}; }
+  };
+  const markWeekly = (slug, t) => {
+    fs.mkdirSync(appDir, { recursive: true });
+    fs.writeFileSync(weeklyFile, JSON.stringify({ ...weeklyTried(), [slug]: t }) + '\n');
+  };
 
   // The app's own pages ride on the settings view for the header the shell needs.
   async function appView(view) {
@@ -103,9 +112,12 @@ export function makeHost({
       if (!budget.can(CALLS_PER_BRIEF)) break;
       const r = await runner.daily(p.slug, { budget });
       if (r.ok) failedAt.delete(p.slug); else { failedAt.set(p.slug, ctx.now()); continue; }
-      if (!weeklyDue(c, ctx.now(), weeklyAt.get(p.slug)) || !budget.can(WEEKLY_CALLS)) continue;
-      const w = await runner.weekly(p.slug, { budget });
-      if (w.ok) weeklyAt.set(p.slug, ctx.now()); else failedAt.set(p.slug, ctx.now());
+      const tried = Number(weeklyTried()[p.slug]);
+      if (!weeklyDue(c, ctx.now(), Number.isFinite(tried) ? tried : 0) || !budget.can(WEEKLY_CALLS)) continue;
+      // One automatic attempt per report day, recorded before it runs. A failure is not retried
+      // and doesn't hold back the daily run; the Coach page's button can run it again.
+      markWeekly(p.slug, ctx.now());
+      await runner.weekly(p.slug, { budget });
     }
     return { calls: budget.used };
   }
@@ -179,8 +191,9 @@ export function makeHost({
     // Every few minutes while the app is running: release due batches for every brand and, if
     // autorun is on, run the daily run. That run calls the model only when its news setting says
     // it's time to read, or a rewrite is queued. On the report day (WEEKLY_DAY) a brand with no
-    // report in six days also gets the weekly coach report (two calls). The whole tick shares one
-    // call budget, and a brand whose last automatic run failed sits out for an hour.
+    // report in six days also gets the weekly coach report (two calls), tried once that day whether
+    // it works or not. The whole tick shares one call budget, and a brand whose last automatic
+    // daily run failed sits out for an hour.
     async tick() {
       if (ticking) return { calls: 0, skipped: true };
       ticking = true;
