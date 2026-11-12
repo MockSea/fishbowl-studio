@@ -1,11 +1,12 @@
 # Installs the standalone Fishbowl Studio for Windows and starts it.
 #
-#   irm https://raw.githubusercontent.com/MockSea/fishbowl-studio/main/scripts/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/MockSea/fishbowl-studio/v0.2.0/scripts/install.ps1 | iex
 #
-# Downloads the latest release's Windows executable and SHA256SUMS, refuses to install if the
+# Downloads this release's Windows executable and SHA256SUMS (the release is the $release line
+# below, so the script fetched from a tag installs that tag's build), refuses to install if the
 # checksum doesn't match, puts it in %LOCALAPPDATA%\Programs\Fishbowl Studio (or
-# $env:FISHBOWL_BIN_DIR) and runs it. Set $env:FISHBOWL_VERSION = 'v1.2.3' for a particular
-# release, $env:FISHBOWL_NO_START = '1' to only install.
+# $env:FISHBOWL_BIN_DIR) and runs it. Set $env:FISHBOWL_VERSION = 'v1.2.3' for another release,
+# $env:FISHBOWL_NO_START = '1' to only install.
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
@@ -14,8 +15,9 @@ if (-not [Environment]::Is64BitOperatingSystem -or $env:PROCESSOR_ARCHITECTURE -
   Write-Error "There's no standalone build for this Windows yet. Use the npx command from the README instead (needs Node 20 or newer): https://github.com/$repo"
 }
 $asset = 'fishbowl-studio-windows-x64.exe'
-if ($env:FISHBOWL_VERSION) { $base = "https://github.com/$repo/releases/download/$($env:FISHBOWL_VERSION)" }
-else { $base = "https://github.com/$repo/releases/latest/download" }
+$release = 'v0.2.0'
+if ($env:FISHBOWL_VERSION) { $release = $env:FISHBOWL_VERSION }
+$base = "https://github.com/$repo/releases/download/$release"
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ("fishbowl-" + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp | Out-Null

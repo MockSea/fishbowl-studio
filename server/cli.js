@@ -14,15 +14,18 @@ import { makeServer } from './lib/web.js';
 import { setExtractArgs } from '#core/brandkit.js';
 import { STORE_LABELS } from './lib/keystore.js';
 import { controlRequest, answerValid } from './lib/control.js';
-import { alive, isStudio, stopProcess, portHolder, answers } from './lib/heal.js';
+import { alive, isStudio, startedAt, stopProcess, portHolder, answers } from './lib/heal.js';
 
 export const TICK_MS = 5 * 60 * 1000;
 export const LOCK_FILE = 'server.json';
+export const LINK_FILE = 'link.txt';
 
 export const HELP = `Fishbowl Studio: drafts social posts from the news, on your computer.
 
   fishbowl-studio              start the studio and open it in your browser
   fishbowl-studio --no-open    start it and only print the link
+  fishbowl-studio --link-file  don't print the link: write it to app/link.txt in the studio
+                               folder, readable only by you, and print where it is
   fishbowl-studio --port 4100  use this port instead of a free one
   fishbowl-studio --home DIR   keep the studio's files in DIR
                                (default: Documents/Fishbowl Studio in your home folder)
@@ -32,10 +35,11 @@ It runs while this window is open. Press Ctrl+C to stop it.
 `;
 
 export function parseArgs(argv) {
-  const o = { open: true, port: 0, home: null, help: false, version: false };
+  const o = { open: true, port: 0, home: null, help: false, version: false, linkFile: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--no-open') o.open = false;
+    else if (a === '--link-file') o.linkFile = true;
     else if (a === '--help' || a === '-h') o.help = true;
     else if (a === '--version' || a === '-v') o.version = true;
     else if (a === '--port' || a === '--home') {
@@ -88,11 +92,12 @@ function readLock(file) {
 }
 
 // The lock file names a studio that didn't answer. Its process has gone (the lock is stale), was
-// replaced by an unrelated one (also stale), or is our own studio, stuck: stop that one.
-export async function clearStale(lockFile, { say, isOurs = isStudio, stop = stopProcess } = {}) {
+// replaced by an unrelated one (also stale), or is our own studio, stuck: stop that one. Ours means
+// the pid's command line is a studio's and its start time is the one the lock recorded.
+export async function clearStale(lockFile, { say, isOurs = (pid, started) => isStudio(pid, { started }), stop = stopProcess } = {}) {
   const lock = readLock(lockFile);
   if (!lock) return null;
-  if (Number.isInteger(lock.pid) && isOurs(lock.pid)) {
+  if (Number.isInteger(lock.pid) && isOurs(lock.pid, typeof lock.started === 'string' ? lock.started : null)) {
     say(`A studio from an earlier start is stuck (process ${lock.pid}). Restarting it.`);
     if (!(await stop(lock.pid))) {
       throw new Error(`An earlier copy of Fishbowl Studio (process ${lock.pid}) is stuck and couldn't be stopped. Restart the computer, then run the command again.`);
@@ -105,8 +110,8 @@ export async function clearStale(lockFile, { say, isOurs = isStudio, stop = stop
   return 'cleared';
 }
 
-// --port is taken. Our own stuck studio is stopped and the port reused; anything else keeps it,
-// and the studio starts on a free port instead.
+// --port is taken. Our own stuck studio (by its whole command line; see isStudio) is stopped and the
+// port reused; anything else keeps it, and the studio starts on a free port instead.
 export async function freePort(port, { say, holder = portHolder, isOurs = isStudio, isAnswering = answers, stop = stopProcess } = {}) {
   const pid = holder(port);
   if (pid && isOurs(pid) && !(await isAnswering(port))) {
@@ -119,8 +124,17 @@ export async function freePort(port, { say, holder = portHolder, isOurs = isStud
 
 function writePrivate(file, data) {
   const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, data, { mode: 0o600 });
+  fs.rmSync(tmp, { force: true });
+  fs.writeFileSync(tmp, data, { mode: 0o600, flag: 'wx' });
   fs.renameSync(tmp, file);
+}
+
+// --link-file: the one-time link goes to a file only this user can read, not to the output, which
+// whoever started the command may be keeping in a log anyone on the computer can read.
+function writeLink(appDir, url) {
+  const file = path.join(appDir, LINK_FILE);
+  writePrivate(file, `${url}\n`);
+  return file;
 }
 
 // The old desktop app kept its run-on-its-own preference in its own folder; carry it over once.
@@ -167,7 +181,8 @@ export async function main(argv = process.argv.slice(2), { env = process.env, ou
   // A lock whose studio doesn't answer at first gets one more try before it is treated as stuck.
   const running = await askRunning(lockFile) || (readLock(lockFile) && await askRunning(lockFile));
   if (running) {
-    say(`Fishbowl Studio is already running. Opening it: ${running}`);
+    if (o.linkFile) say(`Fishbowl Studio is already running. Its new link is in: ${writeLink(appDir, running)}`);
+    else say(`Fishbowl Studio is already running. Opening it: ${running}`);
     if (o.open) open(running);
     return { reused: running };
   }
@@ -186,7 +201,7 @@ export async function main(argv = process.argv.slice(2), { env = process.env, ou
   if (err?.code === 'EADDRINUSE' && o.port) err = await listen(await freePort(o.port, { say }));
   if (err?.code === 'EADDRINUSE' && o.port) err = await listen(0);
   if (err) throw new Error(`Fishbowl Studio couldn't open a port on this computer (${err.code || err.message}). Restart the computer, then run the command again.`);
-  writePrivate(lockFile, JSON.stringify({ pid: process.pid, port: Number(new URL(srv.origin).port), control: srv.control }) + '\n');
+  writePrivate(lockFile, JSON.stringify({ pid: process.pid, started: startedAt(process.pid), port: Number(new URL(srv.origin).port), control: srv.control }) + '\n');
 
   const { batches, drafts } = host.catchUp();
   const url = srv.launchUrl();
@@ -201,7 +216,8 @@ export async function main(argv = process.argv.slice(2), { env = process.env, ou
     srv.emit({ kind: 'notice', state: 'notice', message: msg });
   }
   say('');
-  say(`Open it here (the link works once): ${url}`);
+  if (o.linkFile) say(`The link is in (it works once): ${writeLink(appDir, url)}`);
+  else say(`Open it here (the link works once): ${url}`);
   say('Keep this window open while you use it. Press Ctrl+C to stop.');
   if (o.open) open(url);
 
@@ -215,6 +231,7 @@ export async function main(argv = process.argv.slice(2), { env = process.env, ou
     closed = true;
     clearInterval(timer);
     try { if (JSON.parse(fs.readFileSync(lockFile, 'utf8')).pid === process.pid) fs.rmSync(lockFile, { force: true }); } catch { /* already gone */ }
+    if (o.linkFile) fs.rmSync(path.join(appDir, LINK_FILE), { force: true });
     await srv.close();
   }
   if (signals) {

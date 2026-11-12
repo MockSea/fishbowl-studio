@@ -1,6 +1,6 @@
 {
   "name": "fishbowl-studio",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A social-post drafting studio that runs on your computer and opens in your browser.",
   "private": true,
   "type": "module",
