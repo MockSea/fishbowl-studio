@@ -166,7 +166,7 @@ html[data-host="web"] .shell { min-height: 100vh; }
   };
 
   // ---------- runs ----------
-  const KIND = { daily: 'the daily run', jobs: 'the rewrite queue', wizard: 'the setup drafts', weekly: 'the weekly report' };
+  const KIND = { daily: 'the daily run', jobs: 'your queued drafts', wizard: 'the setup drafts', weekly: 'the weekly report' };
   S.onRun((ev) => {
     if (ev.state === 'start') B.flash(`Working on ${KIND[ev.kind] || 'it'}…`, 'info');
     else if (ev.state === 'done') { B.flash(ev.message || 'Done.', 'good'); B.load(); }

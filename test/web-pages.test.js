@@ -12,7 +12,7 @@ const KIT = { accept: ['.pdf', '.md'], limits: { file_bytes: 10485760, image_byt
 const KEY = { has: true, hint: '…WXYZ', where: 'file', where_label: 'a file', target: 'file', target_label: 'a file', missing: null, engine: { mode: 'auto', engine: 'api', claude: { found: false }, claude_failed: null, key: true }, calls_today: 0, calls_per_day: 60 };
 
 // web-bridge.js's members, faked. kitAdd: what the server answers for an upload.
-async function bootWeb({ kitAdd = async () => ({ results: [] }), key = KEY } = {}) {
+async function bootWeb({ kitAdd = async () => ({ results: [] }), key = KEY, onRun = () => {} } = {}) {
   let ctx;
   const b = await boot({
     extra: WEB_SCRIPTS,
@@ -29,7 +29,7 @@ async function bootWeb({ kitAdd = async () => ({ results: [] }), key = KEY } = {
       kit: { add: kitAdd, remove: async () => ({ ok: true }) },
       key: { status: async () => key, set: async () => key, clear: async () => key },
       prefs: { get: async () => ({ autorun: false, engine: 'auto' }), set: async (p) => p },
-      onRun: () => {},
+      onRun,
     },
   });
   ctx = b.ctx;
@@ -84,7 +84,7 @@ test('the page background fills the window on the web host (B8)', async () => {
 test('long brand names wrap instead of being cut off (B9)', () => {
   const css = ui('board.css');
   const rule = (sel) => css.match(new RegExp(`^${sel.replace(/[.*]/g, '\\$&')} \\{([^}]*)\\}`, 'm'))?.[1] || '';
-  for (const sel of ['.persona-btn .nm', '.profile .nm']) {
+  for (const sel of ['.persona-btn .nm', '.profile .nm', '.menu .item .nm']) {
     assert.doesNotMatch(rule(sel), /nowrap|ellipsis/, sel);
     assert.match(rule(sel), /overflow-wrap: break-word/, sel);
   }
@@ -135,4 +135,12 @@ test('Draft it from a link says when it gets drafted, in the studio\'s words (W5
   const asks = b.sent.filter((m) => m.method === 'ask').map((m) => m.text);
   assert.deepEqual(asks, ['Draft the link I just sent to Fishbowl Studio.']);
   assert.doesNotMatch(flash(b), /do my studio|rewrites/i);
+});
+
+test('a run of queued drafts is announced in the studio\'s words (W5)', async () => {
+  let listen;
+  const b = await bootWeb({ onRun: (f) => { listen = f; } });
+  listen({ state: 'start', kind: 'jobs' });
+  assert.equal(flash(b), 'Working on your queued drafts…');
+  assert.doesNotMatch(flash(b), /rewrite/i);
 });
