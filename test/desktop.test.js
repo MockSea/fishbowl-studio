@@ -140,6 +140,9 @@ test('setup drafts in the app suggest only sites and subreddits, never searches'
   assert.equal(r.kind, 'wizard', JSON.stringify(d));
   const out = await r.done;
   assert.equal(out.ok, true, out.message);
+  // The app shows this message to the person: plain counts, spoken to them.
+  assert.doesNotMatch(out.message, /\(s\)|for them|their board/, out.message);
+  assert.match(out.message, /Keep, edit or drop/, out.message);
   const task = api.requests[0].messages[0].content.at(-1).text;
   assert.match(task, /subreddits/);
   assert.doesNotMatch(task, /search/i);

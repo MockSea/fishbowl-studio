@@ -126,3 +126,18 @@ test('a file that unpacks past the memory limit only stops the reader process, n
 test('reading a document is time-limited', async () => {
   await assert.rejects(isolatedExtract(pdf('Slow.'), 'pdf', { timeoutMs: 1 }), /too long/);
 });
+
+test('the same file twice is refused, by name or by contents', async () => {
+  const { kit, files, home } = setup();
+  assert.equal((await kit.add(files['guidelines.pdf'])).ok, true);
+  const again = await kit.add(files['guidelines.pdf']);
+  assert.equal(again.ok, false);
+  assert.match(again.reason, /guidelines\.pdf is already in the kit/);
+  const copy = path.join(home, 'in', 'guidelines copy.pdf');
+  fs.copyFileSync(files['guidelines.pdf'], copy);
+  const renamed = await kit.add(copy);
+  assert.equal(renamed.ok, false);
+  assert.match(renamed.reason, /already in the kit as guidelines\.pdf/);
+  assert.deepEqual(kit.list().files.map((f) => f.name), ['guidelines.pdf']);
+  assert.equal(kit.content().docs.length, 1);
+});
