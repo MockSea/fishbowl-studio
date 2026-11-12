@@ -1,6 +1,6 @@
 {
   "name": "@fishbowl-studio/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Fishbowl Studio's drafting core: sources, triage, drafting briefs, voice and playbook, proposals, the brand kit, Coach and the engines that call Claude. No server and no UI.",
   "private": true,
   "type": "module",
