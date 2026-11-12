@@ -82,7 +82,7 @@ const ACTIONS = {
     if (d.status !== 'option') refuse(`Draft ${id} isn't waiting to be picked (it's ${d.status}).`);
     checkHash(d, hash, false);
     pickTake(db, d, iso);
-    return { message: `Picked take ${d.take_n}. It's now waiting for pass, edit or kill.`, id: d.id };
+    return { message: `Picked take ${d.take_n}. Approve, edit or skip it.`, id: d.id };
   },
 
   pass(db, { id, hash }, { iso }) {
@@ -91,7 +91,7 @@ const ACTIONS = {
     checkHash(d, hash, true);
     pickTake(db, d, iso);
     Object.assign(d, { status: d.final_text ? 'edited' : 'passed', decided_at: iso, verdict_fp: fingerprint(d) });
-    return { message: `Passed. Copy it from the Passed tab (${d.platform}, ${(d.final_text || d.text).length} characters).${noPostNote(db, d)}`, id: d.id };
+    return { message: `Approved. Copy it from the Approved tab (${d.platform}, ${(d.final_text || d.text).length} characters).${noPostNote(db, d)}`, id: d.id };
   },
 
   edit(db, { id, hash, text, and_pass }, { ctx, iso }) {
@@ -107,7 +107,7 @@ const ACTIONS = {
     d.final_text = t === d.text ? null : t;
     recordEdit(db, d, ctx, iso);
     if (and_pass) Object.assign(d, { status: d.final_text ? 'edited' : 'passed', decided_at: iso, verdict_fp: fingerprint(d) });
-    return { message: and_pass ? `Saved your edit and passed it.${noPostNote(db, d)}` : 'Saved your edit. Pass it when you\'re happy.', id: d.id, hash: fingerprint(d) };
+    return { message: and_pass ? `Saved your edit and approved it.${noPostNote(db, d)}` : 'Saved your edit. Approve it when you\'re happy.', id: d.id, hash: fingerprint(d) };
   },
 
   kill(db, { id, reason }, { iso }) {
@@ -115,7 +115,7 @@ const ACTIONS = {
     if (!['pending', 'passed', 'edited'].includes(d.status)) refuse(`Draft ${id} can't be killed from ${d.status}${d.status === 'option' ? ' (use "none of these" for a set)' : ''}.`);
     Object.assign(d, { status: 'killed', decided_at: iso, killed_from: d.status });
     if (reason) setReason([d], reason);
-    return { message: 'Killed. It will count against its shape.', id: d.id, ask_reason: !reason };
+    return { message: 'Skipped. It will count against its shape.', id: d.id, ask_reason: !reason };
   },
 
   // One tap after a skip: why. Optional; a skip without a reason teaches the same as before.
@@ -132,7 +132,7 @@ const ACTIONS = {
     for (const d of ds) Object.assign(d, { status: 'passed_over', decided_at: iso });
     if (reason) setReason(ds, reason);
     if (note) db.feedback.push({ id: ctx.id('feedback'), set_id: Number(set_id), text: clip(note, 1000), prior_text: ds.map((d) => d.text).join('\n---\n'), at: iso, on_set: true, rewrite: 'n/a' });
-    return { message: 'Passed over all takes. Ask for a redo if the story deserves another go.', set_id: Number(set_id), ask_reason: !reason };
+    return { message: 'Skipped all takes. Ask for a redo if the story deserves another go.', set_id: Number(set_id), ask_reason: !reason };
   },
 
   redo(db, { set_id, note }, { ctx, settings, iso }) {

@@ -78,7 +78,7 @@
   function postHead(c, extra) {
     const [label, kind] = STATUS[c.status] || [c.status, ''];
     return h('div', { class: 'post-head' },
-      h('span', { class: 'identity' }, h('span', { class: 'nm', text: me().name }), h('span', { class: 'meta', text: `@${me().slug}` }),
+      h('span', { class: 'identity' }, h('span', { class: 'nm', text: me().name }), h('span', { class: 'meta', text: `@${B.handle(me())}` }),
       h('span', { class: 'meta', text: `· ${ago(c.released_at || c.created_at) || 'new'}` })),
       h('span', { class: 'tag' }, c.platform_name),
       h('span', { class: 'end' }, extra || null, h('span', { class: `tag ${kind}` }, label)));

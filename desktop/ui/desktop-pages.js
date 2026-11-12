@@ -17,6 +17,7 @@
 .drop.over { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
 .kit-file .preview { color: var(--ink-3); font-size: var(--t-sm); white-space: pre-wrap; overflow: hidden; max-height: 4.5em; }
 .key-field input { font-family: var(--mono, ui-monospace, monospace); }
+html[data-host="desktop"] .shell { min-height: 100vh; }
 `;
   document.head.appendChild(css);
 
@@ -25,6 +26,10 @@
   const kitBtn = h('button', { class: 'navbtn', 'data-view': 'brandkit', 'data-icon': 'briefcase' }, icon('briefcase'), h('span', { class: 'lbl' }, 'Brand kit'));
   kitBtn.addEventListener('click', () => { Object.assign(B.state, { open: {}, why: null, menu: false, wnew: false, wstep: null, arming: null }); B.setDrawer(false); B.load({ view: 'brandkit' }); });
   topics.after(kitBtn);
+  // The API key page (Claude) has its own entry, so the sidebar marks it when it is open.
+  const keyBtn = h('button', { class: 'navbtn', 'data-view': 'apikey', 'data-icon': 'spark' }, icon('spark'), h('span', { class: 'lbl' }, 'Claude'));
+  keyBtn.addEventListener('click', () => { Object.assign(B.state, { open: {}, why: null, menu: false, wnew: false, wstep: null, arming: null }); B.setDrawer(false); B.load({ view: 'apikey' }); });
+  document.querySelector('.navbtn[data-view="settings"]').after(keyBtn);
   // The weekly coach runs in the plugin only, so the app has no Coach page. Proposals from
   // edits wait on the Playbook page.
   document.querySelector('.navbtn[data-view="coach"]')?.remove();
@@ -37,8 +42,10 @@
     if (!r) return;
     if (files && !r.results.length) return B.flash('Those files couldn\'t be read. Try Choose files instead.', 'bad');
     const ok = r.results.filter((x) => x.ok), bad = r.results.filter((x) => !x.ok);
-    if (bad.length) B.flash(bad.map((x) => `${x.name}: ${x.reason}`).join(' '), 'bad');
-    else if (ok.length) B.flash(`Added ${plural(ok.length, 'file')}.`, 'good');
+    const names = ok.map((x) => x.file && x.file.name).filter(Boolean);
+    const added = ok.length ? `Added ${plural(ok.length, 'file')}${ok.length < 4 && names.length ? ` (${names.join(', ')})` : ''}.` : '';
+    const msg = [added, ...bad.map((x) => `${x.name}: ${x.reason}`)].filter(Boolean).join(' ');
+    if (msg) B.flash(msg, bad.length ? (ok.length ? 'warn' : 'bad') : 'good');
     B.load({ view: 'brandkit' });
   }
 
@@ -123,6 +130,13 @@
     noPosting: () => true,
     noCoach: () => true,
     sourceKinds: () => ['site', 'reddit'],
+    firstRunSteps: () => ({
+      setup: { text: 'Three short steps: the brand, a few questions, and Claude’s drafts for you to keep or change.' },
+      schedule: { text: 'Pick when drafts arrive. The app reads and drafts on that schedule while it is open.' },
+    }),
+    // The handle follows the brand's name (the folder keeps its first slug).
+    handle: (p) => String(p.name || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/^[^a-z]+/, '').slice(0, 32).replace(/-+$/, '') || null,
     finishBody: () => ({ sub: 'The app runs it while it is open. Turn this on to have it read and draft by itself.', body: [autorunRow()] }),
   };
 

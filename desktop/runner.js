@@ -154,7 +154,9 @@ export function makeRunner({ ctx, model, kit, progress = () => {} }) {
       }));
       const r = wizardSave(c, { brief_id: b.brief_id, voice: out.voice, playbook: out.playbook, topics: out.topics, off_limits: out.off_limits, audience: out.audience, sources });
       if (!r.ok) throw new Error(r.message);
-      return { message: r.message };
+      // wizardSave's message is written for the plugin's model; the app shows this one.
+      const left = r.rejected && r.rejected.length ? ` ${plural(r.rejected.length, 'suggestion')} didn't fit and ${r.rejected.length === 1 ? 'was' : 'were'} left out.` : '';
+      return { message: `Claude drafted ${plural(r.added, 'suggestion')}${r.sources ? ` and ${plural(r.sources, 'source')}` : ''}. Keep, edit or drop each one below.${left}` };
     }),
   };
 }
